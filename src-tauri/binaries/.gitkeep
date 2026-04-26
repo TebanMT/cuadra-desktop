@@ -1,0 +1,8 @@
+Place sidecar binaries here with target-triple suffix:
+
+  cuadra-sidecar-x86_64-pc-windows-msvc.exe
+  cuadra-sidecar-aarch64-apple-darwin
+  cuadra-sidecar-x86_64-apple-darwin
+
+These are produced by `cuadra-core/cmd/sidecar` (build tag: sidecar).
+This directory is gitignored except for this file.
