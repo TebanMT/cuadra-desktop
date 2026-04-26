@@ -1,6 +1,6 @@
 # cuadra-desktop — IMPLEMENTATION NOTES
 
-Notas técnicas y deuda conocida tras la **Sesión 1**. Léelo antes de continuar con sesiones siguientes.
+Notas técnicas y deuda conocida tras las sesiones 1-5. Léelo antes de continuar con sesiones siguientes.
 
 ## TODOs (sesiones futuras)
 
@@ -16,6 +16,60 @@ Notas técnicas y deuda conocida tras la **Sesión 1**. Léelo antes de continua
 - [ ] **SIGTERM antes de SIGKILL**: el plugin `tauri-plugin-shell` solo expone `child.kill()` (envía SIGKILL en Unix). Para shutdown grace de 5s, hay que (a) agregar un endpoint `/_internal/shutdown` en el sidecar que dispare cleanup y luego `os.Exit`, o (b) bajar a `std::process::Command` directo en Rust. Por ahora `sidecar.rs` espera 5s después del kill, lo cual es suboptimo pero seguro.
 - [ ] **Sentry**: ADR-003 §2.9 menciona Sentry para frontend y sidecar. No instalado en MVP — agregar antes del primer release.
 - [ ] **Auto-i18n**: strings centralizadas en `src/strings/` para futura migración a `i18next` o similar. No urgente.
+
+## Sesión 5 — Check-in (UC-028 a UC-032)
+
+### Contratos de backend asumidos por el FE
+El sidecar `cuadra-core` debe exponer estos endpoints (se pueden mockear hasta su implementación; el FE usa shapes optimistas):
+
+- `GET /api/v1/biometric/status` → `{ available: boolean, reader: { model, vendor, connected } | null }`. Polling cada 5s desde `useBiometricStatus`.
+- `GET /api/v1/checkins/methods` → `{ fingerprint_available, pin_available, manual_available }`. Auto-adaptación de métodos en kiosko (DA-32.4); polling cada 15s.
+- `GET /api/v1/checkins?limit=5` → `{ items: CheckinEvent[] }` para sidebar "Últimos ingresos".
+- `GET /api/v1/checkins/count-today` → `{ count_today: number }` para contador del kiosko.
+- `POST /api/v1/checkins/manual` body `{ member_id }` → `CheckinEvent` (UC-030).
+- `POST /api/v1/checkins/pin` body `{ pin }` → `CheckinEvent` (UC-032). El sidecar aplica el lock de 60s tras 5 intentos fallidos.
+- `POST /api/v1/checkins/override` body `{ member_id, reason, original_checkin_id? }` → `CheckinEvent` con `manual_override=true` (UC-029 DA-29.2).
+- `GET /api/v1/kiosk/events?cursor=&timeout_ms=25000` long-poll → `{ events: KioskEventEnvelope[], cursor }`. El FE re-emite cursor en cada vuelta. Eventos: `attempt_started`, `checkin_result`, `reader_connected`, `reader_disconnected`.
+- `POST /api/v1/members/:id/fingerprint/start` → `{ session_id, captures_total }` (UC-028).
+- `GET /api/v1/members/:id/fingerprint/progress?session_id=` → `FingerprintProgress` con `status: idle|waiting|capturing|success|failed`, `captures_done`, `captures_total`. El FE long-pollea cada 500ms.
+- `POST /api/v1/auth/verify-password` body `{ password }` → 200/401 para gating del exit del modo kiosko (`Ctrl+Shift+K`). No emite token nuevo.
+
+`CheckinEvent` shape:
+```ts
+{
+  id: string;
+  result: "allowed_active" | "allowed_expiring_soon" | "denied_expired" |
+          "denied_inactive" | "denied_no_membership" | "denied_not_found";
+  method: "fingerprint" | "pin" | "manual";
+  member_id: string | null;
+  member_name: string | null;
+  expiry_date: string | null;
+  days_until_expiry: number | null;
+  manual_override: boolean;
+  override_reason?: string | null;
+  operator_name?: string | null;
+  created_at: string;
+}
+```
+
+### Audio sin assets binarios
+El prompt sugería `public/audio/checkin-{success|warning|denied}.mp3`. En vez de eso `src/lib/audio.ts` sintetiza los 3 tonos con Web Audio API (estilo zzfx, también permitido por el prompt). Razones: (a) evita binarios sin licencia clara en el repo, (b) sin red ni assets que cargar (offline-first), (c) volumen y forma de onda configurables sin re-encodear. Si en V1+ se prefieren MP3 reales, se reemplaza la implementación de `playCheckinTone()` sin tocar callers. La integración con la opción de volumen del kiosko (DA-31.2, default 80%) usa el segundo argumento de `playCheckinTone(tone, volume)` — falta exponer el slider en Settings.
+
+### Decisiones específicas
+- **Detección de huella ↔ kiosk events:** la página de check-in (no fullscreen) también suscribe a `/kiosk/events` cuando hay lector conectado. Esto deja al operador trabajar en otras tabs sin perder eventos del lector — el sidecar es el dueño del loop de captura (ADR-004 §3.8).
+- **Override flow:** disparado con tecla `O` cuando el último resultado fue denied y tiene `member_id`. No se ofrece override para `denied_not_found` (no hay socio sobre el cual aplicar). Reason obligatoria, mínimo 5 caracteres.
+- **Exit del kiosko:** `Ctrl+Shift+K` abre modal de password. No hay botón visible (DA-31.1). Falla silenciosa de password (mensaje genérico).
+- **Auto-fade de feedback:** 5s hardcoded vía `useAutoFade`. Cuando se exponga la opción en Settings (DA-29.3 — 3-10s configurable), pasarlo como prop a CheckinPage/KioskPage.
+- **Banner de lector desconectado:** badge ámbar en TopBar (visible siempre que el sidecar reporte `available && !connected`). En el kiosko fullscreen aparece como pill arriba derecha.
+- **PIN pad teclable:** acepta input numérico del teclado físico además de los botones (DA-32.4 implícito — el dueño/operador puede usar PIN sin touch).
+- **`useCheckinMethods` en lugar de derivar de la lista de socios:** evita pull de toda la lista solo para chequear `has_pin`. El backend debe responder con un boolean cacheable.
+
+### Pendiente para sesiones futuras
+- [ ] Integrar volumen configurable del audio (Settings → kiosko volume slider, DA-31.2).
+- [ ] Hacer el auto-fade configurable (3-10s, DA-29.3) — leer de `gym.kiosk_settings.feedback_ttl_ms`.
+- [ ] Settings → Privacidad → "Mis datos biométricos" (ADR-006 §7): contador de socios con huella + botón "Borrar todas".
+- [ ] Botón "Borrar mi huella" en detalle de socio (ADR-006 §6, soft-delete).
+- [ ] Tauri: invocar `tauri::WindowBuilder` con `fullscreen: true` cuando se entre a `/kiosk`. Hoy se usa CSS fullscreen — funciona en browser y dentro del webview, pero no oculta la barra del SO.
 
 ## Decisiones tomadas
 

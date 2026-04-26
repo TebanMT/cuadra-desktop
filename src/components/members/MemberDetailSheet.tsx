@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from "react";
-import { Loader2, Mail, Phone, Pencil, BadgeMinus, BadgeCheck, KeyRound, DollarSign, Lock, Wallet } from "lucide-react";
+import { Loader2, Mail, Phone, Pencil, BadgeMinus, BadgeCheck, KeyRound, DollarSign, Lock, Wallet, Fingerprint } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -14,16 +14,19 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useMember } from "@/hooks/useMembers";
 import { useHotkeys } from "@/hooks/useHotkeys";
+import { useBiometricStatus } from "@/hooks/useBiometric";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { usePaymentHistory, fmtMoney } from "@/hooks/useBilling";
 import { fmtDate, daysFromToday } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { members as t } from "@/strings/members";
 import { billing as bt } from "@/strings/billing";
+import { checkin as ct } from "@/strings/checkin";
 import { MemberEditDialog } from "./MemberEditDialog";
 import { MemberStatusModal } from "./MemberStatusModal";
 import { LockExpiryModal } from "./LockExpiryModal";
 import { AssignPinModal } from "./AssignPinModal";
+import { RegisterFingerprintModal } from "./RegisterFingerprintModal";
 import { PaymentModal } from "@/components/billing/PaymentModal";
 import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
 import { PaymentHistory } from "@/components/billing/PaymentHistory";
@@ -51,6 +54,9 @@ export function MemberDetailSheet({ memberId, onClose }: Props) {
   const [pinOpen, setPinOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
+  const [fpOpen, setFpOpen] = useState(false);
+  const bio = useBiometricStatus(open);
+  const fingerprintAvailable = !!bio.data?.reader?.connected;
 
   const member = detail.data?.member;
   const membership = detail.data?.current_membership;
@@ -79,7 +85,7 @@ export function MemberDetailSheet({ memberId, onClose }: Props) {
   );
   useHotkeys(
     hotkeyHandlers,
-    open && !editOpen && !statusOpen && !lockOpen && !pinOpen && !payOpen && !settleOpen
+    open && !editOpen && !statusOpen && !lockOpen && !pinOpen && !payOpen && !settleOpen && !fpOpen
   );
 
   const handleOpenChange = useCallback(
@@ -246,6 +252,12 @@ export function MemberDetailSheet({ memberId, onClose }: Props) {
                     <KeyRound className="h-4 w-4" />
                     {t.detail.actions.assignPin}
                   </Button>
+                  {fingerprintAvailable && (
+                    <Button variant="outline" onClick={() => setFpOpen(true)}>
+                      <Fingerprint className="h-4 w-4" />
+                      {ct.fingerprint.triggerLabel}
+                    </Button>
+                  )}
                 </div>
                 <Button variant="outline" onClick={() => setStatusOpen(true)}>
                   {member.status === "active" ? (
@@ -295,6 +307,12 @@ export function MemberDetailSheet({ memberId, onClose }: Props) {
             memberName={member.full_name}
             open={pinOpen}
             onOpenChange={setPinOpen}
+          />
+          <RegisterFingerprintModal
+            memberId={member.id}
+            memberName={member.full_name}
+            open={fpOpen}
+            onOpenChange={setFpOpen}
           />
           <PaymentModal
             member={member}

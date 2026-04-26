@@ -1,0 +1,106 @@
+export const checkin = {
+  page: {
+    title: "Check-in",
+    searchPlaceholder: "Buscar socio por nombre o teléfono…",
+    searchEmpty: "No encontré a nadie. Revisa el nombre.",
+    searching: "Buscando…",
+    typeAtLeast: "Escribe al menos 2 letras.",
+    operator: (name: string) => `Operador: ${name}`,
+    openKiosk: "Modo kiosko",
+    todayCount: (n: number) => `Check-ins hoy: ${n}`,
+    recent: "Últimos ingresos",
+    recentEmpty: "Aún no hay ingresos hoy.",
+    methods: {
+      fingerprint: "Huella",
+      pin: "PIN",
+      manual: "Buscar",
+    },
+    overridePrompt: "Presiona O para permitir entrada de todos modos.",
+  },
+  feedback: {
+    idle: "Coloca tu huella en el lector para ingresar.",
+    idleNoReader: "Busca al socio o pídele su PIN.",
+    processing: "Identificando…",
+    successActive: (days: number) =>
+      days === 1 ? "Mensualidad vigente — vence mañana" : `Mensualidad vigente — vence en ${days} días`,
+    successExpiringSoon: (days: number) =>
+      days === 0
+        ? "¡Atención! Vence hoy. Pasa con recepción para renovar."
+        : days === 1
+        ? "¡Atención! Vence mañana. Pasa con recepción para renovar."
+        : `¡Atención! Vence en ${days} días. Pasa con recepción para renovar.`,
+    deniedExpired: (days: number) =>
+      days === 1
+        ? "Membresía vencida hace 1 día. Pasa con recepción."
+        : `Membresía vencida hace ${days} días. Pasa con recepción.`,
+    deniedInactive: "Socio inactivo. Pasa con recepción.",
+    deniedNoMembership: "Sin membresía activa. Pasa con recepción.",
+    deniedNotFound: "No encontré a este socio. Vuelve a intentar.",
+    overrideBadge: "Permitido por operador",
+  },
+  pinPad: {
+    title: "Pon tu PIN para entrar",
+    backspace: "Borrar",
+    submit: "Entrar",
+    locked: (seconds: number) => `Demasiados intentos. Espera ${seconds} segundos.`,
+    invalid: "PIN incorrecto. Vuelve a intentar.",
+  },
+  override: {
+    triggerHint: "O — permitir de todos modos",
+    title: (name: string) => `¿Permitir entrada a ${name}?`,
+    description: "Quedará registrado en el historial.",
+    reasonLabel: "Motivo (obligatorio)",
+    reasonPlaceholder: "Ej. Vino a pagar después; renovó por WhatsApp; cortesía",
+    reasonRequired: "Escribe un motivo (mínimo 5 caracteres).",
+    submit: "Permitir entrada",
+    cancel: "Cancelar",
+    success: (name: string) => `Entrada permitida para ${name}.`,
+  },
+  kiosk: {
+    title: "Cuadra — Kiosko",
+    waiting: "Coloca tu huella en el lector",
+    waitingPin: "Pon tu PIN o coloca tu huella",
+    waitingNoReader: "Pon tu PIN para entrar",
+    sync: "Sincronizado",
+    exitTitle: "Salir del modo kiosko",
+    exitDescription: "Para salir, escribe la contraseña del operador.",
+    exitPasswordLabel: "Contraseña",
+    exitSubmit: "Salir",
+    exitCancel: "Cancelar",
+    exitWrongPassword: "Contraseña incorrecta.",
+    exitHint: "Atajo: Ctrl + Shift + K",
+  },
+  fingerprint: {
+    triggerLabel: "Registrar huella",
+    triggerLabelHas: "Volver a registrar huella",
+    title: (name: string) => `Registrar huella de ${name}`,
+    consentTitle: "Antes de registrar tu huella",
+    consentBody: [
+      "Tu huella se usa solo para que entres al gym sin tener que dar tu nombre o tu PIN.",
+      "Se guarda encriptada en la computadora del gym.",
+      "También se respalda encriptada en la nube de Cuadra.",
+      "Nadie puede ver la imagen de tu huella — solo un código matemático que sirve para identificarte.",
+      "Puedes pedir que la borren cuando quieras.",
+    ],
+    consentAccept: "Sí, acepto",
+    consentCheckbox: "Acepto que se registre mi huella en estos términos.",
+    instruction: "Coloca tu dedo en el lector. Te lo voy a pedir 3 veces.",
+    capturesLabel: (done: number, total: number) => `Capturas: ${done} de ${total}`,
+    start: "Empezar",
+    cancel: "Cancelar",
+    success: "Huella registrada.",
+    errorReader: "No detecto el lector de huella. Conéctalo y vuelve a intentar.",
+    errorCapture: "No pude leer bien tu huella. Intenta otra vez.",
+    errorGeneric: "No pudimos registrar la huella. Vuelve a intentar.",
+    waitingPlace: "Esperando dedo en el lector…",
+    capturing: (n: number) => `Captura ${n} en proceso…`,
+  },
+  reader: {
+    disconnectedBanner: "Lector de huella desconectado. Usa búsqueda manual o PIN.",
+  },
+  audio: {
+    success: "/audio/checkin-success.mp3",
+    warning: "/audio/checkin-warning.mp3",
+    denied: "/audio/checkin-denied.mp3",
+  },
+};

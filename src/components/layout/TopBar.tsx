@@ -1,4 +1,4 @@
-import { LogOut, User } from "lucide-react";
+import { LogOut, User, Fingerprint } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -10,15 +10,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLogout } from "@/hooks/useAuth";
+import { useBiometricStatus } from "@/hooks/useBiometric";
 import { SyncIndicator } from "./SyncIndicator";
 import { Badge } from "@/components/ui/badge";
 import { shell } from "@/strings/shell";
+import { checkin as ct } from "@/strings/checkin";
 
 export function TopBar() {
   const user = useAuthStore((s) => s.user);
   const gym = useAuthStore((s) => s.gym);
   const readOnly = useAuthStore((s) => s.readOnly);
   const logout = useLogout();
+  const bio = useBiometricStatus();
+  const readerDisconnected = bio.data?.available === true && !bio.data?.reader?.connected;
 
   const initials = (user?.full_name || "?")
     .split(" ")
@@ -32,6 +36,16 @@ export function TopBar() {
       <div className="flex items-center gap-3">
         <div className="font-semibold text-base">{gym?.name || "Tu gym"}</div>
         {readOnly && <Badge variant="warning">Solo lectura</Badge>}
+        {readerDisconnected && (
+          <Badge
+            variant="warning"
+            className="gap-1.5"
+            title={ct.reader.disconnectedBanner}
+          >
+            <Fingerprint className="h-3.5 w-3.5" />
+            <span className="hidden md:inline">{ct.reader.disconnectedBanner}</span>
+          </Badge>
+        )}
       </div>
 
       <div className="flex items-center gap-2">

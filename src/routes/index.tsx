@@ -16,6 +16,8 @@ import MembershipTypesPage from "@/pages/settings/MembershipTypes";
 import ProductsPage from "@/pages/products/ProductsPage";
 import QuickSalePage from "@/pages/sales/QuickSalePage";
 import CashClosePage from "@/pages/reports/CashClosePage";
+import CheckinPage from "@/pages/checkin/CheckinPage";
+import KioskPage from "@/pages/kiosk/KioskPage";
 
 const placeholder = (label: string) => () =>
   (
@@ -26,7 +28,6 @@ const placeholder = (label: string) => () =>
   );
 
 const Billing = placeholder("Cobros");
-const Checkin = placeholder("Check-in");
 
 export const router = createBrowserRouter([
   {
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
       { path: "/setup/step-3", element: <Step3FirstPlan /> },
       { path: "/setup/step-4", element: <Step4PaymentMethods /> },
       { path: "/setup/step-5", element: <Step5Done /> },
+      { path: "/kiosk", element: <KioskPage /> },
       {
         element: <DashboardLayout />,
         children: [
@@ -53,7 +55,7 @@ export const router = createBrowserRouter([
           { path: "billing", element: <Billing /> },
           { path: "products", element: <ProductsPage /> },
           { path: "sales", element: <QuickSalePage /> },
-          { path: "checkin", element: <Checkin /> },
+          { path: "checkin", element: <CheckinPage /> },
           { path: "reports", element: <CashClosePage /> },
           { path: "reports/cash-close", element: <CashClosePage /> },
           { path: "settings", element: <SettingsIndex /> },
