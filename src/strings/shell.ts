@@ -3,6 +3,7 @@ export const shell = {
     dashboard: "Dashboard",
     members: "Socios",
     billing: "Cobros",
+    sales: "Venta rápida",
     products: "Productos",
     checkin: "Check-in",
     reports: "Reportes",
