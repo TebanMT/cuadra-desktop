@@ -1,6 +1,7 @@
 export const shell = {
   nav: {
     dashboard: "Dashboard",
+    attention: "Atención",
     members: "Socios",
     billing: "Cobros",
     sales: "Venta rápida",

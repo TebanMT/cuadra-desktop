@@ -10,7 +10,7 @@ export function useSidecarUrl() {
 
   useEffect(() => {
     let cancelled = false;
-    let cleanups: Array<() => void> = [];
+    const cleanups: Array<() => void> = [];
 
     (async () => {
       try {

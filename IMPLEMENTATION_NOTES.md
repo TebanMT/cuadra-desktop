@@ -1,6 +1,6 @@
 # cuadra-desktop — IMPLEMENTATION NOTES
 
-Notas técnicas y deuda conocida tras las sesiones 1-5. Léelo antes de continuar con sesiones siguientes.
+Notas técnicas y deuda conocida tras las sesiones 1-6. Léelo antes de continuar con sesiones siguientes.
 
 ## TODOs (sesiones futuras)
 
@@ -16,6 +16,76 @@ Notas técnicas y deuda conocida tras las sesiones 1-5. Léelo antes de continua
 - [ ] **SIGTERM antes de SIGKILL**: el plugin `tauri-plugin-shell` solo expone `child.kill()` (envía SIGKILL en Unix). Para shutdown grace de 5s, hay que (a) agregar un endpoint `/_internal/shutdown` en el sidecar que dispare cleanup y luego `os.Exit`, o (b) bajar a `std::process::Command` directo en Rust. Por ahora `sidecar.rs` espera 5s después del kill, lo cual es suboptimo pero seguro.
 - [ ] **Sentry**: ADR-003 §2.9 menciona Sentry para frontend y sidecar. No instalado en MVP — agregar antes del primer release.
 - [ ] **Auto-i18n**: strings centralizadas en `src/strings/` para futura migración a `i18next` o similar. No urgente.
+
+## Sesión 6 — Reports + Settings + Operadores + Notifications (UC-005, UC-006-010, UC-033-041)
+
+### Endpoints asumidos por el FE
+Optimistic shapes; el sidecar/cloud tiene que exponerlos. Si cambian, ajustar los hooks correspondientes:
+
+**Reports / dashboard**
+- `GET /api/v1/dashboard` → `DashboardData` con KPIs, ingresos 30d, attention summary, recent payments, caja del día.
+- `GET /api/v1/attention-required` → 6 categorías: expiring_soon, expired_recoverable, inactive_involuntary, low_stock, pending_balance, birthdays_today (UC-034).
+- `GET /api/v1/reports?period=today|week|month|last_month|3_months|year` → `ReportsRangeData` con totals, income/checkins by day, top members, recent payments, by method.
+- `GET /api/v1/reports/{type}/export?format=pdf|xlsx&period=...` → blob (UC-036). El FE lo descarga vía `downloadBlob()` (anchor + ObjectURL — no usa Tauri save dialog para mantenerlo cross-platform y simple).
+
+**Members / persecución (UC-035)**
+- `POST /api/v1/members/{id}/contact-attempts` body `{ channel, note? }` → `{ id, created_at }`.
+- `POST /api/v1/members/{id}/mark-lost` body `{ reason? }` → `{ ok }`.
+
+**Gym profile (UC-005)**
+- `GET /api/v1/gyms/me` → `GymProfile` extendido (rfc, legal_name, postal_code, tax_regime, logo_url, primary/secondary color, open/close_time, kiosk_volume, kiosk_feedback_ttl_ms).
+- `PATCH /api/v1/gyms/me` → mismo shape, partial.
+- `POST /api/v1/gyms/me/transfer-ownership/start` body `{ target_user_id }` → `{ expires_at }` (envía OTP por email).
+- `POST /api/v1/gyms/me/transfer-ownership` body `{ target_user_id, otp }` → `{ ok }` (UC-010).
+
+**Operadores (UC-006-009)**
+- `GET /api/v1/users?include_inactive=true` → `{ items: Operator[] }`.
+- `POST /api/v1/users` → `{ user, generated_password }` (si el FE manda la password, `generated_password=null`; el server respeta o regenera).
+- `PATCH /api/v1/users/{id}` → `Operator`.
+- `PATCH /api/v1/users/{id}/active` body `{ active }` → `Operator`.
+- `POST /api/v1/users/{id}/reset-password` → `{ user_id, new_password }`. Frontend muestra modal one-shot con la password.
+
+**Notifications**
+- `GET /api/v1/gyms/me/whatsapp` → `WhatsappState` con status + stats 30d.
+- `POST /api/v1/gyms/me/whatsapp/start` body `{ phone_number }` → `{ expires_at }` (envía OTP por WhatsApp).
+- `POST /api/v1/gyms/me/whatsapp/connect` body `{ phone_number, code }` → `WhatsappState`.
+- `DELETE /api/v1/gyms/me/whatsapp` → `{ ok }`.
+- `GET /api/v1/notification-templates` → `{ items: NotificationTemplate[] }`.
+- `PATCH /api/v1/notification-templates/{key}` body `{ body?, enabled? }` → `NotificationTemplate`.
+- `POST /api/v1/notification-templates/{key}/reset` → `NotificationTemplate` (vuelve a default).
+- `GET /api/v1/owner-alerts` → `{ items: AlertConfig[] }`.
+- `PATCH /api/v1/owner-alerts/{key}` body `{ enabled }` → `AlertConfig`.
+- `GET /api/v1/broadcasts/preview?audience=...` → `{ recipients_count, sample_phones }`.
+- `POST /api/v1/broadcasts` body `{ audience, body }` → `{ broadcast_id, recipients_count, enqueued_at }`.
+
+**Audit log (UC-005 DA-5.1)**
+- `GET /api/v1/audit-log?entity_type=&actor_id=&from=&to=&page=&page_size=` → paginado, gated por `role==='owner'` en el FE (servidor también debe enforcear).
+
+### Decisiones específicas
+
+- **Charts vía `recharts` (3.x)**. Es la opción más probada para dashboards simples; pesa pero solo se carga en Dashboard/Reports. Bundle final ~1.3MB minified — aceptable para desktop. Si crece, code-splittear `recharts` por route.
+- **Slider** agregado como UI primitive (`@radix-ui/react-slider`) para volumen del kiosko y duración del feedback (DA-31.2 / DA-29.3 quedan satisfechas con esta UI; el sidecar debe leer `gym.kiosk_volume` y `gym.kiosk_feedback_ttl_ms` al iniciar el kiosko — pendiente integración).
+- **Exports PDF/XLSX**: implementado como `api.blob()` + `downloadBlob()` (anchor synthesizado). Razón: funciona idéntico en Tauri webview y dev sin pedir permiso de FS. El nombre de archivo usa `Content-Disposition` del backend si está, si no fallback a `reporte-{period}-{from}_{to}.{ext}`.
+- **Transfer ownership**: dos pasos — start (envía OTP a email del owner actual) → confirm con OTP. Tras éxito, se hace `window.location.reload()` para que la app re-hidrate la sesión con el rol nuevo. Backend debe invalidar refresh tokens del que dejó de ser owner para forzar re-login con permisos reducidos (DA-10.1).
+- **Operator passwords**: charset `abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789` (DA-6.1, sin confusos). Generación client-side vía `crypto.getRandomValues()`. La password se muestra una vez en modal y luego se borra del estado.
+- **Hard limit operadores**: 10 (DA-6.2). El FE blockea el botón "Agregar" si `activeCount >= 10`. Soft warning a partir de 5.
+- **Templates editor**: live preview reemplazando variables con sample data hardcoded. Las variables son tipadas por `TEMPLATE_VARIABLES[key]`. Click en variable la pega al final del body. Toggle activo/desactivo coexiste con el body editable.
+- **AlertsPage**: solo toggles on/off por tipo (DA-40.1). El UI espera 5 keys: `low_stock`, `expired_no_contact`, `vip_member_no_visit`, `cash_close_diff`, `no_payments_today`. Si el backend devuelve keys adicionales, se renderizan con `cfg.description` como fallback (degradación graceful).
+- **BroadcastPage**: `useBroadcastPreview()` cachea recipients_count por audience 15s para evitar rehit en cada keystroke del body. Confirmación bloqueada si WhatsApp no está conectado o `recipients_count === 0`.
+- **AuditLogPage**: gate de `role==='owner'` en cliente (también server-side). No se permite editar registros — solo lectura. JSON pretty-printed en `<pre>`. Filtros usan key `_all` como sentinela porque Radix Select no permite empty value.
+- **Variables WhatsApp**: el preview en `TemplatesPage` y `BroadcastPage` reemplaza `{gym_name}` con el nombre real del gym desde `useAuthStore`, el resto con sample data. Esto comunica al owner cómo se verá realmente sin mockear datos del backend.
+- **YouTube placeholder en WhatsAppSetupPage**: usa `youtube-nocookie.com` con un video ID placeholder (Rick Roll 😅). Reemplazar con video real de onboarding antes del release (DA-37.2).
+
+### Pendiente para sesiones futuras
+
+- [ ] `auth/change-password` route — sigue pendiente (UC-006 flujo first-login). Necesario para que un operador recién creado pueda cambiar su temp password sin pasar por owner.
+- [ ] **Logo upload a S3/R2**: `useUploadGymLogo` en `useGym.ts` está stubbed (FormData → `POST /api/v1/gyms/me/logo`). Falta wirar el endpoint y actualizar `logo_url` en el form. El campo actual acepta solo URL externa — limitación temporal.
+- [ ] **Rate limit en transfer ownership**: el FE no enforza throttle de re-envío de OTP. Si el server lo impone, el toast genérico sale; UX más fina sería un cooldown timer visible.
+- [ ] **WhatsApp connect provider real**: hoy es UI-only contra endpoint hipotético. Cuando llegue Twilio/Meta integration (ADR-007 hipotético), validar que el shape de `WhatsappState.stats` coincida.
+- [ ] **Code-splitting de Reports/Dashboard**: el bundle pesa ~1.3MB por incluir Recharts. Si los socios sin permisos no necesitan ver Reports, hacer `lazy()` para no cargar.
+- [ ] **`Cuadra Desktop completo end-to-end`**: smoke test manual completo (ver Quality Gates en el prompt) requiere sidecar real corriendo. Hoy solo verificado a nivel de typecheck/lint/build/tests.
+- [ ] **Audit log "old vs new"**: la UI muestra `changes` como JSON crudo. Una iteración sería diff visual (chips de keys, before/after lado a lado). Out-of-scope MVP.
+- [ ] **i18n del nuevo copy**: las strings nuevas viven en `src/strings/{dashboard,attention,reports,settings,messaging}.ts`. Mismo patrón que sesiones previas — listas para migración a i18next sin esfuerzo.
 
 ## Sesión 5 — Check-in (UC-028 a UC-032)
 

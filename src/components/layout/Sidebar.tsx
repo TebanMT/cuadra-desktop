@@ -1,6 +1,7 @@
 import { NavLink } from "react-router-dom";
 import {
   BarChart3,
+  Bell,
   CreditCard,
   LayoutDashboard,
   LogIn as Door,
@@ -18,6 +19,7 @@ import { Button } from "@/components/ui/button";
 
 const NAV = [
   { to: "/", icon: LayoutDashboard, label: shell.nav.dashboard, end: true },
+  { to: "/attention-required", icon: Bell, label: shell.nav.attention },
   { to: "/members", icon: Users, label: shell.nav.members },
   { to: "/billing", icon: CreditCard, label: shell.nav.billing },
   { to: "/sales", icon: ShoppingCart, label: shell.nav.sales },

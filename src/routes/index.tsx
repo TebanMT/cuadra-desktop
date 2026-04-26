@@ -9,15 +9,24 @@ import Step2GymInfo from "@/pages/setup-wizard/Step2GymInfo";
 import Step3FirstPlan from "@/pages/setup-wizard/Step3FirstPlan";
 import Step4PaymentMethods from "@/pages/setup-wizard/Step4PaymentMethods";
 import Step5Done from "@/pages/setup-wizard/Step5Done";
-import Dashboard from "@/pages/shell/Dashboard";
+import DashboardPage from "@/pages/dashboard/DashboardPage";
+import AttentionRequiredPage from "@/pages/dashboard/AttentionRequiredPage";
 import MembersPage from "@/pages/members/MembersPage";
 import SettingsIndex from "@/pages/settings/SettingsIndex";
 import MembershipTypesPage from "@/pages/settings/MembershipTypes";
+import GymProfilePage from "@/pages/settings/GymProfilePage";
+import OperatorsPage from "@/pages/settings/OperatorsPage";
+import WhatsAppSetupPage from "@/pages/settings/WhatsAppSetupPage";
+import TemplatesPage from "@/pages/settings/TemplatesPage";
+import AlertsPage from "@/pages/settings/AlertsPage";
 import ProductsPage from "@/pages/products/ProductsPage";
 import QuickSalePage from "@/pages/sales/QuickSalePage";
 import CashClosePage from "@/pages/reports/CashClosePage";
+import ReportsPage from "@/pages/reports/ReportsPage";
 import CheckinPage from "@/pages/checkin/CheckinPage";
 import KioskPage from "@/pages/kiosk/KioskPage";
+import BroadcastPage from "@/pages/messaging/BroadcastPage";
+import AuditLogPage from "@/pages/admin/AuditLogPage";
 
 const placeholder = (label: string) => () =>
   (
@@ -50,16 +59,24 @@ export const router = createBrowserRouter([
       {
         element: <DashboardLayout />,
         children: [
-          { index: true, element: <Dashboard /> },
+          { index: true, element: <DashboardPage /> },
+          { path: "attention-required", element: <AttentionRequiredPage /> },
           { path: "members", element: <MembersPage /> },
           { path: "billing", element: <Billing /> },
           { path: "products", element: <ProductsPage /> },
           { path: "sales", element: <QuickSalePage /> },
           { path: "checkin", element: <CheckinPage /> },
-          { path: "reports", element: <CashClosePage /> },
+          { path: "reports", element: <ReportsPage /> },
           { path: "reports/cash-close", element: <CashClosePage /> },
           { path: "settings", element: <SettingsIndex /> },
+          { path: "settings/gym", element: <GymProfilePage /> },
           { path: "settings/membership-types", element: <MembershipTypesPage /> },
+          { path: "settings/operators", element: <OperatorsPage /> },
+          { path: "settings/whatsapp", element: <WhatsAppSetupPage /> },
+          { path: "settings/templates", element: <TemplatesPage /> },
+          { path: "settings/alerts", element: <AlertsPage /> },
+          { path: "messaging/broadcast", element: <BroadcastPage /> },
+          { path: "admin/audit-log", element: <AuditLogPage /> },
         ],
       },
     ],
