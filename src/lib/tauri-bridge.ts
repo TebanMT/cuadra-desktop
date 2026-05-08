@@ -36,7 +36,7 @@ export async function getLocalAuthToken(): Promise<string> {
 
 export async function secureStorageSet(key: string, value: string): Promise<void> {
   if (!isTauri()) {
-    localStorage.setItem(`cuadra:${key}`, value);
+    localStorage.setItem(`tinta:${key}`, value);
     return;
   }
   const invoke = await getInvoke();
@@ -45,7 +45,7 @@ export async function secureStorageSet(key: string, value: string): Promise<void
 
 export async function secureStorageGet(key: string): Promise<string | null> {
   if (!isTauri()) {
-    return localStorage.getItem(`cuadra:${key}`);
+    return localStorage.getItem(`tinta:${key}`);
   }
   const invoke = await getInvoke();
   const v = await invoke("secure_storage_get", { key });
@@ -54,7 +54,7 @@ export async function secureStorageGet(key: string): Promise<string | null> {
 
 export async function secureStorageDelete(key: string): Promise<void> {
   if (!isTauri()) {
-    localStorage.removeItem(`cuadra:${key}`);
+    localStorage.removeItem(`tinta:${key}`);
     return;
   }
   const invoke = await getInvoke();

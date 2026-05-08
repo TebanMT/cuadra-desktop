@@ -72,9 +72,11 @@ export default function Login() {
 
   return (
     <AuthShell>
-      <div className="space-y-2 mb-8">
-        <h1 className="text-3xl">{auth.login.title}</h1>
-        <p className="text-muted-foreground">{auth.login.subtitle}</p>
+      <div className="space-y-1 mb-8 text-center">
+        <h1 className="font-display text-3xl font-semibold text-foreground tracking-tight">
+          Bienvenido de vuelta.
+        </h1>
+        <p className="text-muted-foreground">Entra a tu Tinta.</p>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-5">
@@ -134,6 +136,13 @@ export default function Login() {
         <Button type="submit" size="lg" className="w-full" disabled={login.isPending}>
           {login.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : auth.login.submit}
         </Button>
+
+        <p className="text-center text-sm text-muted-foreground">
+          ¿No tienes cuenta?{" "}
+          <Link to="/auth/signup" className="text-primary hover:underline font-medium">
+            Crea la tuya
+          </Link>
+        </p>
       </form>
 
       <Dialog open={trialModal} onOpenChange={setTrialModal}>

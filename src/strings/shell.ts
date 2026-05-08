@@ -14,6 +14,12 @@ export const shell = {
     logout: "Cerrar sesión",
     profile: "Mi perfil",
   },
+  theme: {
+    toggle: "Cambiar tema",
+    light: "Modo claro",
+    dark: "Modo noche",
+    system: "Seguir al sistema",
+  },
   sync: {
     online: "Sincronizado",
     syncing: "Sincronizando…",
@@ -25,5 +31,6 @@ export const shell = {
     lastError: "Último error",
     never: "Nunca",
     none: "Ninguno",
+    triggerNow: "Sincronizar ahora",
   },
 };

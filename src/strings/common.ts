@@ -1,5 +1,5 @@
 export const common = {
-  appName: "Cuadra",
+  appName: "Tinta",
   loading: "Cargando…",
   cancel: "Cancelar",
   save: "Guardar",
@@ -11,8 +11,8 @@ export const common = {
   errorBody: "Vuelve a intentarlo en un momento. Si sigue, contacta a soporte.",
   reportSupport: "Reportar a soporte",
   sidecarFailed: {
-    title: "Cuadra está reiniciando…",
+    title: "Tinta está reiniciando…",
     body: "Estamos restableciendo el motor local. Si esto se queda así por más de 30 segundos, contacta a soporte.",
-    quit: "Cerrar Cuadra",
+    quit: "Cerrar Tinta",
   },
 };

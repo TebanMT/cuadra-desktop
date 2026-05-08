@@ -29,11 +29,16 @@ export default function CashClosePage() {
   const isYesterday = date === fmtIso(subDays(new Date(), 1));
 
   return (
-    <div className="p-8 space-y-6 max-w-5xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t.page.title}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-1">
+          <h1
+            className="text-3xl font-bold text-foreground"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            {t.page.title}
+          </h1>
+          <p className="text-sm text-muted-foreground">
             {fmtDate(date)}
             {isToday && ` · ${t.page.today}`}
             {isYesterday && ` · ${t.page.yesterday}`}
@@ -46,7 +51,7 @@ export default function CashClosePage() {
           <Input
             id="cc-date"
             type="date"
-            className="h-9 w-44"
+            className="h-10 w-44"
             value={date}
             onChange={(e) => setDate(e.target.value || todayIso())}
             max={todayIso()}
@@ -55,6 +60,7 @@ export default function CashClosePage() {
             variant="outline"
             size="sm"
             onClick={() => setDate((d) => fmtIso(subDays(parseDate(d) ?? new Date(), 1)))}
+            className="rounded-md"
           >
             ← Día previo
           </Button>
@@ -63,12 +69,14 @@ export default function CashClosePage() {
             size="sm"
             onClick={() => setDate((d) => fmtIso(addDays(parseDate(d) ?? new Date(), 1)))}
             disabled={isToday}
+            className="rounded-md"
           >
             Día siguiente →
           </Button>
         </div>
       </div>
 
+      <div className="space-y-4">
       {report.isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -84,6 +92,7 @@ export default function CashClosePage() {
           canClose={isToday}
         />
       ) : null}
+      </div>
     </div>
   );
 }

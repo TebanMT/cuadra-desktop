@@ -12,7 +12,7 @@ export function ProtectedRoute() {
   }
 
   if (!user) {
-    return <Navigate to="/auth/login" replace state={{ from: location }} />;
+    return <Navigate to="/welcome" replace state={{ from: location }} />;
   }
 
   if (gym && !gym.setup_completed && !location.pathname.startsWith("/setup")) {

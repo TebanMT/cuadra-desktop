@@ -10,7 +10,7 @@ dist-ssr
 
 # Tauri
 src-tauri/target
-src-tauri/binaries/cuadra-sidecar*
+src-tauri/binaries/tinta-sidecar*
 src-tauri/Cargo.lock
 
 # Logs
@@ -23,5 +23,6 @@ pnpm-debug.log*
 
 # Local env
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
+!*.env.example

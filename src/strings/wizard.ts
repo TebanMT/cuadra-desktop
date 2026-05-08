@@ -47,9 +47,9 @@ export const wizard = {
     card: "Tarjeta",
   },
   step5: {
-    title: "¡Tu gym ya está en Cuadra!",
+    title: "¡Tu gym ya está en Tinta!",
     summaryTitle: "Acabas de crear:",
-    cta: "Empezar a usar Cuadra",
+    cta: "Empezar a usar Tinta",
   },
   errors: {
     fieldRequired: (field: string) => `Falta el ${field}. Es obligatorio.`,

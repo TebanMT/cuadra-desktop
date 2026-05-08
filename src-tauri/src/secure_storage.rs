@@ -1,6 +1,6 @@
 use keyring::Entry;
 
-const SERVICE: &str = "app.cuadra.desktop";
+const SERVICE: &str = "app.tinta.desktop";
 
 #[derive(thiserror::Error, Debug)]
 pub enum Error {

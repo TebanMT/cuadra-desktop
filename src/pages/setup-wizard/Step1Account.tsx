@@ -39,7 +39,12 @@ export default function Step1Account() {
       await signup.mutateAsync({ full_name: fullName.trim(), email, password: pwd });
       navigate("/setup/step-2", { replace: true });
     } catch (e) {
-      if (e instanceof ApiError && (e.status === 409 || e.code === "email_exists")) {
+      if (
+        e instanceof ApiError &&
+        (e.status === 409 ||
+          e.code === "email_exists" ||
+          (e.status === 422 && /correo|email/i.test(e.message) && /ya tiene|ya existe|already/i.test(e.message)))
+      ) {
         setEmailExists(true);
         setError(auth.signup.errors.emailExists);
         return;
@@ -51,9 +56,13 @@ export default function Step1Account() {
 
   return (
     <AuthShell>
-      <div className="space-y-2 mb-8">
-        <h1 className="text-3xl">{auth.signup.welcome}</h1>
-        <p className="text-muted-foreground">{auth.signup.subtitle}</p>
+      <div className="space-y-1 mb-8 text-center">
+        <h1 className="font-display text-3xl font-semibold text-foreground tracking-tight">
+          Empieza tu Tinta.
+        </h1>
+        <p className="text-muted-foreground">
+          Pocos datos, 30 segundos y listo.
+        </p>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-5">

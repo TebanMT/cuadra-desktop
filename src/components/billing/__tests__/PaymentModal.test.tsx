@@ -33,7 +33,7 @@ vi.mock("@/lib/api", async () => {
           ];
         }
         if (path.includes("/sync/status")) {
-          return { state: "online", last_sync_at: null, pending_count: 0, last_error: null };
+          return { state: "online", last_synced_at: null, queue_pending_count: 0, last_error: null };
         }
         return null;
       }),

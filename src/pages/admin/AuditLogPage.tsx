@@ -92,11 +92,17 @@ export default function AuditLogPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="p-8 space-y-6 max-w-6xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t.audit.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.audit.subtitle}</p>
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <div className="space-y-1">
+        <h1
+          className="text-3xl font-bold text-foreground"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t.audit.title}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t.audit.subtitle}</p>
       </div>
+      <div className="space-y-4">
 
       <Card>
         <CardContent className="pt-5 pb-5 space-y-4">
@@ -251,6 +257,7 @@ export default function AuditLogPage() {
       )}
 
       <DetailModal entry={detail} onClose={() => setDetail(null)} />
+      </div>
     </div>
   );
 }

@@ -1,6 +1,5 @@
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { useAlerts, useUpdateAlert, type AlertConfig, type AlertKey } from "@/hooks/useNotifications";
@@ -11,10 +10,15 @@ export default function AlertsPage() {
   const list = useAlerts();
 
   return (
-    <div className="p-8 space-y-6 max-w-2xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t.alerts.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.alerts.subtitle}</p>
+    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div className="space-y-1">
+        <h1
+          className="text-3xl font-bold text-foreground"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t.alerts.title}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t.alerts.subtitle}</p>
       </div>
 
       {list.isLoading && (
@@ -30,15 +34,13 @@ export default function AlertsPage() {
       )}
 
       {list.data && (
-        <Card>
-          <CardContent className="p-0">
-            <ul className="divide-y">
-              {list.data.items.map((cfg) => (
-                <AlertRow key={cfg.key} cfg={cfg} />
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm">
+          <ul className="divide-y divide-border">
+            {list.data.items.map((cfg) => (
+              <AlertRow key={cfg.key} cfg={cfg} />
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

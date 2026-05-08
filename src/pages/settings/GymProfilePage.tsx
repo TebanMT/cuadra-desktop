@@ -45,6 +45,9 @@ interface FormState {
   close_time: string;
   kiosk_volume: number;
   kiosk_feedback_ttl_ms: number;
+  access_webhook_url: string;
+  access_webhook_secret: string; // empty = unchanged; "—CLEAR—" sentinel handled in submit
+  access_webhook_secret_set: boolean;
 }
 
 export default function GymProfilePage() {
@@ -74,6 +77,9 @@ export default function GymProfilePage() {
         close_time: p.close_time ?? "",
         kiosk_volume: p.kiosk_volume ?? 80,
         kiosk_feedback_ttl_ms: p.kiosk_feedback_ttl_ms ?? 5000,
+        access_webhook_url: p.access_webhook_url ?? "",
+        access_webhook_secret: "",
+        access_webhook_secret_set: p.access_webhook_secret_set ?? false,
       });
     }
   }, [profile.data, form]);
@@ -122,6 +128,13 @@ export default function GymProfilePage() {
       return;
     }
 
+    // Light validation for the access webhook URL (BE re-validates).
+    const webhookUrl = form.access_webhook_url.trim();
+    if (webhookUrl && !/^https?:\/\//i.test(webhookUrl)) {
+      setError("La URL del webhook de acceso debe empezar con http:// o https://");
+      return;
+    }
+
     const payload: UpdateGymProfileInput = {
       name: form.name.trim(),
       city: form.city.trim() || undefined,
@@ -138,7 +151,14 @@ export default function GymProfilePage() {
       close_time: form.close_time || null,
       kiosk_volume: form.kiosk_volume,
       kiosk_feedback_ttl_ms: form.kiosk_feedback_ttl_ms,
+      access_webhook_url: webhookUrl || "",
     };
+    // Only include the secret if the user typed something — empty input keeps
+    // the existing secret. Sending "" explicitly clears it (handled by a
+    // dedicated "Borrar secreto" button).
+    if (form.access_webhook_secret.trim()) {
+      payload.access_webhook_secret = form.access_webhook_secret.trim();
+    }
 
     try {
       await update.mutateAsync(payload);
@@ -149,10 +169,15 @@ export default function GymProfilePage() {
   }
 
   return (
-    <div className="p-8 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t.gymProfile.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.gymProfile.subtitle}</p>
+    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div className="space-y-1">
+        <h1
+          className="text-3xl font-bold text-foreground"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t.gymProfile.title}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t.gymProfile.subtitle}</p>
       </div>
 
       <form onSubmit={submit} className="space-y-4" noValidate>
@@ -335,6 +360,76 @@ export default function GymProfilePage() {
                 </div>
               </Field>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Access webhook — Phase 1 differentiator. The gym wires its own
+            torniquete / cerradura by configuring a URL we POST to whenever
+            a checkin resolves to allowed. */}
+        <Card>
+          <CardContent className="pt-5 pb-5 space-y-3">
+            <div>
+              <h2 className="font-semibold">Acceso por hardware (avanzado)</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                Tinta envía una notificación a la URL que configures cada vez que un
+                socio entra correctamente. Tu electricista o instalador puede usar eso
+                para abrir un torniquete, cerradura, etc. Si no usas hardware, déjalo
+                vacío.
+              </p>
+            </div>
+            <Field label="URL del webhook">
+              <Input
+                type="url"
+                placeholder="https://192.168.1.50/door/open"
+                value={form.access_webhook_url}
+                onChange={(e) => update_("access_webhook_url", e.target.value)}
+                autoComplete="off"
+              />
+            </Field>
+            <Field label={`Secreto compartido${form.access_webhook_secret_set ? " (ya configurado)" : ""}`}>
+              <div className="flex gap-2">
+                <Input
+                  type="text"
+                  placeholder={
+                    form.access_webhook_secret_set
+                      ? "Pegar nuevo para rotar"
+                      : "Opcional — firma HMAC-SHA256"
+                  }
+                  value={form.access_webhook_secret}
+                  onChange={(e) => update_("access_webhook_secret", e.target.value)}
+                  autoComplete="off"
+                />
+                {form.access_webhook_secret_set && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      // Submitting `access_webhook_secret: ""` explicitly
+                      // clears the stored secret server-side. We use a
+                      // dedicated mutation call so the user can clear
+                      // without filling in a new value.
+                      update.mutate(
+                        { access_webhook_secret: "" },
+                        {
+                          onSuccess: () => {
+                            toast.success("Secreto eliminado.");
+                            update_("access_webhook_secret_set", false);
+                          },
+                        }
+                      );
+                    }}
+                    disabled={update.isPending}
+                  >
+                    Borrar
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Cuando configures un secreto, cada llamada llevará el header{" "}
+                <code className="text-xs">X-Tinta-Signature</code> con el HMAC-SHA256
+                del cuerpo. Tu hardware puede validarlo para evitar llamadas falsas.
+              </p>
+            </Field>
           </CardContent>
         </Card>
 

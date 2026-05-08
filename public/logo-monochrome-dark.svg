@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0F1A2E"/>
+  <text x="32" y="48"
+        text-anchor="middle"
+        font-family="Fraunces, Georgia, serif"
+        font-weight="600"
+        font-size="44"
+        fill="#FDFBF6"
+        letter-spacing="-1.2">T</text>
+  <circle cx="44" cy="22" r="5" fill="#D6593C"/>
+</svg>

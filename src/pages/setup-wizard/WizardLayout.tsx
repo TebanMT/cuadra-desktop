@@ -15,7 +15,7 @@ export function WizardLayout({ step, total = 5, title, subtitle, children }: Pro
     <div className="min-h-screen w-full bg-background">
       <div className="mx-auto max-w-xl px-6 py-10">
         <div className="text-center">
-          <div className="text-2xl font-bold tracking-tight text-primary">Cuadra</div>
+          <div className="text-2xl font-bold tracking-tight text-primary">Tinta</div>
           <div className="mt-1 text-sm text-muted-foreground">{wizard.progress(step, total)}</div>
         </div>
         <Progress value={(step / total) * 100} className="mt-4" />

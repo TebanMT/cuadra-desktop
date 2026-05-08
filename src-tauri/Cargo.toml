@@ -1,13 +1,13 @@
 [package]
-name = "cuadra-desktop"
+name = "tinta-desktop"
 version = "0.1.0"
-description = "Cuadra — sistema operativo para gimnasios"
-authors = ["Cuadra"]
+description = "Tinta — sistema operativo para gimnasios"
+authors = ["Tinta"]
 edition = "2021"
 rust-version = "1.77"
 
 [lib]
-name = "cuadra_desktop_lib"
+name = "tinta_desktop_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

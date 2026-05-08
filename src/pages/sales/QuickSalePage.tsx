@@ -239,11 +239,16 @@ export default function QuickSalePage() {
 
   return (
     <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between border-b px-6 py-4 bg-background">
+      <header className="flex items-center justify-between border-b border-foreground/10 px-6 py-5 bg-background">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{t.page.title}</h1>
+          <h1
+            className="text-3xl font-semibold text-foreground"
+            style={{ letterSpacing: "-0.025em" }}
+          >
+            {t.page.title}
+          </h1>
           {keyBuffer && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border bg-muted px-2 py-1 text-xs">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs">
               <Search className="h-3 w-3" />
               <span className="font-mono">{keyBuffer}</span>
             </span>
@@ -258,7 +263,7 @@ export default function QuickSalePage() {
       </header>
 
       {offline && (
-        <div className="bg-warning/10 text-warning-foreground border-b px-6 py-2 text-sm">
+        <div className="bg-warning/10 text-warning-foreground border-b border-border px-6 py-2 text-sm">
           {t.page.offline}
         </div>
       )}
@@ -299,9 +304,9 @@ export default function QuickSalePage() {
           )}
         </div>
 
-        <aside className="border-l bg-muted/30 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <h2 className="font-semibold">{t.page.cart.title}</h2>
+        <aside className="border-l border-border bg-muted/40 flex flex-col overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+            <h2 className="font-semibold text-foreground">{t.page.cart.title}</h2>
             {cartLines.length > 0 && (
               <Button variant="ghost" size="sm" onClick={clearCart}>
                 <Trash2 className="h-4 w-4" />
@@ -326,7 +331,7 @@ export default function QuickSalePage() {
             )}
           </div>
 
-          <div className="border-t bg-background px-4 py-4 space-y-4">
+          <div className="border-t border-border bg-background px-4 py-4 space-y-4">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>

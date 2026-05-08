@@ -1,0 +1,217 @@
+# Build Tinta Desktop para macOS (arm64 + x86_64) y Windows (x86_64).
+#
+# La app Tauri necesita el sidecar Go (tinta-core/cmd/sidecar) bundleado
+# como binary externo. El sidecar usa CGO (mattn/go-sqlite3) así que cada
+# plataforma se cross-compila en su runner nativo (no desde Mac).
+#
+# Triggers:
+#   - push de tag `desktop-v*` → release artifacts
+#   - workflow_dispatch → builds ad-hoc para testing
+#
+# Artefactos producidos:
+#   macOS arm64  → Tinta.app + Tinta_x.y.z_aarch64.dmg
+#   macOS x86_64 → Tinta.app + Tinta_x.y.z_x64.dmg
+#   Windows      → Tinta_x.y.z_x64-setup.exe + Tinta_x.y.z_x64_en-US.msi
+#
+# Para release firmado en macOS necesitas (futuro):
+#   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
+#   APPLE_ID, APPLE_PASSWORD, APPLE_TEAM_ID
+# Para Windows firmado:
+#   WINDOWS_CERTIFICATE, WINDOWS_CERTIFICATE_PASSWORD
+# Mientras esos secrets no existan, los .app/.exe salen sin firma → el
+# usuario verá "autor desconocido" al abrir. Funcional pero con friction.
+
+name: Build desktop
+
+on:
+  push:
+    tags: ["desktop-v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version override (defaults to tauri.conf.json)"
+        required: false
+
+# Si la repo está organizada como monorepo con tinta-core en otro repo,
+# hay que clonar ambos. Asumimos que tinta-desktop tiene los repos como
+# submodules o que el workflow clona tinta-core por separado. Con
+# repos independientes (caso actual), checkout tinta-core via clone.
+
+env:
+  TINTA_CORE_REPO: TebanMT/cuadra-core
+  TINTA_CORE_REF: main
+  GO_VERSION: "1.25"
+  NODE_VERSION: "20"
+  RUST_TOOLCHAIN: "stable"
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # macOS — un solo job que produce arm64 + x86_64 separados
+  # ─────────────────────────────────────────────────────────────────────
+  build-macos:
+    name: macOS ${{ matrix.target.arch }}
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { arch: arm64,  rust: aarch64-apple-darwin, go: arm64 }
+          - { arch: x86_64, rust: x86_64-apple-darwin,  go: amd64 }
+    steps:
+      - name: Checkout tinta-desktop
+        uses: actions/checkout@v4
+
+      - name: Checkout tinta-core (sidecar source)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TINTA_CORE_REPO }}
+          ref: ${{ env.TINTA_CORE_REF }}
+          path: tinta-core
+          # Si tinta-core es repo privado, agregar token:
+          # token: ${{ secrets.TINTA_CORE_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: tinta-core/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        # No pasamos `version:` — action-setup lo lee de `packageManager`
+        # en package.json (pnpm@9.0.0). Pasar ambos rompe con
+        # ERR_PNPM_BAD_PM_VERSION en v4 / "multiple versions specified".
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target.rust }}
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target.rust }}
+
+      - name: Build Go sidecar (${{ matrix.target.arch }})
+        env:
+          CGO_ENABLED: 1
+          GOOS: darwin
+          GOARCH: ${{ matrix.target.go }}
+        run: |
+          mkdir -p src-tauri/binaries
+          cd tinta-core
+          export SDKROOT=$(xcrun -sdk macosx --show-sdk-path)
+          go build -tags sidecar \
+            -o ../src-tauri/binaries/tinta-sidecar-${{ matrix.target.rust }} \
+            ./cmd/sidecar
+          file ../src-tauri/binaries/tinta-sidecar-${{ matrix.target.rust }}
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri
+        run: pnpm tauri build --target ${{ matrix.target.rust }}
+
+      - name: Upload .app bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinta-desktop-macos-${{ matrix.target.arch }}-app
+          path: src-tauri/target/${{ matrix.target.rust }}/release/bundle/macos/Tinta.app
+          if-no-files-found: error
+
+      - name: Upload .dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinta-desktop-macos-${{ matrix.target.arch }}-dmg
+          path: src-tauri/target/${{ matrix.target.rust }}/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Windows x86_64
+  # ─────────────────────────────────────────────────────────────────────
+  build-windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout tinta-desktop
+        uses: actions/checkout@v4
+
+      - name: Checkout tinta-core
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TINTA_CORE_REPO }}
+          ref: ${{ env.TINTA_CORE_REF }}
+          path: tinta-core
+          # token: ${{ secrets.TINTA_CORE_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: tinta-core/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        # No pasamos `version:` — action-setup lo lee de `packageManager`
+        # en package.json (pnpm@9.0.0). Pasar ambos rompe con
+        # ERR_PNPM_BAD_PM_VERSION en v4 / "multiple versions specified".
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: x86_64-pc-windows-msvc
+
+      - name: Build Go sidecar (windows x86_64)
+        # windows-latest viene con MinGW/MSYS preinstalado y Go usa el
+        # toolchain por defecto cuando CGO_ENABLED=1 + GOOS=windows.
+        env:
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: amd64
+        shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          cd tinta-core
+          go build -tags sidecar \
+            -o ../src-tauri/binaries/tinta-sidecar-x86_64-pc-windows-msvc.exe \
+            ./cmd/sidecar
+          ls -la ../src-tauri/binaries/
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri
+        run: pnpm tauri build --target x86_64-pc-windows-msvc
+
+      - name: Upload Windows installer (NSIS .exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinta-desktop-windows-setup
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          if-no-files-found: warn
+
+      - name: Upload Windows installer (MSI)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinta-desktop-windows-msi
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          if-no-files-found: warn

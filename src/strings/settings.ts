@@ -7,6 +7,10 @@ export const settings = {
         title: "Datos del gym",
         body: "Nombre, ciudad, datos fiscales y branding.",
       },
+      subscription: {
+        title: "Suscripción",
+        body: "Tu plan, próximos cobros y recibos.",
+      },
       membershipTypes: {
         title: "Membresías",
         body: "Crea, edita o desactiva los planes que ofreces.",
@@ -212,7 +216,7 @@ export const settings = {
     title: "Conectar WhatsApp",
     subtitle: "Recordatorios, comprobantes y avisos automáticos a tus socios.",
     notConnected: {
-      hero: "Conecta WhatsApp a Cuadra",
+      hero: "Conecta WhatsApp a Tinta",
       copy:
         "Para que tus socios reciban recordatorios y comprobantes automáticos, conecta el WhatsApp del gym.",
       step1Title: "Necesitas WhatsApp Business",

@@ -50,10 +50,15 @@ export default function WhatsAppSetupPage() {
   }
 
   return (
-    <div className="p-8 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t.whatsapp.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.whatsapp.subtitle}</p>
+    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div className="space-y-1">
+        <h1
+          className="text-3xl font-bold text-foreground"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t.whatsapp.title}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t.whatsapp.subtitle}</p>
       </div>
 
       {state.data?.status === "connected" ? (
@@ -115,7 +120,7 @@ function ConnectedView({ state }: { state: StateLike }) {
               <Stat
                 label={t.whatsapp.connected.stats.failed}
                 value={stats.failed_last_30d.toString()}
-                variant={stats.failed_last_30d > 0 ? "destructive" : undefined}
+                variant={stats.failed_last_30d > 0 ? "danger" : undefined}
               />
               <Stat
                 label={t.whatsapp.connected.stats.successRate}

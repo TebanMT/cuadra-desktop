@@ -10,7 +10,6 @@ import {
   MessageSquare,
   Users,
 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { settings as t } from "@/strings/settings";
 
@@ -34,6 +33,13 @@ const SECTIONS: Section[] = [
     icon: CreditCard,
     title: t.index.sections.membershipTypes.title,
     body: t.index.sections.membershipTypes.body,
+  },
+  {
+    to: "/settings/subscription",
+    icon: CreditCard,
+    title: t.index.sections.subscription.title,
+    body: t.index.sections.subscription.body,
+    ownerOnly: true,
   },
   {
     to: "/settings/operators",
@@ -84,27 +90,34 @@ export default function SettingsIndex() {
   const visible = SECTIONS.filter((s) => !s.ownerOnly || role === "owner");
 
   return (
-    <div className="p-8 space-y-6 max-w-4xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t.index.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.index.subtitle}</p>
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="space-y-1">
+        <h1
+          className="text-3xl font-bold text-foreground"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t.index.title}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t.index.subtitle}</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((s) => (
-          <Link key={s.to} to={s.to}>
-            <Card className="hover:bg-muted/40 transition-colors cursor-pointer h-full">
-              <CardContent className="pt-5 pb-5 flex items-start justify-between gap-3 h-full">
-                <div className="flex items-start gap-3">
-                  <s.icon className="h-5 w-5 text-primary mt-0.5 shrink-0" />
-                  <div>
-                    <div className="font-semibold">{s.title}</div>
-                    <div className="text-sm text-muted-foreground mt-1">{s.body}</div>
-                  </div>
-                </div>
-                <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0" />
-              </CardContent>
-            </Card>
+          <Link
+            key={s.to}
+            to={s.to}
+            className="group rounded-xl border border-border bg-card text-card-foreground p-5 flex items-start justify-between gap-3 transition-all hover:border-foreground/30 hover:shadow-sm"
+          >
+            <div className="flex items-start gap-3 min-w-0">
+              <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <s.icon className="h-5 w-5" strokeWidth={2} />
+              </span>
+              <div className="min-w-0">
+                <div className="font-semibold text-foreground">{s.title}</div>
+                <div className="text-sm text-muted-foreground mt-1">{s.body}</div>
+              </div>
+            </div>
+            <ChevronRight className="h-5 w-5 text-muted-foreground shrink-0 group-hover:text-foreground transition-colors" />
           </Link>
         ))}
       </div>

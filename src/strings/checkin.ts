@@ -57,7 +57,7 @@ export const checkin = {
     success: (name: string) => `Entrada permitida para ${name}.`,
   },
   kiosk: {
-    title: "Cuadra — Kiosko",
+    title: "Tinta — Kiosko",
     waiting: "Coloca tu huella en el lector",
     waitingPin: "Pon tu PIN o coloca tu huella",
     waitingNoReader: "Pon tu PIN para entrar",
@@ -78,7 +78,7 @@ export const checkin = {
     consentBody: [
       "Tu huella se usa solo para que entres al gym sin tener que dar tu nombre o tu PIN.",
       "Se guarda encriptada en la computadora del gym.",
-      "También se respalda encriptada en la nube de Cuadra.",
+      "También se respalda encriptada en la nube de Tinta.",
       "Nadie puede ver la imagen de tu huella — solo un código matemático que sirve para identificarte.",
       "Puedes pedir que la borren cuando quieras.",
     ],

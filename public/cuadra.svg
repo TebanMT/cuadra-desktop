@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="14" fill="#0F1A2E"/>
+  <g stroke="#FDFBF6" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.5">
+    <path d="M 10 10 L 18 10 M 10 10 L 10 18"/>
+    <path d="M 54 10 L 46 10 M 54 10 L 54 18"/>
+    <path d="M 10 54 L 18 54 M 10 54 L 10 46"/>
+    <path d="M 54 54 L 46 54 M 54 54 L 54 46"/>
+  </g>
+  <text x="32" y="48"
+        text-anchor="middle"
+        font-family="Fraunces, Georgia, serif"
+        font-weight="600"
+        font-size="44"
+        fill="#D6593C"
+        letter-spacing="-1.5">C</text>
+</svg>

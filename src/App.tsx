@@ -11,6 +11,9 @@ import { queryClient } from "@/lib/queryClient";
 
 function Bootstrapped() {
   useHydrateAuth();
+  // No setOnAuthExpired wiring — the sidecar mints effectively-eternal JWTs
+  // and refresh failures no longer drop the session. The only exit from a
+  // signed-in state is the explicit "Cerrar sesión" action in useLogout.
   return <RouterProvider router={router} />;
 }
 

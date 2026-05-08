@@ -99,13 +99,18 @@ export default function BroadcastPage() {
   }
 
   return (
-    <div className="p-8 space-y-6 max-w-3xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t.broadcast.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.broadcast.subtitle}</p>
+    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <div className="space-y-1">
+        <h1
+          className="text-3xl font-bold text-foreground"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t.broadcast.title}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t.broadcast.subtitle}</p>
       </div>
-
-      {!isWhatsappConnected && !whatsapp.isLoading && (
+      <div className="space-y-4">
+        {!isWhatsappConnected && !whatsapp.isLoading && (
         <Alert variant="warning">
           <AlertDescription>{t.broadcast.notConnected}</AlertDescription>
         </Alert>
@@ -208,6 +213,7 @@ export default function BroadcastPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </div>
     </div>
   );
 }

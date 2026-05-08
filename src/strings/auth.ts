@@ -1,7 +1,7 @@
 export const auth = {
   login: {
     title: "Bienvenido",
-    subtitle: "Inicia sesión para entrar a tu Cuadra.",
+    subtitle: "Inicia sesión para entrar a tu Tinta.",
     emailLabel: "Correo electrónico",
     passwordLabel: "Contraseña",
     rememberMe: "Mantenerme conectado",
@@ -16,8 +16,8 @@ export const auth = {
     },
     trialExpired: {
       title: "Tu prueba terminó",
-      body: "Para seguir usando Cuadra, activa tu plan.",
-      activate: "Activar Cuadra Pro",
+      body: "Para seguir usando Tinta, activa tu plan.",
+      activate: "Activar Tinta Pro",
       later: "Recordármelo después",
     },
   },
@@ -43,7 +43,7 @@ export const auth = {
     short: "Mínimo 8 caracteres.",
   },
   signup: {
-    welcome: "Bienvenido a Cuadra",
+    welcome: "Bienvenido a Tinta",
     subtitle: "Vamos a poner tu gym a cuadrar en 5 minutos.",
     fullName: "Tu nombre completo",
     email: "Tu correo electrónico",
@@ -55,7 +55,7 @@ export const auth = {
       emailExists: "Este correo ya tiene una cuenta. ¿Quieres iniciar sesión?",
       passwordShort: "Tu contraseña debe tener al menos 8 caracteres.",
       passwordMismatch: "Las contraseñas no coinciden.",
-      offline: "Necesitas internet solo esta vez para crear tu cuenta. Una vez creada, Cuadra funciona sin internet.",
+      offline: "Necesitas internet solo esta vez para crear tu cuenta. Una vez creada, Tinta funciona sin internet.",
     },
   },
 };

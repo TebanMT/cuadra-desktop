@@ -14,6 +14,7 @@ export interface Payment {
   id: string;
   gym_id: string;
   member_id: string;
+  member_name?: string | null;
   amount: number;
   payment_method: PaymentMethod | null;
   concept: PaymentConcept;
@@ -82,6 +83,25 @@ export interface PaymentHistoryFilters {
 export interface PaymentHistoryResponse {
   items: Payment[];
   total_pending: number;
+}
+
+export interface GymPaymentsFilters {
+  concept?: PaymentConcept | "";
+  from?: string;
+  to?: string;
+  page?: number;
+  page_size?: number;
+}
+
+export interface GymPaymentsResponse {
+  items: Payment[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_paid: number;
+  cash_total: number;
+  transfer_total: number;
+  card_total: number;
 }
 
 export interface SendReceiptInput {
@@ -162,6 +182,24 @@ export function usePaymentHistory(
         },
       }),
     enabled: !!memberID,
+  });
+}
+
+// useGymPayments lists every payment of the gym in a given window. Used by
+// the Cobros screen as a global timeline + day-total. Defaults backend-side
+// to "today" when from/to are omitted.
+export function useGymPayments(filters: GymPaymentsFilters) {
+  const cleaned: Record<string, string | number> = {};
+  if (filters.concept) cleaned.concept = filters.concept;
+  if (filters.from) cleaned.from = filters.from;
+  if (filters.to) cleaned.to = filters.to;
+  if (filters.page) cleaned.page = filters.page;
+  if (filters.page_size) cleaned.page_size = filters.page_size;
+  return useQuery<GymPaymentsResponse>({
+    queryKey: ["billing", "gym-payments", cleaned],
+    queryFn: () => api.get<GymPaymentsResponse>("/api/v1/payments", { query: cleaned }),
+    refetchInterval: 30_000,
+    refetchIntervalInBackground: false,
   });
 }
 

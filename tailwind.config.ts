@@ -12,6 +12,9 @@ export default {
     },
     extend: {
       colors: {
+        // ── Semantic tokens (shadcn) — resuelven a --primary/--success/etc.
+        // Componentes que usan bg-primary / text-success / etc. heredan
+        // automáticamente la paleta terracota desde globals.css.
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -20,6 +23,7 @@ export default {
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
+          soft: "hsl(var(--primary-soft))",
         },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
@@ -28,6 +32,7 @@ export default {
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+          soft: "hsl(var(--destructive-soft))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -36,6 +41,7 @@ export default {
         accent: {
           DEFAULT: "hsl(var(--accent))",
           foreground: "hsl(var(--accent-foreground))",
+          soft: "hsl(var(--accent-soft))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -48,10 +54,65 @@ export default {
         success: {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
+          soft: "hsl(var(--success-soft))",
         },
         warning: {
+          // Híbrido: contrato shadcn + escala numérica para spec
+          // (bg-warning-100 / text-warning-700 etc.).
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
+          soft: "hsl(var(--warning-soft))",
+          100: "hsl(var(--warning-100))",
+          500: "hsl(var(--warning-500))",
+          700: "hsl(var(--warning-700))",
+        },
+        chart: {
+          "1": "hsl(var(--chart-1))",
+          "2": "hsl(var(--chart-2))",
+          "3": "hsl(var(--chart-3))",
+          "4": "hsl(var(--chart-4))",
+          "5": "hsl(var(--chart-5))",
+        },
+
+        // ── Named scales — para shades específicos. Disciplina:
+        //   ink/paper  → tipografía + superficies
+        //   brick      → ACCIÓN POSITIVA (CTAs, links, nav activa)
+        //   moss       → success (Activo, Pagado, Sincronizado)
+        //   warning    → ámbar dorado (Por vencer)
+        //   danger     → rojo profundo (Vencido) — alias de destructive
+        ink: {
+          900: "hsl(var(--ink-900))",
+          700: "hsl(var(--ink-700))",
+          500: "hsl(var(--ink-500))",
+          400: "hsl(var(--ink-400))",
+          300: "hsl(var(--ink-300))",
+        },
+        paper: {
+          50:  "hsl(var(--paper-50))",
+          100: "hsl(var(--paper-100))",
+          200: "hsl(var(--paper-200))",
+          300: "hsl(var(--paper-300))",
+        },
+        brick: {
+          100: "hsl(var(--brick-100))",
+          300: "hsl(var(--brick-300))",
+          500: "hsl(var(--brick-500))",
+          600: "hsl(var(--brick-600))",
+          700: "hsl(var(--brick-700))",
+        },
+        moss: {
+          100: "hsl(var(--moss-100))",
+          500: "hsl(var(--moss-500))",
+          700: "hsl(var(--moss-700))",
+        },
+        // `danger` es un alias semántico de destructive — los componentes
+        // shadcn siguen leyendo destructive internamente, pero código de
+        // app puede escribir bg-danger-100 / text-danger-500 / etc. para
+        // aclarar la intención (vencidos, errores explícitos).
+        danger: {
+          100: "hsl(var(--danger-100))",
+          500: "hsl(var(--danger-500))",
+          700: "hsl(var(--danger-700))",
         },
       },
       borderRadius: {
@@ -61,6 +122,14 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
+        // Display — Fraunces. Aplicar SOLO en page headers grandes,
+        // empty states amistosos y modales emocionales. NO usar en data
+        // tables, KPI numbers, formularios, navegación o status pills.
+        display: ["Fraunces", "Georgia", "serif"],
+      },
+      backgroundImage: {
+        "paper-pattern":
+          "radial-gradient(circle at 1px 1px, rgb(15 26 46 / 0.04) 1px, transparent 0)",
       },
       keyframes: {
         "accordion-down": {

@@ -39,7 +39,7 @@ export const cashClose = {
   },
   modal: {
     title: "Cierre de caja",
-    calculatedLabel: "Efectivo calculado por Cuadra",
+    calculatedLabel: "Efectivo calculado por Tinta",
     countedLabel: "Efectivo contado físicamente",
     diffLabel: "Diferencia",
     reasonLabel: "Si hay diferencia, ¿qué pasó?",

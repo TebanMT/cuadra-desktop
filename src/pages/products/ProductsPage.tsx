@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Plus, Search, Pencil, BadgeMinus, BadgePlus, PackagePlus } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  Search,
+  Pencil,
+  BadgeMinus,
+  BadgePlus,
+  Package,
+  PackageOpen,
+  PackagePlus,
+  PackageX,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +29,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableHead,
+  DataTableRow,
+  DataTableTh,
+  EmptyState,
+  PageHeader,
+  SectionCard,
+} from "@/components/shared/PagePrimitives";
+import { StatCard } from "@/components/shared/StatCard";
 import {
   DEFAULT_CATEGORIES,
   stockLevel,
@@ -97,65 +119,103 @@ export default function ProductsPage() {
     return Array.from(set);
   }, [items]);
 
+  const lowCount = items.filter((p) => p.active && stockLevel(p) === "low").length;
+  const outCount = items.filter((p) => p.active && stockLevel(p) === "out").length;
+  const totalValue = items
+    .filter((p) => p.active)
+    .reduce((acc, p) => acc + p.price * p.stock, 0);
+
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold tracking-tight">{t.page.title}</h1>
-        <Button size="lg" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          {t.page.new}
-        </Button>
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+      <PageHeader
+        title={t.page.title}
+        subtitle="Catálogo y stock del gym"
+        actions={
+          <Button
+            size="lg"
+            onClick={() => setCreateOpen(true)}
+            className="h-10 rounded-md font-semibold shadow-sm"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            {t.page.new}
+          </Button>
+        }
+      />
+
+      {/* Stats */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          title="Productos"
+          value={total || items.length}
+          icon={Package}
+          tone="neutral"
+          hint="catálogo activo"
+        />
+        <StatCard
+          title="Stock bajo"
+          value={lowCount}
+          icon={PackageOpen}
+          tone={lowCount > 0 ? "warning" : "neutral"}
+          hint="por debajo del mínimo"
+        />
+        <StatCard
+          title="Agotados"
+          value={outCount}
+          icon={PackageX}
+          tone={outCount > 0 ? "danger" : "neutral"}
+          hint="sin existencias"
+        />
+        <StatCard
+          title="Valor de stock"
+          value={formatMoney(totalValue)}
+          icon={PackagePlus}
+          tone="success"
+          hint="precio venta × existencias"
+        />
       </div>
 
-      <div className="space-y-4">
-        <div className="relative max-w-md">
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3">
+        <div className="flex-1 min-w-[280px] max-w-md relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.page.searchPlaceholder}
-            className="pl-9"
+            className="pl-9 h-10"
             aria-label={t.page.searchPlaceholder}
           />
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">{t.page.filters.categoryLabel}:</span>
-            <Select value={category || "_all"} onValueChange={(v) => setCategory(v === "_all" ? "" : v)}>
-              <SelectTrigger className="h-9 w-[180px]">
-                <SelectValue placeholder={t.page.filters.categoryAll} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="_all">{t.page.filters.categoryAll}</SelectItem>
-                {knownCategories.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <Select value={category || "_all"} onValueChange={(v) => setCategory(v === "_all" ? "" : v)}>
+          <SelectTrigger className="h-10 w-[180px]">
+            <SelectValue placeholder={t.page.filters.categoryAll} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="_all">{t.page.filters.categoryAll}</SelectItem>
+            {knownCategories.map((c) => (
+              <SelectItem key={c} value={c}>
+                {c}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-muted-foreground">{t.page.filters.statusLabel}:</span>
-            <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProductStatusFilter)}>
-              <SelectTrigger className="h-9 w-[180px]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">{t.page.filters.statusActive}</SelectItem>
-                <SelectItem value="inactive">{t.page.filters.statusInactive}</SelectItem>
-                <SelectItem value="all">{t.page.filters.statusAll}</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProductStatusFilter)}>
+          <SelectTrigger className="h-10 w-[160px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">{t.page.filters.statusActive}</SelectItem>
+            <SelectItem value="inactive">{t.page.filters.statusInactive}</SelectItem>
+            <SelectItem value="all">{t.page.filters.statusAll}</SelectItem>
+          </SelectContent>
+        </Select>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <Switch checked={lowStockOnly} onCheckedChange={setLowStockOnly} />
-            <span className="text-sm">{t.page.filters.lowStockOnly}</span>
-          </label>
-        </div>
+        <label className="flex items-center gap-2 cursor-pointer h-10 px-3 rounded-md border border-input hover:bg-muted">
+          <Switch checked={lowStockOnly} onCheckedChange={setLowStockOnly} />
+          <span className="text-sm whitespace-nowrap">{t.page.filters.lowStockOnly}</span>
+        </label>
       </div>
 
       {list.error && (
@@ -164,86 +224,106 @@ export default function ProductsPage() {
         </Alert>
       )}
 
-      <div className="rounded-md border bg-background">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-16" />
-              <TableHead>{t.page.columns.name}</TableHead>
-              <TableHead>{t.page.columns.category}</TableHead>
-              <TableHead className="text-right">{t.page.columns.price}</TableHead>
-              <TableHead className="text-right">{t.page.columns.stock}</TableHead>
-              <TableHead>{t.page.columns.status}</TableHead>
-              <TableHead className="w-48 text-right">{t.page.columns.actions}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {list.isLoading && items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin inline-block" />
-                </TableCell>
-              </TableRow>
-            ) : items.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
-                  {debouncedSearch || category || lowStockOnly
-                    ? t.page.noResults
-                    : t.page.empty}
-                </TableCell>
-              </TableRow>
-            ) : (
-              items.map((p) => (
-                <TableRow
+      <SectionCard flush>
+        {list.isLoading && items.length === 0 ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : items.length === 0 ? (
+          <EmptyState
+            icon={<Package className="h-5 w-5" />}
+            title={debouncedSearch || category || lowStockOnly ? t.page.noResults : t.page.empty}
+            hint={
+              !debouncedSearch && !category && !lowStockOnly
+                ? "Empezá agregando tu primer producto."
+                : undefined
+            }
+          />
+        ) : (
+          <DataTable>
+            <DataTableHead>
+              <DataTableTh className="w-12 pl-5" />
+              <DataTableTh>Producto</DataTableTh>
+              <DataTableTh>Categoría</DataTableTh>
+              <DataTableTh className="text-right">Precio</DataTableTh>
+              <DataTableTh className="text-right">Stock</DataTableTh>
+              <DataTableTh>Estado</DataTableTh>
+              <DataTableTh className="w-32 text-right pr-5">Acciones</DataTableTh>
+            </DataTableHead>
+            <DataTableBody>
+              {items.map((p) => (
+                <DataTableRow
                   key={p.id}
-                  className={cn("cursor-pointer group", !p.active && "opacity-60")}
                   onClick={() => setEditing(p)}
+                  className={cn("group", !p.active && "opacity-60")}
                 >
-                  <TableCell>
-                    <div className="h-9 w-9 rounded-md border bg-muted flex items-center justify-center overflow-hidden">
+                  <DataTableCell className="w-12 pl-5">
+                    <div className="h-10 w-10 rounded-md border border-border bg-muted flex items-center justify-center overflow-hidden">
                       {p.photo_url ? (
                         <img src={p.photo_url} alt="" className="h-full w-full object-cover" />
                       ) : (
-                        <span className="text-xs font-medium text-muted-foreground">
+                        <span className="text-xs font-semibold text-muted-foreground">
                           {p.name.slice(0, 2).toUpperCase()}
                         </span>
                       )}
                     </div>
-                  </TableCell>
-                  <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell className="text-muted-foreground">{p.category}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatMoney(p.price)}</TableCell>
-                  <TableCell className={cn("text-right tabular-nums", stockColorClass(p))}>
-                    {p.stock}
+                  </DataTableCell>
+                  <DataTableCell>
+                    <span className="font-semibold text-foreground">{p.name}</span>
+                  </DataTableCell>
+                  <DataTableCell className="text-muted-foreground">{p.category}</DataTableCell>
+                  <DataTableCell className="text-right tabular font-medium text-foreground">
+                    {formatMoney(p.price)}
+                  </DataTableCell>
+                  <DataTableCell className={cn("text-right tabular", stockColorClass(p))}>
+                    <span className="font-semibold">{p.stock}</span>
                     {p.min_stock > 0 && (
                       <span className="ml-1 text-xs text-muted-foreground">/ {p.min_stock}</span>
                     )}
-                  </TableCell>
-                  <TableCell>{p.active ? stockBadge(p) : <Badge variant="outline">{t.page.badges.inactive}</Badge>}</TableCell>
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {p.active && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setAdjusting(p)}
+                  </DataTableCell>
+                  <DataTableCell>
+                    {p.active ? (
+                      stockBadge(p)
+                    ) : (
+                      <Badge variant="outline">{t.page.badges.inactive}</Badge>
+                    )}
+                  </DataTableCell>
+                  <DataTableCell
+                    className="text-right pr-3"
+                    children={
+                      <div
+                        className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {p.active && (
+                          <button
+                            type="button"
+                            onClick={() => setAdjusting(p)}
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                            title={t.page.rowAdjust}
+                            aria-label={t.page.rowAdjust}
+                          >
+                            <PackagePlus className="h-4 w-4" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setEditing(p)}
+                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                          title={t.page.rowEdit}
+                          aria-label={t.page.rowEdit}
                         >
-                          <PackagePlus className="h-4 w-4" />
-                          {t.page.rowAdjust}
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
-                        <Pencil className="h-4 w-4" />
-                        {t.page.rowEdit}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      </div>
+                    }
+                  />
+                </DataTableRow>
+              ))}
+            </DataTableBody>
+          </DataTable>
+        )}
+      </SectionCard>
 
       {totalPages > 1 && (
         <div className="flex items-center justify-end gap-1">
@@ -252,10 +332,11 @@ export default function ProductsPage() {
             size="sm"
             onClick={() => setPage((n) => Math.max(1, n - 1))}
             disabled={page <= 1 || list.isFetching}
+            className="rounded-md"
           >
             Anterior
           </Button>
-          <span className="text-sm px-3">
+          <span className="text-sm px-3 tabular">
             {page} / {totalPages}
           </span>
           <Button
@@ -263,6 +344,7 @@ export default function ProductsPage() {
             size="sm"
             onClick={() => setPage((n) => Math.min(totalPages, n + 1))}
             disabled={page >= totalPages || list.isFetching}
+            className="rounded-md"
           >
             Siguiente
           </Button>

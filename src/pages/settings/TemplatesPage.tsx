@@ -63,10 +63,15 @@ export default function TemplatesPage() {
   const sample = { ...SAMPLE_DATA, "{gym_name}": gymName };
 
   return (
-    <div className="p-8 space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{t.templates.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">{t.templates.subtitle}</p>
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="space-y-1">
+        <h1
+          className="text-3xl font-bold text-foreground"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          {t.templates.title}
+        </h1>
+        <p className="text-sm text-muted-foreground">{t.templates.subtitle}</p>
       </div>
 
       {list.isLoading && (

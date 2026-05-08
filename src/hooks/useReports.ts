@@ -88,7 +88,6 @@ export interface AttentionPendingBalance {
   full_name: string;
   phone: string;
   balance: number;
-  payment_id: string;
   due_since: string;
 }
 

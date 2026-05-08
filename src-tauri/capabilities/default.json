@@ -1,8 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capabilities for the main Cuadra window",
-  "windows": ["main"],
+  "description": "Capabilities for the main Tinta window",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "core:window:default",

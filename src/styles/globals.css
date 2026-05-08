@@ -4,42 +4,173 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    /* ── Identidad terracota — alineada con landing + dashboard ──────
+       Paper cremoso de fondo, ink navy oscuro para tipografía, brick
+       (#D6593C) como primario de acción, moss para success, warning
+       dorado y danger rojo profundo con disciplina semántica estricta.
+
+       La paleta convive como CSS vars en HSL "h s% l%" para que el
+       Tailwind extend en tailwind.config.ts pueda referenciarlas con
+       hsl(var(--token)) y el modo dark sobreescribirlas en bloque. */
+
+    /* ── Named scales ── nuevos tokens del spec ─────────────────────── */
+    --ink-900: 222 51% 12%;   /* #0F1A2E */
+    --ink-700: 217 33% 17%;   /* #1F2937 */
+    --ink-500: 217 13% 34%;   /* #4B5563 */
+    --ink-400: 220 9% 46%;    /* #6B7280 */
+    --ink-300: 218 11% 65%;   /* #9CA3AF */
+
+    --paper-50:  40 64% 98%;  /* #FDFBF6 */
+    --paper-100: 36 35% 97%;  /* #FAF7F2 */
+    --paper-200: 36 31% 91%;  /* #F1ECE2 */
+    --paper-300: 38 23% 86%;  /* #E5DFD2 */
+
+    --brick-100: 17 84% 93%;  /* #FCE8DF */
+    --brick-300: 18 82% 75%;  /* #F4A688 */
+    --brick-500: 12 64% 54%;  /* #D6593C  ← primario */
+    --brick-600: 12 64% 44%;  /* #B8442A */
+    --brick-700: 12 65% 34%;  /* #8E311E */
+
+    --moss-100: 161 32% 91%;  /* #E0F1EC */
+    --moss-500: 175 77% 26%;  /* #0F766E */
+    --moss-700: 174 80% 19%;  /* #0A5950 */
+
+    --warning-100: 48 96% 89%; /* #FEF3C7 */
+    --warning-500: 32 95% 44%; /* #D97706 */
+    --warning-700: 23 83% 31%; /* #92400E */
+
+    --danger-100: 0 93% 94%;   /* #FEE2E2 */
+    --danger-500: 0 72% 51%;   /* #DC2626 */
+    --danger-700: 0 70% 35%;   /* #991B1B */
+
+    /* ── Semantic tokens (shadcn) ── ahora resuelven a la paleta nueva. */
+    --background: var(--paper-50);
+    --foreground: var(--ink-900);
 
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: var(--ink-900);
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
+    --popover-foreground: var(--ink-900);
 
-    /* Deep navy — Banorte/Santander seriedad */
-    --primary: 224 76% 33%;
-    --primary-foreground: 0 0% 100%;
+    --primary: var(--brick-500);
+    --primary-foreground: var(--paper-50);
+    --primary-soft: var(--brick-100);
 
-    --secondary: 215 20% 95%;
-    --secondary-foreground: 222 47% 11%;
+    --secondary: var(--paper-100);
+    --secondary-foreground: var(--ink-900);
 
-    --muted: 215 20% 95%;
-    --muted-foreground: 215 14% 40%;
+    --muted: var(--paper-100);
+    --muted-foreground: var(--ink-500);
 
-    --accent: 215 20% 95%;
-    --accent-foreground: 222 47% 11%;
+    --accent: var(--paper-200);
+    --accent-foreground: var(--ink-900);
+    --accent-soft: var(--paper-100);
 
-    --destructive: 0 78% 48%;
-    --destructive-foreground: 0 0% 100%;
+    --destructive: var(--danger-500);
+    --destructive-foreground: var(--paper-50);
+    --destructive-soft: var(--danger-100);
 
-    --success: 142 72% 32%;
-    --success-foreground: 0 0% 100%;
+    --success: var(--moss-500);
+    --success-foreground: var(--paper-50);
+    --success-soft: var(--moss-100);
 
-    --warning: 38 92% 50%;
-    --warning-foreground: 25 95% 15%;
+    --warning: var(--warning-500);
+    --warning-foreground: var(--warning-700);
+    --warning-soft: var(--warning-100);
 
-    --border: 215 20% 88%;
-    --input: 215 20% 88%;
-    --ring: 224 76% 33%;
+    --border: var(--paper-300);
+    --input: var(--paper-300);
+    --ring: var(--brick-500);
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
+
+    /* Charts — terracota como serie principal, moss segunda, warning
+       tercera. Mantenemos púrpura/azul como hues distintos para que 5
+       series sigan siendo legibles. */
+    --chart-1: var(--brick-500);
+    --chart-2: var(--moss-500);
+    --chart-3: var(--warning-500);
+    --chart-4: 271 70% 55%;
+    --chart-5: 199 89% 48%;
+
+    /* Sidebar — superficie paper-100 (más cálida que el bg).
+       Item activo en brick-100 + texto brick-600 (estilo "soft active"
+       per spec, no solid pill). */
+    --sidebar: var(--paper-100);
+    --sidebar-foreground: var(--ink-900);
+    --sidebar-muted: var(--ink-400);
+    --sidebar-active: var(--brick-100);
+    --sidebar-active-foreground: var(--brick-600);
+    --sidebar-hover: var(--paper-200);
+    --sidebar-border: var(--paper-300);
+  }
+
+  .dark {
+    /* ── Dark mode terracota ──────────────────────────────────────────
+       Las named scales (--ink-*, --paper-*, --brick-*, etc.) se HEREDAN
+       de :root sin override. `bg-ink-900` siempre es navy oscuro y
+       `bg-paper-50` siempre es cremoso — son colores absolutos, no
+       relativos a tema.
+
+       Lo que SÍ flippea son los semantic tokens. Componentes que
+       hardcodean named scales (StatCard icon, Badge soft pills,
+       EmptyState icon) tienen `dark:` variants explícitos. */
+
+    /* Surfaces — flip a tonos oscuros. */
+    --background: 222 51% 12%;       /* ink-900 */
+    --foreground: 40 64% 98%;        /* paper-50 */
+
+    --card: 217 33% 17%;             /* ink-700 — surface lifted */
+    --card-foreground: 40 64% 98%;
+
+    --popover: 217 33% 17%;
+    --popover-foreground: 40 64% 98%;
+
+    /* Primary — brick mantiene matiz cross-theme. */
+    --primary: 12 64% 54%;
+    --primary-foreground: 40 64% 98%;
+    --primary-soft: 12 35% 18%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 40 64% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 218 11% 65%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 40 64% 98%;
+    --accent-soft: 217 33% 14%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 40 64% 98%;
+    --destructive-soft: 0 50% 16%;
+
+    --success: 175 55% 38%;          /* moss-500 lifted +12L */
+    --success-foreground: 40 64% 98%;
+    --success-soft: 175 50% 14%;
+
+    --warning: 32 92% 55%;           /* warning-500 lifted */
+    --warning-foreground: 48 96% 89%;
+    --warning-soft: 32 60% 16%;
+
+    --border: 217 33% 22%;
+    --input: 217 33% 22%;
+    --ring: 12 64% 54%;
+
+    --chart-1: 12 70% 60%;
+    --chart-2: 175 55% 45%;
+    --chart-3: 32 92% 60%;
+    --chart-4: 271 70% 65%;
+    --chart-5: 199 89% 60%;
+
+    --sidebar: 222 55% 9%;
+    --sidebar-foreground: 40 64% 98%;
+    --sidebar-muted: 218 11% 65%;
+    --sidebar-active: 12 35% 20%;
+    --sidebar-active-foreground: 18 82% 80%;
+    --sidebar-hover: 217 33% 17%;
+    --sidebar-border: 217 33% 17%;
   }
 
   * {
@@ -52,10 +183,93 @@
 
   body {
     @apply bg-background text-foreground antialiased font-sans;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    font-feature-settings: "ss01", "cv11";
+    letter-spacing: -0.011em;
   }
 
   h1, h2, h3, h4 {
     @apply font-semibold tracking-tight;
+    letter-spacing: -0.02em;
   }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "lnum";
+  }
+
+  /* Display type (Fraunces). Aplicar selectivamente — page headers,
+     empty states, modales emocionales. NO en data tables, KPI numbers,
+     formularios, navegación o status pills. */
+  .font-display {
+    font-family: "Fraunces", Georgia, serif;
+    letter-spacing: -0.02em;
+  }
+
+  /* Sombras suaves alineadas con la landing. */
+  .shadow-app {
+    box-shadow:
+      0 1px 0 rgb(15 26 46 / 0.04),
+      0 8px 24px -8px rgb(15 26 46 / 0.06);
+  }
+  .shadow-app-md {
+    box-shadow:
+      0 1px 0 rgb(15 26 46 / 0.04),
+      0 24px 60px -20px rgb(15 26 46 / 0.10);
+  }
+
+  /* Patrón de fondo paper sutil. */
+  .paper-pattern {
+    background-color: hsl(var(--paper-50));
+    background-image: radial-gradient(circle at 1px 1px, rgb(15 26 46 / 0.04) 1px, transparent 0);
+    background-size: 28px 28px;
+  }
+
+  /* Subtle elevated card — matches petzul's shadow-sm + ring-1 feel. */
+  .surface-raised {
+    background-color: hsl(var(--card));
+    border: 1px solid hsl(var(--border));
+    box-shadow: 0 1px 2px 0 hsl(var(--foreground) / 0.04);
+  }
+
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--muted) / 0.6) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+    border-radius: 0.5rem;
+  }
+
+  @keyframes skeleton-shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+
+  .fade-in {
+    animation: fade-in 0.25s ease-out;
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; transform: translateY(2px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .lift-on-hover {
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out, border-color 0.15s ease-out;
+  }
+  .lift-on-hover:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px -4px hsl(var(--foreground) / 0.12);
+  }
+
+  /* Sidebar token utilities (Tailwind doesn't pick custom names automatically). */
+  .bg-sidebar { background-color: hsl(var(--sidebar)); }
+  .text-sidebar-foreground { color: hsl(var(--sidebar-foreground)); }
+  .text-sidebar-muted { color: hsl(var(--sidebar-muted)); }
+  .border-sidebar-border { border-color: hsl(var(--sidebar-border)); }
 }

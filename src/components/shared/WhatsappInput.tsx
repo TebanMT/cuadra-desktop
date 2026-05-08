@@ -40,3 +40,10 @@ export function whatsappValid(value: string): boolean {
   const digits = value.replace(/\D/g, "");
   return digits.length >= 12 && digits.length <= 13;
 }
+
+// Strip the human-friendly spaces before sending to the backend, which
+// validates against ^\+?[1-9]\d{9,14}$ (no whitespace allowed).
+export function whatsappNormalize(value: string): string {
+  const digits = value.replace(/\D/g, "");
+  return `+${digits}`;
+}

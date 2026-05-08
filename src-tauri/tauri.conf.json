@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Cuadra",
+  "productName": "Tinta",
   "version": "0.1.0",
-  "identifier": "app.cuadra.desktop",
+  "identifier": "app.tinta.desktop",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Cuadra",
+        "title": "Tinta",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,
@@ -23,12 +23,15 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:* https://api.cuadra.app https://releases.cuadra.app ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:* https://api.entinta.app https://releases.entinta.app ipc: http://ipc.localhost"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["msi", "dmg"],
+    "targets": [
+      "msi",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -36,19 +39,21 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/cuadra-sidecar"],
+    "externalBin": [
+      "binaries/tinta-sidecar"
+    ],
     "category": "Productivity",
     "shortDescription": "Sistema operativo para gimnasios",
-    "longDescription": "Cuadra — gestión integral para gimnasios pequeños y medianos. Funciona offline."
+    "longDescription": "Tinta — gestión integral para gimnasios pequeños y medianos. Funciona offline."
   },
   "plugins": {
     "updater": {
-      "active": true,
+      "active": false,
       "endpoints": [
-        "https://releases.cuadra.app/{{target}}/{{current_version}}"
+        "https://releases.tinta.app/{{target}}/{{current_version}}"
       ],
       "dialog": false,
-      "pubkey": "REPLACE_ME_WITH_TAURI_UPDATER_PUBKEY"
+      "pubkey": ""
     }
   }
 }

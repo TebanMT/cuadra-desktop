@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertDialog,
@@ -59,22 +58,30 @@ export default function OperatorsPage() {
   const activeCount = operators.filter((o) => o.active).length;
 
   return (
-    <div className="p-8 space-y-6 max-w-5xl">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t.operators.title}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
+    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <h1
+            className="text-3xl font-bold text-foreground"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            {t.operators.title}
+          </h1>
+          <p className="text-sm text-muted-foreground">
             {t.operators.subtitle(HARD_LIMIT, activeCount)}
           </p>
         </div>
         <Button
+          size="lg"
           onClick={() => setCreateOpen(true)}
           disabled={activeCount >= HARD_LIMIT}
+          className="h-10 rounded-md font-semibold shadow-sm"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-4 w-4 mr-2" />
           {t.operators.create}
         </Button>
       </div>
+      <div className="space-y-4">
 
       {activeCount >= HARD_LIMIT && (
         <Alert variant="warning">
@@ -100,9 +107,8 @@ export default function OperatorsPage() {
       )}
 
       {list.data && (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
+        <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden">
+          <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t.operators.columns.name}</TableHead>
@@ -183,11 +189,11 @@ export default function OperatorsPage() {
                     </TableRow>
                   );
                 })}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          </TableBody>
+        </Table>
+        </div>
       )}
+      </div>
 
       <OperatorCreateModal open={createOpen} onOpenChange={setCreateOpen} />
       <OperatorEditModal

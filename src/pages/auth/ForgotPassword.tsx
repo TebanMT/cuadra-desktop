@@ -26,9 +26,13 @@ export default function ForgotPassword() {
 
   return (
     <AuthShell>
-      <div className="space-y-2 mb-8">
-        <h1 className="text-3xl">{auth.forgot.title}</h1>
-        <p className="text-muted-foreground">{auth.forgot.subtitle}</p>
+      <div className="space-y-1 mb-8 text-center">
+        <h1 className="font-display text-3xl font-semibold text-foreground tracking-tight">
+          Recupera tu acceso.
+        </h1>
+        <p className="text-muted-foreground">
+          Te mandamos una liga al correo.
+        </p>
       </div>
 
       {submitted ? (

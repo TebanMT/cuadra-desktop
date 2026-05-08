@@ -80,9 +80,9 @@ describe("MembersPage", () => {
     expect(screen.getByText("Mensual")).toBeInTheDocument();
 
     await waitFor(() => {
-      expect(screen.getByText("8")).toBeInTheDocument();
-      expect(screen.getByText("5")).toBeInTheDocument();
-      expect(screen.getByText("2")).toBeInTheDocument();
+      expect(screen.getAllByText("8").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("5").length).toBeGreaterThan(0);
+      expect(screen.getAllByText("2").length).toBeGreaterThan(0);
     });
   });
 });

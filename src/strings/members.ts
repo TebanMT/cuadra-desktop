@@ -181,7 +181,7 @@ export const members = {
   pin: {
     title: "PIN del socio",
     description:
-      "Cuadra genera un PIN aleatorio de 4 dígitos. Solo se ve esta vez; si se pierde, puedes regenerarlo.",
+      "Tinta genera un PIN aleatorio de 4 dígitos. Solo se ve esta vez; si se pierde, puedes regenerarlo.",
     generating: "Generando PIN…",
     label: (name: string) => `PIN de ${name}`,
     copy: "Copiar",

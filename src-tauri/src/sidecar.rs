@@ -8,7 +8,7 @@ use tauri_plugin_shell::ShellExt;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-const SIDECAR_BIN: &str = "binaries/cuadra-sidecar";
+const SIDECAR_BIN: &str = "binaries/tinta-sidecar";
 const MAX_RESTARTS: usize = 3;
 const RESTART_WINDOW: Duration = Duration::from_secs(60);
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);

@@ -56,9 +56,13 @@ export default function ResetPassword() {
 
   return (
     <AuthShell>
-      <div className="space-y-2 mb-8">
-        <h1 className="text-3xl">{auth.reset.title}</h1>
-        <p className="text-muted-foreground">{auth.reset.subtitle}</p>
+      <div className="space-y-1 mb-8 text-center">
+        <h1 className="font-display text-3xl font-semibold text-foreground tracking-tight">
+          Pon una contraseña nueva.
+        </h1>
+        <p className="text-muted-foreground">
+          La que te quede más cómoda.
+        </p>
       </div>
 
       <form onSubmit={onSubmit} className="space-y-5">

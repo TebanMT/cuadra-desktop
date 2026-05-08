@@ -18,7 +18,7 @@ import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { checkin as t } from "@/strings/checkin";
 
-const AUTOFADE_MS = 5000;
+const AUTOFADE_MS = 3500;
 
 export default function KioskPage() {
   const navigate = useNavigate();
@@ -82,12 +82,13 @@ export default function KioskPage() {
 
   const checkinPin = useCheckinByPin();
 
-  async function submitPin() {
-    if (pin.length !== 4) return;
+  async function submitPin(value?: string) {
+    const candidate = value ?? pin;
+    if (candidate.length !== 4) return;
     setFeedback({ kind: "processing" });
     setPinError(null);
     try {
-      const ev = await checkinPin.mutateAsync({ pin });
+      const ev = await checkinPin.mutateAsync({ pin: candidate });
       const fb = eventToFeedback(ev);
       setFeedback(fb);
       announceTone(fb);
@@ -100,6 +101,15 @@ export default function KioskPage() {
       setPin("");
     }
   }
+
+  // Auto-submit the moment the operator reaches 4 digits — saves the extra
+  // OK tap and shaves ~0.5s off the kiosk roundtrip. Kiosk-mode only.
+  useEffect(() => {
+    if (pin.length === 4 && !checkinPin.isPending) {
+      submitPin(pin);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pin]);
 
   // Hidden Ctrl+Shift+K combo to exit
   useEffect(() => {

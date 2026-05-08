@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { CityAutocomplete } from "@/components/shared/CityAutocomplete";
-import { WhatsappInput, whatsappValid } from "@/components/shared/WhatsappInput";
+import { WhatsappInput, whatsappValid, whatsappNormalize } from "@/components/shared/WhatsappInput";
 import { useSetupWizardStore } from "@/stores/useSetupWizardStore";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { api } from "@/lib/api";
@@ -40,8 +40,9 @@ export default function Step2GymInfo() {
     if (name.trim().length === 0 || name.length > 100) return setError(wizard.errors.nameLength);
     if (!city) return setError(wizard.errors.fieldRequired("ciudad"));
     if (!whatsappValid(whatsapp)) return setError(wizard.errors.whatsappFormat);
+    const whatsappWire = whatsappNormalize(whatsapp);
     try {
-      await m.mutateAsync({ name: name.trim(), city, whatsapp });
+      await m.mutateAsync({ name: name.trim(), city, whatsapp: whatsappWire });
       store.setGymInfo({ gymName: name.trim(), city, whatsapp });
       if (gym) setGym({ ...gym, name: name.trim() });
       navigate("/setup/step-3");

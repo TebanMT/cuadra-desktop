@@ -30,6 +30,7 @@ import { RegisterFingerprintModal } from "./RegisterFingerprintModal";
 import { PaymentModal } from "@/components/billing/PaymentModal";
 import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
 import { PaymentHistory } from "@/components/billing/PaymentHistory";
+import { getAvatarPalette, getInitials } from "@/lib/avatar";
 
 interface Props {
   memberId: string | null;
@@ -37,10 +38,7 @@ interface Props {
   planMap?: Record<string, string>;
 }
 
-function initials(name: string): string {
-  const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0] || "") + (parts[1]?.[0] || "")).toUpperCase();
-}
+// Avatar helpers viven en `lib/avatar.ts`. Importamos abajo.
 
 export function MemberDetailSheet({ memberId, onClose }: Props) {
   const open = !!memberId;
@@ -116,10 +114,20 @@ export function MemberDetailSheet({ memberId, onClose }: Props) {
             <>
               <SheetHeader>
                 <div className="flex items-start gap-4">
-                  <Avatar className="h-14 w-14">
-                    {member.photo_url && <AvatarImage src={member.photo_url} alt="" />}
-                    <AvatarFallback className="text-base">{initials(member.full_name)}</AvatarFallback>
-                  </Avatar>
+                  {(() => {
+                    const palette = getAvatarPalette(member.full_name);
+                    return (
+                      <Avatar className="h-14 w-14">
+                        {member.photo_url && <AvatarImage src={member.photo_url} alt="" />}
+                        <AvatarFallback
+                          className="text-base font-semibold"
+                          style={{ backgroundColor: palette.bg, color: palette.text }}
+                        >
+                          {getInitials(member.full_name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    );
+                  })()}
                   <div className="min-w-0 flex-1">
                     <SheetTitle className="text-xl truncate">{member.full_name}</SheetTitle>
                     <SheetDescription className="space-y-1 mt-1">

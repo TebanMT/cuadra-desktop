@@ -1,8 +1,24 @@
+function firstName(input: string | null): string | null {
+  if (!input) return null;
+  // Bail out on email-shaped names — guessing first vs surname from
+  // local-parts is unreliable (mendiola_esteban vs juan.perez); the user
+  // fixes it via /profile and we get clean data from the next /me call.
+  if (input.includes("@")) return null;
+  const cleaned = input.trim();
+  if (!cleaned) return null;
+  const first = cleaned.split(/\s+/)[0];
+  return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
+}
+
 export const dashboard = {
-  greeting: (name: string | null) =>
-    name ? `Hola, ${name.split(" ")[0]}` : "Hola",
+  greeting: (name: string | null) => {
+    const first = firstName(name);
+    return first ? `Hola, ${first}` : "Hola";
+  },
+  fixProfileHint: "Aún no configuras tu nombre.",
+  fixProfileCta: "Editar perfil",
   subtitle: (gymName: string | null) =>
-    gymName ? gymName : "Bienvenido a Cuadra",
+    gymName ? gymName : "Bienvenido a Tinta",
   loading: "Cargando dashboard…",
   error: "No pudimos cargar el dashboard.",
   kpis: {

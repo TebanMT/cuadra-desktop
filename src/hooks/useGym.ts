@@ -19,6 +19,12 @@ export interface GymProfile {
   close_time: string | null;
   kiosk_volume: number;
   kiosk_feedback_ttl_ms: number;
+  /** Outbound URL invoked by the sidecar when a checkin is allowed. Empty
+   * string clears the value; null means "not configured". */
+  access_webhook_url: string | null;
+  /** Whether an HMAC secret is set. The actual secret is never returned to
+   * the client (it stays in the sidecar/cloud database). */
+  access_webhook_secret_set: boolean;
   setup_completed: boolean;
 }
 
@@ -38,6 +44,10 @@ export interface UpdateGymProfileInput {
   close_time?: string | null;
   kiosk_volume?: number;
   kiosk_feedback_ttl_ms?: number;
+  access_webhook_url?: string | null;
+  /** Set to a non-empty string to rotate the secret, "" to clear, omit to
+   * keep the existing one. */
+  access_webhook_secret?: string | null;
 }
 
 export interface TransferOwnershipStartInput {

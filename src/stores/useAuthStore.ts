@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 
 export type Role = "owner" | "operator";
 
@@ -9,12 +10,16 @@ export interface AuthUser {
   role: Role;
 }
 
+export type SubscriptionStatus = "active" | "past_due" | "cancelled";
+
 export interface AuthGym {
   gym_id: string;
   name: string | null;
   setup_completed: boolean;
   trial_ends_at: string | null;
   subscription_plan: string;
+  subscription_status: SubscriptionStatus;
+  subscription_ends_at: string | null;
 }
 
 interface AuthState {
@@ -29,16 +34,29 @@ interface AuthState {
   markHydrated(): void;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  gym: null,
-  hydrated: false,
-  readOnly: false,
-  setSession: (user, gym) => set({ user, gym }),
-  setGym: (gym) => set({ gym }),
-  setReadOnly: (value) => set({ readOnly: value }),
-  clear: () => set({ user: null, gym: null, readOnly: false }),
-  markHydrated: () => set({ hydrated: true }),
-}));
+// Persisting user + gym keeps the operator signed in across reloads even
+// when the sidecar is briefly unreachable: the route guards see the cached
+// session immediately, useHydrateAuth refreshes it in the background.
+// Only `clear()` (explicit logout) wipes the persisted entry.
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      gym: null,
+      hydrated: false,
+      readOnly: false,
+      setSession: (user, gym) => set({ user, gym }),
+      setGym: (gym) => set({ gym }),
+      setReadOnly: (value) => set({ readOnly: value }),
+      clear: () => set({ user: null, gym: null, readOnly: false }),
+      markHydrated: () => set({ hydrated: true }),
+    }),
+    {
+      name: "tinta.session",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (s) => ({ user: s.user, gym: s.gym }),
+    }
+  )
+);
 
 export const isAuthenticated = () => useAuthStore.getState().user !== null;

@@ -159,14 +159,19 @@ export default function CheckinPage() {
       onPointerDown={unlockAudio}
       onKeyDown={unlockAudio}
     >
-      <header className="flex items-center justify-between border-b px-6 py-3">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">{t.page.title}</h1>
-          <span className="text-sm text-muted-foreground tabular-nums">
+      <header className="flex items-center justify-between border-b border-foreground/10 px-6 py-5">
+        <div className="flex items-baseline gap-4">
+          <h1
+            className="text-3xl font-semibold text-foreground"
+            style={{ letterSpacing: "-0.025em" }}
+          >
+            {t.page.title}
+          </h1>
+          <span className="text-sm text-muted-foreground tabular">
             {format(now, "EEEE d MMM · HH:mm", { locale: es })}
           </span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate("/kiosk")}>
+        <Button variant="outline" size="sm" onClick={() => navigate("/kiosk")} className="rounded-md">
           <Maximize2 className="h-4 w-4" />
           {t.page.openKiosk}
         </Button>
@@ -218,15 +223,15 @@ export default function CheckinPage() {
           )}
         </main>
 
-        <aside className="border-l bg-muted/20 overflow-y-auto px-4 py-4">
-          <h2 className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-3">
+        <aside className="border-l border-border bg-muted/30 overflow-y-auto px-4 py-4">
+          <h2 className="text-[11px] uppercase tracking-[0.12em] text-muted-foreground font-medium mb-3">
             {t.page.recent}
           </h2>
           <RecentList items={recents.items} />
         </aside>
       </div>
 
-      <footer className="border-t px-6 py-2 flex items-center justify-between text-xs text-muted-foreground">
+      <footer className="border-t border-border px-6 py-2 flex items-center justify-between text-xs text-muted-foreground">
         <span>{operator?.full_name ? t.page.operator(operator.full_name) : ""}</span>
         {bio.data && !bio.data.reader?.connected && (
           <span className="text-warning">{t.reader.disconnectedBanner}</span>

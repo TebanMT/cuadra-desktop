@@ -36,14 +36,23 @@ export default function MembershipTypesPage() {
   const [confirmDeactivate, setConfirmDeactivate] = useState<MembershipType | null>(null);
 
   return (
-    <div className="p-8 space-y-6 max-w-4xl">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">{t.types.pageTitle}</h1>
-          <p className="text-sm text-muted-foreground mt-1">{t.types.pageSubtitle}</p>
+    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <h1
+            className="text-3xl font-bold text-foreground"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            {t.types.pageTitle}
+          </h1>
+          <p className="text-sm text-muted-foreground">{t.types.pageSubtitle}</p>
         </div>
-        <Button size="lg" onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
+        <Button
+          size="lg"
+          onClick={() => setCreateOpen(true)}
+          className="h-10 rounded-md font-semibold shadow-sm"
+        >
+          <Plus className="h-4 w-4 mr-2" />
           {t.types.addNew}
         </Button>
       </div>
@@ -54,7 +63,7 @@ export default function MembershipTypesPage() {
         </Alert>
       )}
 
-      <div className="rounded-md border bg-background">
+      <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
