@@ -144,14 +144,32 @@ export function CheckinFeedback({ state, size = "lg", idleMessage, className }: 
   const detailSize =
     size === "xl" ? "text-2xl" : "text-lg md:text-xl";
 
+  // Animation key forzada al cambiar de tone — re-monta el círculo y dispara
+  // el pop-in. React reusa el mismo div sino y la animation no se replay.
+  // Excluimos idle/processing para no popear cuando vuelve a idle (post fade).
+  const animationKey = state.kind === "idle" || state.kind === "processing"
+    ? "static"
+    : `${state.kind}-${state.memberName ?? "anon"}`;
+
+  // motion-safe:* solo aplica si el browser/OS NO tiene prefers-reduced-motion.
+  // Tailwind v3 expone esto built-in. Garantiza accesibilidad para users con
+  // sensibilidad vestibular sin perder el efecto para el resto.
+  const popInAnim = "motion-safe:animate-kiosk-pop-in";
+  const pulseAnim = tone === "success" ? "motion-safe:animate-kiosk-pulse-success" : "";
+  const shakeAnim = tone === "denied" ? "motion-safe:animate-kiosk-shake" : "";
+
   return (
     <div className={cn("flex flex-col items-center text-center gap-6", className)}>
       <div
+        key={animationKey}
         className={cn(
-          "flex items-center justify-center rounded-full ring-8 transition-all duration-200",
+          "flex items-center justify-center rounded-full ring-8 transition-colors duration-300",
           circleSize,
           styles.iconBg,
-          styles.ring
+          styles.ring,
+          popInAnim,
+          pulseAnim,
+          shakeAnim
         )}
         role="status"
         aria-live="polite"
@@ -170,8 +188,9 @@ export function CheckinFeedback({ state, size = "lg", idleMessage, className }: 
         )}
         {state.memberName && (
           <h2
+            key={`name-${animationKey}`}
             className={cn(
-              "font-bold uppercase tracking-tight leading-tight",
+              "font-bold uppercase tracking-tight leading-tight motion-safe:animate-kiosk-pop-in",
               nameSize,
               tone === "denied" ? "text-destructive" : "text-foreground"
             )}
@@ -180,12 +199,17 @@ export function CheckinFeedback({ state, size = "lg", idleMessage, className }: 
           </h2>
         )}
         {detail && state.kind !== "idle" && state.kind !== "processing" && (
-          <p className={cn("font-medium", styles.text, detailSize)}>{detail}</p>
+          <p
+            key={`detail-${animationKey}`}
+            className={cn("font-medium motion-safe:animate-kiosk-pop-in", styles.text, detailSize)}
+          >
+            {detail}
+          </p>
         )}
         {state.override && (
           <span
             className={cn(
-              "inline-flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-sm font-medium text-success"
+              "inline-flex items-center gap-1.5 rounded-full bg-success/15 px-3 py-1 text-sm font-medium text-success motion-safe:animate-kiosk-pop-in"
             )}
           >
             <Shield className="h-4 w-4" />

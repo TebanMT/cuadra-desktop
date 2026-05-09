@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, AlertTriangle, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { CheckinFeedback, eventToFeedback, feedbackTone, useAutoFade, type FeedbackState } from "@/components/checkin/CheckinFeedback";
 import { PinPad } from "@/components/checkin/PinPad";
 import { KioskExitDialog } from "@/components/checkin/KioskExitDialog";
@@ -20,6 +21,26 @@ import { checkin as t } from "@/strings/checkin";
 
 const AUTOFADE_MS = 3500;
 
+/**
+ * Reloj memoizado — re-render solo cuando cambia el minuto, no cada
+ * segundo. Optimización para el kiosko que vive horas en pantalla:
+ * 60× menos renders del árbol de KioskPage.
+ *
+ * Muestra HH:mm grande + fecha en español debajo (ej. "lun 8 de mayo").
+ */
+const KioskClock = memo(function KioskClock({ now }: { now: Date }) {
+  return (
+    <div className="flex flex-col" aria-live="off">
+      <div className="text-7xl font-bold tracking-tight tabular-nums text-foreground leading-none">
+        {format(now, "HH:mm")}
+      </div>
+      <div className="mt-1 text-sm font-medium text-muted-foreground capitalize">
+        {format(now, "EEEE d 'de' MMMM", { locale: es })}
+      </div>
+    </div>
+  );
+});
+
 export default function KioskPage() {
   const navigate = useNavigate();
   const bio = useBiometricStatus();
@@ -30,19 +51,55 @@ export default function KioskPage() {
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: "idle" });
   const [pin, setPin] = useState("");
   const [pinError, setPinError] = useState<string | null>(null);
+  const [pinShake, setPinShake] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
+  // Tick por minuto en lugar de por segundo — el reloj solo necesita
+  // precisión al minuto. Reduce wakeups + repaints en el OS host.
   const [now, setNow] = useState(() => new Date());
 
   const fingerprintAvailable = !!bio.data?.reader?.connected;
   const pinAvailable = methods.data?.pin_available ?? false;
 
-  // Clock tick (every second for the big display)
+  // Clock tick al cambio de minuto. El primer setTimeout calcula los ms
+  // hasta el próximo minuto exacto (HH:MM:00) y desde ahí cada 60s.
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 1000);
-    return () => window.clearInterval(id);
+    let intervalId: number | undefined;
+    const msUntilNextMinute = 60000 - (Date.now() % 60000);
+    const initialId = window.setTimeout(() => {
+      setNow(new Date());
+      intervalId = window.setInterval(() => setNow(new Date()), 60000);
+    }, msUntilNextMinute);
+    return () => {
+      window.clearTimeout(initialId);
+      if (intervalId) window.clearInterval(intervalId);
+    };
   }, []);
 
-  // Lock to fullscreen-ish: hide cursor while idle? Just keep layout fullscreen via CSS.
+  // Hide cursor in kiosk mode despues de 3s sin movimiento — sutil
+  // pero hace ver el kiosko más "appliance" y menos "computadora con
+  // el browser abierto". El cursor reaparece con cualquier movimiento.
+  useEffect(() => {
+    let timeoutId: number | undefined;
+    const hideCursor = () => {
+      document.body.style.cursor = "none";
+    };
+    const showCursor = () => {
+      document.body.style.cursor = "";
+      window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(hideCursor, 3000);
+    };
+    showCursor();
+    window.addEventListener("mousemove", showCursor);
+    window.addEventListener("touchstart", showCursor);
+    return () => {
+      window.clearTimeout(timeoutId);
+      window.removeEventListener("mousemove", showCursor);
+      window.removeEventListener("touchstart", showCursor);
+      document.body.style.cursor = "";
+    };
+  }, []);
+
+  // Lock body scroll mientras estamos en kiosko.
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => {
@@ -97,13 +154,18 @@ export default function KioskPage() {
       const msg = checkinErrorMessage(err, t.pinPad.invalid);
       setPinError(msg);
       setFeedback({ kind: "denied_not_found", detail: msg });
+      // Shake brief en el PinPad como feedback haptico-visual
+      // de "intento incorrecto". 360ms total, sin acumular si
+      // hay clics rápidos.
+      setPinShake(true);
+      window.setTimeout(() => setPinShake(false), 400);
       playCheckinTone("denied");
       setPin("");
     }
   }
 
-  // Auto-submit the moment the operator reaches 4 digits — saves the extra
-  // OK tap and shaves ~0.5s off the kiosk roundtrip. Kiosk-mode only.
+  // Auto-submit al llegar a 4 dígitos — saves el OK tap y baja ~0.5s
+  // del roundtrip del kiosko. Solo en kiosk-mode.
   useEffect(() => {
     if (pin.length === 4 && !checkinPin.isPending) {
       submitPin(pin);
@@ -123,11 +185,17 @@ export default function KioskPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const idleMessage = fingerprintAvailable && pinAvailable
-    ? t.kiosk.waitingPin
-    : fingerprintAvailable
-    ? t.kiosk.waiting
-    : t.kiosk.waitingNoReader;
+  // Mensaje del idle priorizando el contexto: ambos métodos > solo huella
+  // > solo PIN > nada configurado (último caso es edge: gym sin operadores
+  // con PIN ni huella registrada — mejor un mensaje que un kiosko mudo).
+  const idleMessage =
+    fingerprintAvailable && pinAvailable
+      ? t.kiosk.waitingPin
+      : fingerprintAvailable
+      ? t.kiosk.waiting
+      : pinAvailable
+      ? t.kiosk.waitingNoReader
+      : t.kiosk.waitingNoReaderNoPin;
 
   const syncLevel = levelOf(sync.data);
   const SyncIcon =
@@ -141,28 +209,37 @@ export default function KioskPage() {
       onPointerDown={unlockAudio}
       onKeyDown={unlockAudio}
     >
+      {/* Top bar — reloj + fecha a la izquierda; counter + reader status a la derecha. */}
       <div className="absolute top-6 left-6 right-6 flex items-start justify-between text-muted-foreground pointer-events-none">
-        <div className="text-7xl font-bold tracking-tight tabular-nums text-foreground">
-          {format(now, "HH:mm")}
-        </div>
+        <KioskClock now={now} />
         <div className="flex flex-col items-end gap-2">
-          <div className="text-base font-medium tabular-nums">
+          <div
+            className="text-base font-medium tabular-nums"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             {t.page.todayCount(count.data?.count_today ?? 0)}
           </div>
           {bio.data && !bio.data.reader?.connected && (
-            <div className="text-xs text-warning bg-warning/10 px-2 py-1 rounded">
+            <div className="text-xs text-warning bg-warning/10 px-2 py-1 rounded-md font-medium">
               {t.reader.disconnectedBanner}
             </div>
           )}
         </div>
       </div>
 
+      {/* Main feedback area — central, large, animated. */}
       <main className="flex flex-1 items-center justify-center px-12">
         <div className="flex flex-col items-center gap-10 w-full max-w-3xl">
           <CheckinFeedback state={feedback} idleMessage={idleMessage} size="xl" />
 
           {pinAvailable && feedback.kind === "idle" && (
-            <div className="w-full max-w-md space-y-3">
+            <div
+              className={cn(
+                "w-full max-w-md space-y-3",
+                pinShake && "motion-safe:animate-kiosk-shake"
+              )}
+            >
               <PinPad
                 value={pin}
                 onChange={(v) => {
@@ -173,15 +250,37 @@ export default function KioskPage() {
                 disabled={checkinPin.isPending}
                 size="lg"
               />
-              {pinError && <p className="text-sm text-destructive text-center">{pinError}</p>}
+              {pinError && (
+                <p
+                  className="text-sm text-destructive text-center font-medium"
+                  role="alert"
+                >
+                  {pinError}
+                </p>
+              )}
             </div>
           )}
         </div>
       </main>
 
-      <div className="absolute bottom-4 right-6 flex items-center gap-2 text-xs text-muted-foreground pointer-events-none">
-        <SyncIcon className={cn("h-4 w-4", syncColor)} />
-        <span className="opacity-70">{t.kiosk.exitHint}</span>
+      {/* Bottom bar — sync status + exit hint. Sutil, no distrae. */}
+      <div className="absolute bottom-4 left-6 right-6 flex items-center justify-between text-xs text-muted-foreground pointer-events-none">
+        {/* Brand mark sutil — confirma "esto corre con Tinta" sin
+            competir con el branding visual del gym. */}
+        <span className="font-display font-semibold opacity-40 inline-flex items-baseline relative" style={{ letterSpacing: "-0.02em" }}>
+          T<span className="relative inline-block">
+            <span aria-hidden="true" className="absolute bg-brick-500 rounded-full" style={{ width: "0.18em", height: "0.18em", top: "-0.05em", left: "0.10em" }} />
+            inta
+          </span>
+        </span>
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1.5 opacity-70">
+            <SyncIcon className={cn("h-4 w-4", syncColor)} />
+            <span>{syncLevel === "fail" ? t.kiosk.syncOffline : t.kiosk.sync}</span>
+          </span>
+          <span className="opacity-50" aria-hidden="true">·</span>
+          <span className="opacity-70">{t.kiosk.exitHint}</span>
+        </div>
       </div>
 
       <KioskExitDialog

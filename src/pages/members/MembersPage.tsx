@@ -327,8 +327,8 @@ export default function MembersPage() {
             title={hasFilters ? "Sin resultados" : "Aún no hay socios"}
             hint={
               hasFilters
-                ? "Probá con otro nombre, folio o teléfono."
-                : "Empezá registrando tu primer socio."
+                ? "Prueba con otro nombre, folio o teléfono."
+                : "Empieza registrando tu primer socio."
             }
             action={
               !hasFilters && (

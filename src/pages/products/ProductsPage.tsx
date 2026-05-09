@@ -235,7 +235,7 @@ export default function ProductsPage() {
             title={debouncedSearch || category || lowStockOnly ? t.page.noResults : t.page.empty}
             hint={
               !debouncedSearch && !category && !lowStockOnly
-                ? "Empezá agregando tu primer producto."
+                ? "Empieza agregando tu primer producto."
                 : undefined
             }
           />

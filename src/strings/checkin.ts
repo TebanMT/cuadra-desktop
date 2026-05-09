@@ -59,9 +59,11 @@ export const checkin = {
   kiosk: {
     title: "Tinta — Kiosko",
     waiting: "Coloca tu huella en el lector",
-    waitingPin: "Pon tu PIN o coloca tu huella",
+    waitingPin: "Coloca tu huella o pon tu PIN",
     waitingNoReader: "Pon tu PIN para entrar",
+    waitingNoReaderNoPin: "El kiosko no está configurado todavía. Avísale a recepción.",
     sync: "Sincronizado",
+    syncOffline: "Sin conexión — operando offline",
     exitTitle: "Salir del modo kiosko",
     exitDescription: "Para salir, escribe la contraseña del operador.",
     exitPasswordLabel: "Contraseña",

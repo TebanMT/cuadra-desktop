@@ -44,16 +44,16 @@ export default function RedeemInstaller() {
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.status === 410) {
-          setError("Este código ya fue usado o caducó. Pedí uno nuevo desde el dashboard.");
+          setError("Este código ya fue usado o caducó. Pide uno nuevo desde el dashboard.");
         } else if (e.status === 404) {
-          setError("Código no reconocido. Verificá que lo copiaste completo.");
+          setError("Código no reconocido. Verifica que lo copiaste completo.");
         } else if (e.status === 503) {
           setError("Sin internet. El primer canjeo necesita conexión al cloud.");
         } else {
           setError(e.message || "No pudimos canjear el código.");
         }
       } else {
-        setError("Error inesperado. Reintentá en un momento.");
+        setError("Error inesperado. Reintenta en un momento.");
       }
     }
   }
