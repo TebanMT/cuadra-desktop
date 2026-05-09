@@ -8,10 +8,15 @@
 #   - push de tag `desktop-v*` → release artifacts
 #   - workflow_dispatch → builds ad-hoc para testing
 #
-# Artefactos producidos:
-#   macOS arm64  → Tinta.app + Tinta_x.y.z_aarch64.dmg
-#   macOS x86_64 → Tinta.app + Tinta_x.y.z_x64.dmg
-#   Windows      → Tinta_x.y.z_x64-setup.exe + Tinta_x.y.z_x64_en-US.msi
+# Artefactos producidos (configurado en tauri.conf.json bundle.targets):
+#   macOS arm64  → Tinta_x.y.z_aarch64.dmg     (DMG contiene Tinta.app adentro)
+#   macOS x86_64 → Tinta_x.y.z_x64.dmg         (idem)
+#   Windows      → Tinta_x.y.z_x64-setup.exe   (NSIS installer)
+#                  Tinta_x.y.z_x64_en-US.msi   (MSI alternativo, GPO-friendly)
+#
+# El usuario abre el DMG, arrastra Tinta.app a /Applications, y listo.
+# Si querés también un .app standalone, agregá 'app' a bundle.targets en
+# tauri.conf.json y volvé a habilitar el step de Upload .app del macOS job.
 #
 # Para release firmado en macOS necesitas (futuro):
 #   APPLE_CERTIFICATE, APPLE_CERTIFICATE_PASSWORD, APPLE_SIGNING_IDENTITY,
@@ -122,19 +127,27 @@ jobs:
       - name: Build Tauri
         run: pnpm tauri build --target ${{ matrix.target.rust }}
 
-      - name: Upload .app bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: tinta-desktop-macos-${{ matrix.target.arch }}-app
-          path: src-tauri/target/${{ matrix.target.rust }}/release/bundle/macos/Tinta.app
-          if-no-files-found: error
+      # Debug: lista lo que Tauri produjo, útil cuando algún bundle target
+      # falla silenciosamente o se genera con nombre distinto al esperado.
+      - name: List bundle output
+        run: |
+          echo "Contents of bundle/:"
+          ls -la src-tauri/target/${{ matrix.target.rust }}/release/bundle/ || true
+          echo
+          echo "All files in bundle/ (recursive):"
+          find src-tauri/target/${{ matrix.target.rust }}/release/bundle/ -type f 2>/dev/null || true
 
       - name: Upload .dmg
+        # bundle.targets en tauri.conf.json es ['msi', 'dmg'] — Tauri NO
+        # genera un .app standalone, solo lo empaqueta dentro del DMG.
+        # El DMG es lo que el user descarga y arrastra a /Applications.
+        # Si en algún momento querés el .app aparte (raro), agregá 'app'
+        # a bundle.targets y volvés a poner el upload acá.
         uses: actions/upload-artifact@v4
         with:
           name: tinta-desktop-macos-${{ matrix.target.arch }}-dmg
           path: src-tauri/target/${{ matrix.target.rust }}/release/bundle/dmg/*.dmg
-          if-no-files-found: warn
+          if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────
   # Windows x86_64
