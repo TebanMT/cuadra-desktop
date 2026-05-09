@@ -16,19 +16,58 @@ pub async fn get_local_auth_token(state: State<'_, AppState>) -> Result<String, 
     Ok(state.sidecar.local_token().await)
 }
 
+// secure_storage_* commands log every call so support tickets can be
+// diagnosed without DevTools. We only log keys (which are well-known
+// constants like "user_access_token") and lengths/presence of values
+// — never the actual JWT/refresh-token contents. If keyring fails
+// (sandbox issues, missing entitlements on ad-hoc signed builds),
+// the error is logged AND propagated to the JS layer so frontend can
+// show a proper error instead of looking like a silent success.
 #[tauri::command]
 pub fn secure_storage_set(key: String, value: String) -> Result<(), String> {
-    secure_storage::set(&key, &value).map_err(|e| e.to_string())
+    let value_len = value.len();
+    match secure_storage::set(&key, &value) {
+        Ok(()) => {
+            log::info!("secure_storage_set ok key={key} len={value_len}");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("secure_storage_set FAILED key={key} len={value_len}: {e}");
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]
 pub fn secure_storage_get(key: String) -> Result<Option<String>, String> {
-    secure_storage::get(&key).map_err(|e| e.to_string())
+    match secure_storage::get(&key) {
+        Ok(Some(v)) => {
+            log::info!("secure_storage_get hit key={key} len={}", v.len());
+            Ok(Some(v))
+        }
+        Ok(None) => {
+            log::warn!("secure_storage_get miss key={key}");
+            Ok(None)
+        }
+        Err(e) => {
+            log::error!("secure_storage_get FAILED key={key}: {e}");
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]
 pub fn secure_storage_delete(key: String) -> Result<(), String> {
-    secure_storage::delete(&key).map_err(|e| e.to_string())
+    match secure_storage::delete(&key) {
+        Ok(()) => {
+            log::info!("secure_storage_delete ok key={key}");
+            Ok(())
+        }
+        Err(e) => {
+            log::error!("secure_storage_delete FAILED key={key}: {e}");
+            Err(e.to_string())
+        }
+    }
 }
 
 #[tauri::command]

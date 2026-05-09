@@ -5,16 +5,28 @@ import { toast } from "sonner";
 import { AuthShell } from "@/components/shared/AuthShell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { api } from "@/lib/api";
 
 const DASHBOARD_URL =
   (import.meta.env.VITE_DASHBOARD_URL as string | undefined) ?? "https://entinta.app";
 const SIGNUP_URL = `${DASHBOARD_URL}/auth/signup`;
+
+interface PairingStatus {
+  paired: boolean;
+  email?: string;
+  gym_name?: string;
+}
 
 export default function Welcome() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const [autoRedirected, setAutoRedirected] = useState(false);
   const [copied, setCopied] = useState(false);
+  // Initial null = checking. Once resolved we either redirect (paired)
+  // or render the install-flow steps. Hiding the flow until we know
+  // avoids a flash of "Bienvenido" when in fact the laptop is already
+  // paired and the operator should see Login.
+  const [checkingPairing, setCheckingPairing] = useState(true);
 
   // If the installer dropped a `?bootstrap=` token in the launch URL,
   // jump straight to the redeem screen with the token pre-filled.
@@ -25,6 +37,44 @@ export default function Welcome() {
       navigate(`/auth/redeem-installer?token=${encodeURIComponent(code)}`, { replace: true });
     }
   }, [params, navigate, autoRedirected]);
+
+  // Pairing-status guard: ask the sidecar whether this laptop has a
+  // cached_login row. If it does, the install flow doesn't apply —
+  // send the operator to Login (with an optional `?email=` hint so
+  // the email field is pre-filled). If the sidecar is unreachable we
+  // fall through to the welcome view; redeem-installer requires the
+  // sidecar anyway, so the operator will hit the same wall there.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const status = await api.get<PairingStatus>(
+          "/api/v1/auth/pairing-status",
+          { skipAuth: true, retry: 0 }
+        );
+        if (cancelled) return;
+        if (status.paired) {
+          const qs = status.email ? `?email=${encodeURIComponent(status.email)}` : "";
+          navigate(`/auth/login${qs}`, { replace: true });
+          return;
+        }
+      } catch {
+        // Sidecar offline or endpoint missing (older sidecar build).
+        // Render the welcome steps as-is — old behavior.
+      }
+      if (!cancelled) setCheckingPairing(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [navigate]);
+
+  // While we don't know yet, render an empty AuthShell to avoid the
+  // welcome-then-redirect flicker. AuthShell already shows the brand
+  // chrome so the user sees the app, just not the wrong steps.
+  if (checkingPairing) {
+    return <AuthShell> </AuthShell>;
+  }
 
   async function handleCopy() {
     try {

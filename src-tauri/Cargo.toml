@@ -14,13 +14,25 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# `devtools` permite Cmd+Opt+I en builds de release. Imprescindible
+# para soporte y para que el operador (y nosotros) podamos debuggear
+# en producción sin tener que recompilar. El overhead es despreciable
+# (~unos KB) y no abre la consola por defecto — solo el atajo.
+tauri = { version = "2", features = ["devtools"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-os = "2"
 tauri-plugin-process = "2"
-keyring = "3"
+# `dirs` for cross-platform app-data directory resolution. We
+# previously used `keyring` v3 for OS keychain integration, but on
+# macOS with ad-hoc signing the entries silently weren't visible
+# across processes (no Apple Team ID → access-group mismatch). The
+# fallback is a plain JSON file in the user's app-data dir with
+# 0600 permissions — same effective threat model as keychain on a
+# single-user reception desktop, with the advantage that it works
+# under any signing posture.
+dirs = "5"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }

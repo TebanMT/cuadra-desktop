@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { AuthShell } from "@/components/shared/AuthShell";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,13 @@ export default function Login() {
   const login = useLogin();
   const setReadOnly = useAuthStore((s) => s.setReadOnly);
 
-  const [email, setEmail] = useState("");
+  // Welcome.tsx pasa `?email=` cuando detecta que el laptop ya está
+  // pareado — pre-llenamos el campo así el operador solo tipea la
+  // contraseña. Si el operador quiere loguearse con otro mail, igual
+  // puede borrarlo. Sin override, el campo arranca vacío como antes.
+  const [searchParams] = useSearchParams();
+  const initialEmail = searchParams.get("email") ?? "";
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [remember, setRemember] = useState(true);
