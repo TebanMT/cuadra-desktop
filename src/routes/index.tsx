@@ -6,11 +6,7 @@ import Welcome from "@/pages/auth/Welcome";
 import RedeemInstaller from "@/pages/auth/RedeemInstaller";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
 import ResetPassword from "@/pages/auth/ResetPassword";
-import Step1Account from "@/pages/setup-wizard/Step1Account";
-import Step2GymInfo from "@/pages/setup-wizard/Step2GymInfo";
-import Step3FirstPlan from "@/pages/setup-wizard/Step3FirstPlan";
-import Step4PaymentMethods from "@/pages/setup-wizard/Step4PaymentMethods";
-import Step5Done from "@/pages/setup-wizard/Step5Done";
+import SetupRequired from "@/pages/auth/SetupRequired";
 import DashboardPage from "@/pages/dashboard/DashboardPage";
 import AttentionRequiredPage from "@/pages/dashboard/AttentionRequiredPage";
 import MembersPage from "@/pages/members/MembersPage";
@@ -43,17 +39,23 @@ export const router = createBrowserRouter([
       { path: "/auth/redeem-installer", element: <RedeemInstaller /> },
       { path: "/auth/forgot-password", element: <ForgotPassword /> },
       { path: "/auth/reset-password", element: <ResetPassword /> },
-      { path: "/auth/signup", element: <Step1Account /> },
+      // NOTA: el desktop NO maneja signup. La creación de cuenta + setup
+      // del gym viven en el dashboard (https://entinta.app). Si el user
+      // intenta llegar a /auth/signup, lo mandamos a /welcome donde tiene
+      // un CTA externo al dashboard.
+      { path: "/auth/signup", element: <Navigate to="/welcome" replace /> },
       { path: "/pricing", element: <PricingPage /> },
     ],
   },
   {
     element: <ProtectedRoute />,
     children: [
-      { path: "/setup/step-2", element: <Step2GymInfo /> },
-      { path: "/setup/step-3", element: <Step3FirstPlan /> },
-      { path: "/setup/step-4", element: <Step4PaymentMethods /> },
-      { path: "/setup/step-5", element: <Step5Done /> },
+      // /auth/setup-required: pantalla terminal cuando el dueño se loguea
+      // pero su gym todavía no completó el wizard del dashboard. Le
+      // ofrece un botón para abrir el setup en el browser del sistema.
+      // Reemplaza al wizard duplicado que vivía acá (Step1-5) — ese
+      // flow ahora vive solo en el dashboard.
+      { path: "/auth/setup-required", element: <SetupRequired /> },
       { path: "/kiosk", element: <KioskPage /> },
       {
         element: <DashboardLayout />,

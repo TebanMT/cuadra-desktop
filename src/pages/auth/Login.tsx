@@ -54,7 +54,9 @@ export default function Login() {
       }
 
       if (!data.setup_completed) {
-        navigate("/setup/step-2", { replace: true });
+        // El setup del gym vive en el dashboard web, no acá. Mandamos
+        // al user a una pantalla con CTA externo al dashboard.
+        navigate("/auth/setup-required", { replace: true });
       } else {
         navigate("/", { replace: true });
       }
@@ -139,9 +141,19 @@ export default function Login() {
 
         <p className="text-center text-sm text-muted-foreground">
           ¿No tienes cuenta?{" "}
-          <Link to="/auth/signup" className="text-primary hover:underline font-medium">
+          {/*
+            La creación de cuenta vive en el dashboard web, no acá. Abrimos
+            en el browser del sistema (target=_blank) en vez de routear a
+            una página interna del desktop. Patrón same-as Welcome.tsx.
+          */}
+          <a
+            href={`${import.meta.env.VITE_DASHBOARD_URL || "https://entinta.app"}/auth/signup`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary hover:underline font-medium"
+          >
             Crea la tuya
-          </Link>
+          </a>
         </p>
       </form>
 

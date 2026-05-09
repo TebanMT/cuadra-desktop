@@ -34,7 +34,10 @@ export default function RedeemInstaller() {
     try {
       const data = await redeem.mutateAsync({ token: value.trim() });
       if (!data.setup_completed) {
-        navigate("/setup/step-2", { replace: true });
+        // Si el dueño redime el token sin haber completado setup en el
+        // dashboard, lo mandamos a la pantalla terminal que lo manda al
+        // dashboard web a terminar el wizard.
+        navigate("/auth/setup-required", { replace: true });
       } else {
         navigate("/", { replace: true });
       }
