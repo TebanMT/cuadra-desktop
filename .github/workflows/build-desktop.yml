@@ -113,19 +113,47 @@ jobs:
           GOOS: darwin
           GOARCH: ${{ matrix.target.go }}
         run: |
-          mkdir -p src-tauri/binaries
+          # Output al raíz de src-tauri/ (sin subcarpeta binaries/) porque
+          # Tauri aplana paths al bundlear macOS — ver comentario en
+          # src-tauri/src/sidecar.rs sobre el mismatch que causaba ENOENT.
           cd tinta-core
           export SDKROOT=$(xcrun -sdk macosx --show-sdk-path)
           go build -tags sidecar \
-            -o ../src-tauri/binaries/tinta-sidecar-${{ matrix.target.rust }} \
+            -o ../src-tauri/tinta-sidecar-${{ matrix.target.rust }} \
             ./cmd/sidecar
-          file ../src-tauri/binaries/tinta-sidecar-${{ matrix.target.rust }}
+          file ../src-tauri/tinta-sidecar-${{ matrix.target.rust }}
+
+          # Ad-hoc signing del sidecar. Apple Silicon (M1+) exige que todo
+          # binario tenga al menos firma ad-hoc para ejecutarse — sin
+          # esto el spawn falla con ENOENT aunque el archivo exista.
+          # Tauri firma su binario principal automáticamente; el sidecar
+          # external NO, así que lo hacemos acá.
+          # Una vez tengamos Developer ID + notarization (APPLE_CERTIFICATE
+          # en secrets), reemplazar `-` por la identidad real.
+          codesign --force --sign - --options runtime \
+            ../src-tauri/tinta-sidecar-${{ matrix.target.rust }}
+          codesign -dv ../src-tauri/tinta-sidecar-${{ matrix.target.rust }} 2>&1 | head -3
 
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
       - name: Build Tauri
+        # Tauri 2 hace `codesign --deep` automáticamente del bundle entero
+        # (incluyendo external bins como nuestro sidecar Go) si
+        # `bundle.macOS.signingIdentity` está seteado en tauri.conf.json.
+        # Lo seteamos a "-" (ad-hoc) ahí para que cada DMG salga con
+        # bundle firmado de forma que pueda ejecutarse en Apple Silicon.
         run: pnpm tauri build --target ${{ matrix.target.rust }}
+
+      # Verificar que la firma quedó OK (defensa contra cambios en
+      # tauri.conf.json que rompan el signing)
+      - name: Verify bundle signature
+        run: |
+          BUNDLE="src-tauri/target/${{ matrix.target.rust }}/release/bundle/macos/Tinta.app"
+          codesign --verify --deep --strict "$BUNDLE" && echo "✓ bundle firmado correctamente"
+          codesign -dv "$BUNDLE" 2>&1 | head -5
+          # El sidecar específicamente — es lo que Apple Silicon más exige
+          codesign -dv "$BUNDLE/Contents/MacOS/tinta-sidecar" 2>&1 | head -5
 
       # Debug: lista lo que Tauri produjo, útil cuando algún bundle target
       # falla silenciosamente o se genera con nombre distinto al esperado.
@@ -207,12 +235,14 @@ jobs:
           GOARCH: amd64
         shell: bash
         run: |
-          mkdir -p src-tauri/binaries
+          # Sin subcarpeta binaries/ — match con tauri.conf.json
+          # externalBin = ["tinta-sidecar"] para evitar el mismatch
+          # de paths que rompía el spawn en macOS (ver sidecar.rs).
           cd tinta-core
           go build -tags sidecar \
-            -o ../src-tauri/binaries/tinta-sidecar-x86_64-pc-windows-msvc.exe \
+            -o ../src-tauri/tinta-sidecar-x86_64-pc-windows-msvc.exe \
             ./cmd/sidecar
-          ls -la ../src-tauri/binaries/
+          ls -la ../src-tauri/tinta-sidecar-*.exe
 
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile

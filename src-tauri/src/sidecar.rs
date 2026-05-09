@@ -8,7 +8,12 @@ use tauri_plugin_shell::ShellExt;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-const SIDECAR_BIN: &str = "binaries/tinta-sidecar";
+// Sin prefix `binaries/` a propósito. Tauri 2 aplana las subcarpetas al
+// bundlear external bins en macOS (las copia directo a Contents/MacOS/),
+// pero al llamar a `shell.sidecar()` el lookup conserva el path con
+// subdir → posix_spawn busca Contents/MacOS/binaries/tinta-sidecar y
+// falla con ENOENT. Manteniéndolo plano evitamos el mismatch.
+const SIDECAR_BIN: &str = "tinta-sidecar";
 const MAX_RESTARTS: usize = 3;
 const RESTART_WINDOW: Duration = Duration::from_secs(60);
 const SHUTDOWN_GRACE: Duration = Duration::from_secs(5);

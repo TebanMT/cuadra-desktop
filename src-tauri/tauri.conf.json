@@ -33,6 +33,10 @@
       "msi",
       "dmg"
     ],
+    "macOS": {
+      "signingIdentity": "-",
+      "minimumSystemVersion": "12.0"
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -41,7 +45,7 @@
       "icons/icon.ico"
     ],
     "externalBin": [
-      "binaries/tinta-sidecar"
+      "tinta-sidecar"
     ],
     "category": "Productivity",
     "shortDescription": "Sistema operativo para gimnasios",
