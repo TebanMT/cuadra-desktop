@@ -3,7 +3,7 @@ mod secure_storage;
 mod sidecar;
 
 use std::sync::Arc;
-use tauri::Manager;
+use tauri::{Manager, RunEvent};
 
 pub struct AppState {
     pub sidecar: Arc<sidecar::SidecarManager>,
@@ -14,8 +14,9 @@ pub fn run() {
     env_logger::init();
 
     let sidecar_manager = Arc::new(sidecar::SidecarManager::new());
+    let sidecar_for_event = sidecar_manager.clone();
 
-    tauri::Builder::default()
+    let app = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_os::init())
@@ -33,6 +34,9 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(move |window, event| {
+            // Window-X click → graceful shutdown of the sidecar so it
+            // releases port 9090 before the next launch. This path is
+            // the "happy" close on every platform.
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 let state: tauri::State<AppState> = window.state();
                 let sm = state.sidecar.clone();
@@ -50,6 +54,21 @@ pub fn run() {
             commands::print_pdf,
             commands::quit_app,
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    // RunEvent::Exit fires on Cmd+Q (macOS), Alt+F4, app menu Quit, and
+    // any other "app is going down" signal that does NOT necessarily
+    // route through window CloseRequested. Without this the sidecar
+    // gets orphaned on Cmd+Q — reparented to launchd holding port 9090
+    // until reboot — and the next launch can't bind. Belt+suspenders
+    // with the parent-PID watcher in the Go sidecar (the watcher is the
+    // safety net for crash/SIGKILL cases this handler can't catch).
+    app.run(move |_app_handle, event| {
+        if let RunEvent::Exit = event {
+            tauri::async_runtime::block_on(async {
+                sidecar_for_event.shutdown().await;
+            });
+        }
+    });
 }
