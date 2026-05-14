@@ -12,6 +12,7 @@ import {
   useRefund,
   fmtMoney,
   type Payment,
+  type PaymentMethod,
   type RefundMoneyReturn,
 } from "@/hooks/useBilling";
 import { ApiError } from "@/lib/api";
@@ -51,10 +52,19 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
       return;
     }
     try {
+      // money_returned es la abstracción UI; mapeamos a `method` para
+      // el wire. Caso "none" (cortesía / no se devuelve): heredamos el
+      // método del pago original para que la auditoría refleje qué
+      // forma de cobro original se está reversando, aunque físicamente
+      // no haya salido dinero.
+      const method: PaymentMethod =
+        moneyReturned === "none"
+          ? (payment.payment_method ?? "cash")
+          : moneyReturned;
       await refund.mutateAsync({
         reason: reason.trim(),
-        revert_membership: isMembership ? revertMembership : false,
-        money_returned: moneyReturned,
+        payment_method: method,
+        revert_membership: isMembership ? revertMembership : undefined,
       });
       toast.success(t.refund.success);
       onOpenChange(false);

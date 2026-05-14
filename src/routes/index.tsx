@@ -2,6 +2,7 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 import { ProtectedRoute, PublicOnlyRoute } from "@/components/shared/RouteGuards";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Login from "@/pages/auth/Login";
+import LoginEmail from "@/pages/auth/LoginEmail";
 import Welcome from "@/pages/auth/Welcome";
 import RedeemInstaller from "@/pages/auth/RedeemInstaller";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
@@ -10,6 +11,8 @@ import SetupRequired from "@/pages/auth/SetupRequired";
 import DashboardPage from "@/pages/dashboard/DashboardPage";
 import AttentionRequiredPage from "@/pages/dashboard/AttentionRequiredPage";
 import MembersPage from "@/pages/members/MembersPage";
+import MemberCreatePage from "@/pages/members/MemberCreatePage";
+import MemberDetailPage from "@/pages/members/MemberDetailPage";
 import ProfilePage from "@/pages/profile/ProfilePage";
 import SettingsIndex from "@/pages/settings/SettingsIndex";
 import SubscriptionPage from "@/pages/settings/SubscriptionPage";
@@ -29,6 +32,8 @@ import CobrosPage from "@/pages/billing/CobrosPage";
 import KioskPage from "@/pages/kiosk/KioskPage";
 import BroadcastPage from "@/pages/messaging/BroadcastPage";
 import AuditLogPage from "@/pages/admin/AuditLogPage";
+import ChallengesListPage from "@/pages/challenges/ChallengesListPage";
+import ChallengeDetailPage from "@/pages/challenges/ChallengeDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -36,6 +41,7 @@ export const router = createBrowserRouter([
     children: [
       { path: "/welcome", element: <Welcome /> },
       { path: "/auth/login", element: <Login /> },
+      { path: "/auth/login-email", element: <LoginEmail /> },
       { path: "/auth/redeem-installer", element: <RedeemInstaller /> },
       { path: "/auth/forgot-password", element: <ForgotPassword /> },
       { path: "/auth/reset-password", element: <ResetPassword /> },
@@ -63,6 +69,12 @@ export const router = createBrowserRouter([
           { index: true, element: <DashboardPage /> },
           { path: "attention-required", element: <AttentionRequiredPage /> },
           { path: "members", element: <MembersPage /> },
+          // Orden importante: "new" antes que ":id" porque react-router
+          // mata el match en el primero que pegue. Si "members/:id"
+          // viniera primero, navegar a "/members/new" lo atraparía
+          // como detail de un socio con id="new".
+          { path: "members/new", element: <MemberCreatePage /> },
+          { path: "members/:id", element: <MemberDetailPage /> },
           { path: "profile", element: <ProfilePage /> },
           { path: "billing", element: <CobrosPage /> },
           { path: "products", element: <ProductsPage /> },
@@ -80,6 +92,8 @@ export const router = createBrowserRouter([
           { path: "settings/alerts", element: <AlertsPage /> },
           { path: "messaging/broadcast", element: <BroadcastPage /> },
           { path: "admin/audit-log", element: <AuditLogPage /> },
+          { path: "retos", element: <ChallengesListPage /> },
+          { path: "retos/:id", element: <ChallengeDetailPage /> },
         ],
       },
     ],

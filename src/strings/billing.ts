@@ -9,6 +9,16 @@ export const billing = {
       maintenance: "Mantenimiento",
       discount: "Descuento",
     },
+    // Warnings inline que aparecen sólo cuando el operador FUERZA
+    // (override manual) un cobro que el sistema no recomienda. La
+    // intención es advertir sin bloquear — el operador sabrá si tiene
+    // razón legítima (recargo, error previo, etc.).
+    warn: {
+      enrollmentAlreadyPaid:
+        "Este socio ya pagó su inscripción anteriormente. Sólo cóbrasela otra vez si es un caso especial.",
+      maintenanceNotDue: (date: string) =>
+        `El siguiente cobro de mantenimiento toca hasta el ${date}. Sólo adelántalo si es un caso especial.`,
+    },
     addDiscount: "+ Aplicar descuento",
     removeDiscount: "− Quitar descuento",
     addPartial: "+ Pago parcial (diferido)",

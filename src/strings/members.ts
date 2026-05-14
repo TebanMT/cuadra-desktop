@@ -19,7 +19,10 @@ export const members = {
       all: "Todos",
       active: "Activos",
       expiringSoon: "Por vencer",
-      expired: "Vencidos",
+      // "Por cobrar" incluye vencidos clásicos y socios inscritos sin
+      // primer pago (pending_payment). Para el operador es la misma
+      // acción: cobrar.
+      expired: "Por cobrar",
       inactive: "Inactivos",
     },
     columns: {
@@ -58,11 +61,16 @@ export const members = {
     membership: {
       title: "Membresía actual",
       none: "Este socio no tiene membresía activa.",
+      pendingTitle: "Falta primer pago",
+      pendingBody:
+        "Este socio aún no ha pagado su inscripción. Cobra cualquier monto (parcial está bien) para activar la membresía.",
+      pendingChargeCta: "Cobrar ahora",
       vigente: "Vigente",
       expiring: (days: number) => `Vence en ${days} ${days === 1 ? "día" : "días"}`,
       expired: (days: number) => `Vencida hace ${Math.abs(days)} ${Math.abs(days) === 1 ? "día" : "días"}`,
       due: "Vence",
       pay: "Cobrar renovación",
+      payFirst: "Cobrar primer pago",
       lock: "Ajustar vigencia",
     },
     tabs: {
@@ -78,6 +86,7 @@ export const members = {
       markInactive: "Marcar inactivo",
       markActive: "Reactivar",
       assignPin: "Asignar PIN",
+      changePin: "Cambiar PIN",
     },
     shortcuts: {
       title: "Atajos",
@@ -90,8 +99,26 @@ export const members = {
   form: {
     titleNew: "Nuevo socio",
     titleEdit: "Editar socio",
+    matches: {
+      header: (n: number) =>
+        n === 1 ? "Tal vez ya está registrado:" : "Tal vez ya están registrados:",
+      hint: "Si es uno de estos, ábrelo en vez de crearlo otra vez.",
+      open: "Abrir perfil",
+      dismiss: "Ocultar sugerencias",
+      createNew: (name: string) => `Crear nuevo socio: "${name}"`,
+      status: {
+        active: "Activo",
+        expiringSoon: "Por vencer",
+        expired: "Vencido",
+        pendingPayment: "Sin primer pago",
+        inactive: "Inactivo",
+        noPlan: "Sin plan",
+      },
+    },
     sections: {
       basics: "Datos básicos",
+      basicsHint:
+        "Sólo necesitamos nombre y teléfono — lo demás es opcional.",
       membership: "Membresía",
     },
     fields: {
@@ -109,17 +136,41 @@ export const members = {
     addBirthdate: "+ Agregar fecha de nacimiento",
     addPhoto: "+ Agregar foto",
     addNotes: "+ Agregar notas",
-    chooseFile: "Elegir archivo",
+    chooseFile: "Subir archivo",
+    takePhoto: "Tomar foto",
     removePhoto: "Quitar foto",
+    camera: {
+      title: "Capturar foto del socio",
+      hint: "Cuando estés listo, presiona Capturar.",
+      capture: "Capturar",
+      retake: "Volver a tomar",
+      use: "Usar esta foto",
+      cancel: "Cancelar",
+      starting: "Iniciando cámara…",
+      errors: {
+        notFound: "No se detectó cámara conectada.",
+        denied:
+          "Tinta no tiene permiso para usar la cámara. Abre Ajustes del Sistema → Privacidad → Cámara.",
+        generic: "No pudimos abrir la cámara. Vuelve a intentar.",
+      },
+    },
+    // Inverso al botón "+ Agregar X" — esconde la sección y limpia el
+    // valor. Misma copia para email/birthdate/notes para mantener
+    // consistencia.
+    removeOptional: "Quitar",
     expiryPreview: (date: string) => `Vencerá: ${date}`,
     chargeFirstPayment: "Cobrar primer pago ahora",
     chargeAmount: (amount: string) => `Monto: ${amount}`,
+    chargeBreakdown: "Desglose del cobro",
+    chargeEnrollment: "Inscripción",
+    chargeMaintenance: "Mantenimiento",
+    chargeTotal: "Total",
     methods: {
       cash: "Efectivo",
       transfer: "Transferencia",
       card: "Tarjeta",
     },
-    submitNew: "Guardar socio",
+    submitNew: "Inscribir socio",
     submitEdit: "Guardar cambios",
     cancel: "Cancelar",
     duplicate: {
@@ -180,22 +231,53 @@ export const members = {
   },
   pin: {
     title: "PIN del socio",
+    titleChange: "Cambiar PIN",
     description:
-      "Tinta genera un PIN aleatorio de 4 dígitos. Solo se ve esta vez; si se pierde, puedes regenerarlo.",
+      "Tinta asignó un PIN de 4 dígitos cuando inscribiste al socio. Puedes generar uno nuevo si se compartió por error — se reenvía automáticamente por WhatsApp.",
     generating: "Generando PIN…",
     label: (name: string) => `PIN de ${name}`,
     copy: "Copiar",
     copied: "PIN copiado al portapapeles.",
     done: "Listo",
-    regenerate: "Regenerar PIN",
+    regenerate: "Generar nuevo PIN",
     disclaimer:
-      "Compártelo con el socio. Para verlo después, vuelve a esta pantalla y regenera.",
-    success: "PIN asignado.",
+      "Siempre puedes consultar el PIN desde el perfil del socio.",
+    success: "PIN actualizado.",
+    triggerChange: "Cambiar PIN",
+    profileLabel: "PIN",
+    profileHint: "Compártelo cuando el socio lo olvide.",
+    profileCopy: "Copiar",
+    profileNone: "Sin PIN asignado.",
+    profileAssign: "Asignar PIN",
+    // Copy del strip post-creación / modal de cambio. Cuando WhatsApp
+    // está conectado y el socio tiene teléfono, mostramos a quién se
+    // mandó; en cualquier otro caso, instrucción de copiarlo a mano.
+    sentToWhatsApp: (phone: string) => `Enviado por WhatsApp a ${phone}.`,
+    notSent: "Escríbelo en la credencial.",
+    notSentNoWhatsApp: "Conecta WhatsApp en Configuración para enviarlo automáticamente.",
+    notSentNoPhone: "El socio no tiene teléfono — escríbelo en la credencial.",
   },
   types: {
     pageTitle: "Membresías",
     pageSubtitle: "Crea, edita o desactiva los planes que ofreces.",
     addNew: "Agregar membresía",
+    // Configuración a nivel gym (no por plan): si el dueño cobra cuota
+    // de inscripción / mantenimiento al socio, lo dice acá. Cada plan
+    // sólo define el MONTO (puede ser $0 para plan-de-paso, etc.).
+    gymSettingsTitle: "Cobros del gym",
+    gymSettingsHint:
+      "Activa lo que tu gym cobra. Cada membresía define después el monto.",
+    chargeEnrollment: "Cobrar inscripción",
+    chargeEnrollmentHint: "Pago único cuando un socio nuevo se inscribe.",
+    chargeMaintenance: "Cobrar mantenimiento",
+    chargeMaintenanceHint: "Cuota recurrente además de la membresía.",
+    maintenanceFrequency: "Frecuencia",
+    // Orden = cada cuánto se cobra, de más frecuente a menos.
+    freqMonthly: "Mensual",
+    freqBimonthly: "Bimestral",
+    freqQuarterly: "Trimestral",
+    freqSemiannual: "Semestral",
+    freqAnnual: "Anual",
     columns: {
       name: "Nombre",
       price: "Precio",
@@ -220,14 +302,30 @@ export const members = {
       titleEdit: "Editar membresía",
       name: "Nombre",
       price: "Precio",
-      durationDays: "Duración (días)",
-      enrollment: "Cobrar inscripción",
+      durationDays: "Duración",
+      // Opciones predefinidas para el select de duración. Cubren el
+      // 99% de los planes de gimnasios mexicanos (paso, semanal,
+      // quincenal, mensual, bimestral, trimestral, semestral, anual).
+      // "Personalizada" abre un input numérico para casos exóticos.
+      durationOptions: [
+        { days: 1, label: "1 día (paso)" },
+        { days: 7, label: "1 semana" },
+        { days: 15, label: "15 días (quincenal)" },
+        { days: 30, label: "30 días (mensual)" },
+        { days: 60, label: "60 días (bimestral)" },
+        { days: 90, label: "90 días (trimestral)" },
+        { days: 180, label: "180 días (semestral)" },
+        { days: 365, label: "365 días (anual)" },
+      ] as const,
+      durationCustom: "Personalizada…",
+      durationCustomLabel: "Cantidad de días",
+      // Fields reintroducidos como condicionales — visibles sólo cuando
+      // el dueño habilita la feature desde el toggle a nivel página
+      // (ver MembershipTypes.tsx). La decisión de cobrar inscripción/
+      // mantenimiento es de gym, no por plan; lo que varía por plan es
+      // el monto.
       enrollmentAmount: "Monto de inscripción",
-      maintenance: "Cobrar mantenimiento",
       maintenanceAmount: "Monto de mantenimiento",
-      maintenanceFreq: "Frecuencia",
-      freqMonthly: "Mensual",
-      freqAnnual: "Anual",
       submitNew: "Crear membresía",
       submitEdit: "Guardar cambios",
       cancel: "Cancelar",
@@ -237,9 +335,8 @@ export const members = {
         nameRequired: "Falta el nombre.",
         nameLength: "El nombre debe tener entre 3 y 100 caracteres.",
         priceRequired: "El precio debe ser mayor a cero.",
-        durationRequired: "La duración debe ser al menos 1 día.",
-        enrollmentNegative: "La inscripción no puede ser negativa.",
-        maintenanceNegative: "El mantenimiento no puede ser negativo.",
+        durationRequired: "Elige una duración.",
+        durationCustomInvalid: "La duración personalizada debe ser al menos 1 día.",
         generic: "No pudimos guardar. Vuelve a intentar.",
       },
       success: {

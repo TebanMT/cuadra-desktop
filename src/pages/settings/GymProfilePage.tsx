@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, ShieldAlert } from "lucide-react";
+import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -21,6 +21,7 @@ import {
   useUpdateGymProfile,
   type UpdateGymProfileInput,
 } from "@/hooks/useGym";
+import { useRefreshIdentity } from "@/hooks/useAuth";
 import { ApiError } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { settings as t } from "@/strings/settings";
@@ -53,10 +54,30 @@ interface FormState {
 export default function GymProfilePage() {
   const profile = useGymProfile();
   const update = useUpdateGymProfile();
+  const refreshIdentity = useRefreshIdentity();
   const role = useAuthStore((s) => s.user?.role);
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
+
+  async function onRefresh() {
+    try {
+      await refreshIdentity.mutateAsync();
+      // El query de gym profile se invalida adentro del hook; el form
+      // se re-hidrata cuando profile.data cambie (useEffect existente).
+      // Forzamos a re-leer reseteando el form para que el useEffect dispare.
+      setForm(null);
+      toast.success("Datos del gym actualizados desde la nube.");
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 412) {
+        toast.error("Esta laptop no está vinculada a la nube. Re-pareo necesario.");
+      } else if (e instanceof ApiError && e.status === 503) {
+        toast.error("Necesitas internet para volver a leer los datos.");
+      } else {
+        toast.error("No pudimos refrescar los datos. Vuelve a intentar.");
+      }
+    }
+  }
 
   useEffect(() => {
     if (profile.data && !form) {
@@ -170,14 +191,35 @@ export default function GymProfilePage() {
 
   return (
     <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <div className="space-y-1">
-        <h1
-          className="text-3xl font-bold text-foreground"
-          style={{ letterSpacing: "-0.02em" }}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1">
+          <h1
+            className="text-3xl font-bold text-foreground"
+            style={{ letterSpacing: "-0.02em" }}
+          >
+            {t.gymProfile.title}
+          </h1>
+          <p className="text-sm text-muted-foreground">{t.gymProfile.subtitle}</p>
+        </div>
+        {/* Nivel 1 de re-pareo: bota al cloud, baja los datos frescos
+            del gym + dueño, re-mirrorea el SQLite local. No revoca
+            credenciales — sólo refresca identidad. Útil cuando ves
+            nombre vacío / phone null tras un setup desde otro device. */}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={onRefresh}
+          disabled={refreshIdentity.isPending}
+          title="Volver a leer los datos del gym desde la nube"
         >
-          {t.gymProfile.title}
-        </h1>
-        <p className="text-sm text-muted-foreground">{t.gymProfile.subtitle}</p>
+          {refreshIdentity.isPending ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <RefreshCw className="h-4 w-4 mr-2" />
+          )}
+          Refrescar datos
+        </Button>
       </div>
 
       <form onSubmit={submit} className="space-y-4" noValidate>

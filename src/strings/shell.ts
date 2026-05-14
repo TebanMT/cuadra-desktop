@@ -1,14 +1,23 @@
 export const shell = {
   nav: {
-    dashboard: "Dashboard",
+    dashboard: "Inicio",
     attention: "Atención",
     members: "Socios",
     billing: "Cobros",
     sales: "Venta rápida",
     products: "Productos",
+    membershipTypes: "Tipos de membresía",
     checkin: "Check-in",
+    challenges: "Retos",
     reports: "Reportes",
-    settings: "Configuración",
+    settings: "Ajustes",
+  },
+  navGroups: {
+    operation: "Operación",
+    catalog: "Catálogo",
+    programs: "Programas",
+    reports: "Reportes",
+    settings: "Ajustes",
   },
   user: {
     logout: "Cerrar sesión",

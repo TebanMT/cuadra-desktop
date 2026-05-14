@@ -1,4 +1,6 @@
 use std::collections::VecDeque;
+use std::fs;
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -7,6 +9,8 @@ use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 use tokio::sync::Mutex;
 use uuid::Uuid;
+
+use crate::secure_storage::APP_DIR_NAME;
 
 // Sin prefix `binaries/` a propósito. Tauri 2 aplana las subcarpetas al
 // bundlear external bins en macOS (las copia directo a Contents/MacOS/),
@@ -77,6 +81,22 @@ impl SidecarManager {
                 log::error!("sidecar binary not found ({SIDECAR_BIN}): {e}");
                 self.mark_failed(app).await;
                 return false;
+            }
+        };
+
+        // Resuelve los paths persistentes del sidecar (SQLite + cache
+        // de fotos) al app-data dir per-OS. Sin esto el sidecar cae
+        // a ./tmp/ relativo al cwd, que en macOS empaquetado es `/`
+        // → /tmp, donde el OS borra archivos en reboot. Catastrófico
+        // para tinta.db (perderías toda la operación local) e
+        // incómodo para uploads/ (re-download desde R2 en cada boot).
+        let cmd = match app_data_paths() {
+            Ok(paths) => cmd
+                .env("SIDECAR_DB_PATH", &paths.db_path)
+                .env("UPLOADS_DIR", &paths.uploads_dir),
+            Err(e) => {
+                log::warn!("could not resolve app data dir, sidecar will use defaults: {e}");
+                cmd
             }
         };
 
@@ -178,4 +198,28 @@ impl SidecarManager {
             tokio::time::sleep(SHUTDOWN_GRACE).await;
         }
     }
+}
+
+struct AppDataPaths {
+    db_path: PathBuf,
+    uploads_dir: PathBuf,
+}
+
+// app_data_paths resuelve el directorio app-data per-OS y devuelve los
+// paths que el sidecar Go espera por env var. Crea el directorio si
+// no existe. Comparte el constante APP_DIR_NAME con secure_storage
+// para que todo el estado del desktop viva bajo el mismo paraguas.
+fn app_data_paths() -> Result<AppDataPaths, String> {
+    let root = dirs::data_dir().ok_or_else(|| "no platform data dir".to_string())?;
+    let app_dir = root.join(APP_DIR_NAME);
+    let uploads_dir = app_dir.join("uploads");
+    // mkdir -p sobre uploads (que es nieto de root) — crea también
+    // el app_dir si no existe. Errores se propagan al caller que
+    // decide caer al default del sidecar.
+    fs::create_dir_all(&uploads_dir).map_err(|e| format!("mkdir uploads: {e}"))?;
+    let db_path = app_dir.join("tinta.db");
+    Ok(AppDataPaths {
+        db_path,
+        uploads_dir,
+    })
 }

@@ -43,7 +43,7 @@ describe("MemberForm", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: /guardar socio/i }));
+    await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
 
     expect(await screen.findByText(/el nombre debe tener entre 3 y 100/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -63,7 +63,7 @@ describe("MemberForm", () => {
 
     await user.type(screen.getByLabelText(/nombre completo/i), "Juan Pérez");
     await user.type(screen.getByLabelText(/teléfono/i), "12345");
-    await user.click(screen.getByRole("button", { name: /guardar socio/i }));
+    await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
 
     expect(await screen.findByText(/necesito 10 dígitos/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();

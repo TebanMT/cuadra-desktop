@@ -78,7 +78,7 @@ export function TopBar() {
   const bio = useBiometricStatus();
   const { resolved, toggle } = useTheme();
   const attention = useAttentionRequired();
-  const readerDisconnected = bio.data?.available === true && !bio.data?.reader?.connected;
+  const readerDisconnected = bio.data?.available === true && !bio.data?.connected;
 
   const [searchValue, setSearchValue] = useState("");
 

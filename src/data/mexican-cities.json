@@ -1,215 +1,9914 @@
 [
-  { "name": "Ciudad de México", "state": "CDMX" },
-  { "name": "Ecatepec de Morelos", "state": "Méx." },
-  { "name": "Guadalajara", "state": "Jal." },
-  { "name": "Puebla", "state": "Pue." },
-  { "name": "Tijuana", "state": "BC" },
-  { "name": "León", "state": "Gto." },
-  { "name": "Monterrey", "state": "NL" },
-  { "name": "Ciudad Juárez", "state": "Chih." },
-  { "name": "Zapopan", "state": "Jal." },
-  { "name": "Nezahualcóyotl", "state": "Méx." },
-  { "name": "Chihuahua", "state": "Chih." },
-  { "name": "Naucalpan", "state": "Méx." },
-  { "name": "Mérida", "state": "Yuc." },
-  { "name": "San Luis Potosí", "state": "SLP" },
-  { "name": "Aguascalientes", "state": "Ags." },
-  { "name": "Hermosillo", "state": "Son." },
-  { "name": "Saltillo", "state": "Coah." },
-  { "name": "Mexicali", "state": "BC" },
-  { "name": "Culiacán", "state": "Sin." },
-  { "name": "Guadalupe", "state": "NL" },
-  { "name": "Acapulco", "state": "Gro." },
-  { "name": "Tlalnepantla", "state": "Méx." },
-  { "name": "Cancún", "state": "Q. Roo" },
-  { "name": "Querétaro", "state": "Qro." },
-  { "name": "Chimalhuacán", "state": "Méx." },
-  { "name": "Torreón", "state": "Coah." },
-  { "name": "Morelia", "state": "Mich." },
-  { "name": "Reynosa", "state": "Tamps." },
-  { "name": "Tlaquepaque", "state": "Jal." },
-  { "name": "Tuxtla Gutiérrez", "state": "Chis." },
-  { "name": "Toluca", "state": "Méx." },
-  { "name": "Durango", "state": "Dgo." },
-  { "name": "Ciudad López Mateos", "state": "Méx." },
-  { "name": "Ciudad Apodaca", "state": "NL" },
-  { "name": "Cuautitlán Izcalli", "state": "Méx." },
-  { "name": "Matamoros", "state": "Tamps." },
-  { "name": "General Escobedo", "state": "NL" },
-  { "name": "Veracruz", "state": "Ver." },
-  { "name": "Villahermosa", "state": "Tab." },
-  { "name": "Xalapa", "state": "Ver." },
-  { "name": "Mazatlán", "state": "Sin." },
-  { "name": "Irapuato", "state": "Gto." },
-  { "name": "Nuevo Laredo", "state": "Tamps." },
-  { "name": "Xochimilco", "state": "CDMX" },
-  { "name": "Tonalá", "state": "Jal." },
-  { "name": "Pachuca", "state": "Hgo." },
-  { "name": "Ciudad Victoria", "state": "Tamps." },
-  { "name": "Tampico", "state": "Tamps." },
-  { "name": "Ciudad Obregón", "state": "Son." },
-  { "name": "Ensenada", "state": "BC" },
-  { "name": "Santa Catarina", "state": "NL" },
-  { "name": "Coacalco", "state": "Méx." },
-  { "name": "Uruapan", "state": "Mich." },
-  { "name": "Los Mochis", "state": "Sin." },
-  { "name": "Oaxaca", "state": "Oax." },
-  { "name": "Soledad de Graciano Sánchez", "state": "SLP" },
-  { "name": "Tepic", "state": "Nay." },
-  { "name": "Ixtapaluca", "state": "Méx." },
-  { "name": "Tehuacán", "state": "Pue." },
-  { "name": "Ojo de Agua", "state": "Méx." },
-  { "name": "García", "state": "NL" },
-  { "name": "Cuernavaca", "state": "Mor." },
-  { "name": "Playa del Carmen", "state": "Q. Roo" },
-  { "name": "Buenavista", "state": "Méx." },
-  { "name": "Celaya", "state": "Gto." },
-  { "name": "Campeche", "state": "Camp." },
-  { "name": "Chilpancingo", "state": "Gro." },
-  { "name": "Coatzacoalcos", "state": "Ver." },
-  { "name": "La Paz", "state": "BCS" },
-  { "name": "Poza Rica", "state": "Ver." },
-  { "name": "Iztapalapa", "state": "CDMX" },
-  { "name": "San Pedro Garza García", "state": "NL" },
-  { "name": "Salamanca", "state": "Gto." },
-  { "name": "Puerto Vallarta", "state": "Jal." },
-  { "name": "Carmen", "state": "Camp." },
-  { "name": "Boca del Río", "state": "Ver." },
-  { "name": "Tlajomulco de Zúñiga", "state": "Jal." },
-  { "name": "Salina Cruz", "state": "Oax." },
-  { "name": "Ciudad del Carmen", "state": "Camp." },
-  { "name": "Manzanillo", "state": "Col." },
-  { "name": "Zacatecas", "state": "Zac." },
-  { "name": "Colima", "state": "Col." },
-  { "name": "Cuautla", "state": "Mor." },
-  { "name": "Tepatitlán", "state": "Jal." },
-  { "name": "Iguala", "state": "Gro." },
-  { "name": "Atizapán de Zaragoza", "state": "Méx." },
-  { "name": "Tultitlán", "state": "Méx." },
-  { "name": "Tapachula", "state": "Chis." },
-  { "name": "Nogales", "state": "Son." },
-  { "name": "Piedras Negras", "state": "Coah." },
-  { "name": "Delicias", "state": "Chih." },
-  { "name": "Texcoco", "state": "Méx." },
-  { "name": "Cabo San Lucas", "state": "BCS" },
-  { "name": "Apizaco", "state": "Tlax." },
-  { "name": "Fresnillo", "state": "Zac." },
-  { "name": "Hidalgo del Parral", "state": "Chih." },
-  { "name": "Pénjamo", "state": "Gto." },
-  { "name": "Lázaro Cárdenas", "state": "Mich." },
-  { "name": "Salvatierra", "state": "Gto." },
-  { "name": "Tlaxcala", "state": "Tlax." },
-  { "name": "Comitán", "state": "Chis." },
-  { "name": "Cozumel", "state": "Q. Roo" },
-  { "name": "Chetumal", "state": "Q. Roo" },
-  { "name": "Tulum", "state": "Q. Roo" },
-  { "name": "San Cristóbal de las Casas", "state": "Chis." },
-  { "name": "Zamora", "state": "Mich." },
-  { "name": "Apatzingán", "state": "Mich." },
-  { "name": "Pátzcuaro", "state": "Mich." },
-  { "name": "San Juan del Río", "state": "Qro." },
-  { "name": "Tequisquiapan", "state": "Qro." },
-  { "name": "El Marqués", "state": "Qro." },
-  { "name": "Corregidora", "state": "Qro." },
-  { "name": "Cadereyta", "state": "NL" },
-  { "name": "Linares", "state": "NL" },
-  { "name": "Sabinas Hidalgo", "state": "NL" },
-  { "name": "Allende", "state": "NL" },
-  { "name": "Montemorelos", "state": "NL" },
-  { "name": "Salinas Victoria", "state": "NL" },
-  { "name": "Juárez", "state": "NL" },
-  { "name": "Ramos Arizpe", "state": "Coah." },
-  { "name": "Monclova", "state": "Coah." },
-  { "name": "Acuña", "state": "Coah." },
-  { "name": "San Juan de los Lagos", "state": "Jal." },
-  { "name": "Tlajomulco", "state": "Jal." },
-  { "name": "Lagos de Moreno", "state": "Jal." },
-  { "name": "Ocotlán", "state": "Jal." },
-  { "name": "Ameca", "state": "Jal." },
-  { "name": "Autlán", "state": "Jal." },
-  { "name": "Chapala", "state": "Jal." },
-  { "name": "Atotonilco", "state": "Jal." },
-  { "name": "Zapotlanejo", "state": "Jal." },
-  { "name": "El Salto", "state": "Jal." },
-  { "name": "Huejotzingo", "state": "Pue." },
-  { "name": "San Pedro Cholula", "state": "Pue." },
-  { "name": "San Andrés Cholula", "state": "Pue." },
-  { "name": "Atlixco", "state": "Pue." },
-  { "name": "Izúcar de Matamoros", "state": "Pue." },
-  { "name": "Teziutlán", "state": "Pue." },
-  { "name": "Huauchinango", "state": "Pue." },
-  { "name": "San Martín Texmelucan", "state": "Pue." },
-  { "name": "Huixquilucan", "state": "Méx." },
-  { "name": "Metepec", "state": "Méx." },
-  { "name": "Lerma", "state": "Méx." },
-  { "name": "Tultepec", "state": "Méx." },
-  { "name": "Chalco", "state": "Méx." },
-  { "name": "La Paz", "state": "Méx." },
-  { "name": "Nicolás Romero", "state": "Méx." },
-  { "name": "Zumpango", "state": "Méx." },
-  { "name": "Tepotzotlán", "state": "Méx." },
-  { "name": "Acolman", "state": "Méx." },
-  { "name": "Coatepec", "state": "Ver." },
-  { "name": "Orizaba", "state": "Ver." },
-  { "name": "Córdoba", "state": "Ver." },
-  { "name": "Minatitlán", "state": "Ver." },
-  { "name": "Tuxpan", "state": "Ver." },
-  { "name": "San Andrés Tuxtla", "state": "Ver." },
-  { "name": "Martínez de la Torre", "state": "Ver." },
-  { "name": "Papantla", "state": "Ver." },
-  { "name": "Río Blanco", "state": "Ver." },
-  { "name": "Pánuco", "state": "Ver." },
-  { "name": "Cosoleacaque", "state": "Ver." },
-  { "name": "Ciudad Mendoza", "state": "Ver." },
-  { "name": "Nanchital", "state": "Ver." },
-  { "name": "Acayucan", "state": "Ver." },
-  { "name": "Las Choapas", "state": "Ver." },
-  { "name": "Tres Valles", "state": "Ver." },
-  { "name": "Tierra Blanca", "state": "Ver." },
-  { "name": "Cuitláhuac", "state": "Ver." },
-  { "name": "Tezonapa", "state": "Ver." },
-  { "name": "Misantla", "state": "Ver." },
-  { "name": "Perote", "state": "Ver." },
-  { "name": "Soledad de Doblado", "state": "Ver." },
-  { "name": "Banderilla", "state": "Ver." },
-  { "name": "Atoyac de Álvarez", "state": "Gro." },
-  { "name": "Taxco", "state": "Gro." },
-  { "name": "Zihuatanejo", "state": "Gro." },
-  { "name": "Tlapa de Comonfort", "state": "Gro." },
-  { "name": "Petatlán", "state": "Gro." },
-  { "name": "Costa Chica", "state": "Gro." },
-  { "name": "Juchitán", "state": "Oax." },
-  { "name": "Puerto Escondido", "state": "Oax." },
-  { "name": "Huatulco", "state": "Oax." },
-  { "name": "Tehuantepec", "state": "Oax." },
-  { "name": "Tlacolula", "state": "Oax." },
-  { "name": "Tuxtepec", "state": "Oax." },
-  { "name": "Loreto", "state": "BCS" },
-  { "name": "Comondú", "state": "BCS" },
-  { "name": "Mulegé", "state": "BCS" },
-  { "name": "Rosarito", "state": "BC" },
-  { "name": "Tecate", "state": "BC" },
-  { "name": "San Felipe", "state": "BC" },
-  { "name": "Sahuayo", "state": "Mich." },
-  { "name": "Jacona", "state": "Mich." },
-  { "name": "Hidalgo", "state": "Mich." },
-  { "name": "Maravatío", "state": "Mich." },
-  { "name": "Zitácuaro", "state": "Mich." },
-  { "name": "Jiquilpan", "state": "Mich." },
-  { "name": "La Piedad", "state": "Mich." },
-  { "name": "Yautepec", "state": "Mor." },
-  { "name": "Jiutepec", "state": "Mor." },
-  { "name": "Temixco", "state": "Mor." },
-  { "name": "Emiliano Zapata", "state": "Mor." },
-  { "name": "Xochitepec", "state": "Mor." },
-  { "name": "Progreso", "state": "Yuc." },
-  { "name": "Tizimín", "state": "Yuc." },
-  { "name": "Valladolid", "state": "Yuc." },
-  { "name": "Kanasín", "state": "Yuc." },
-  { "name": "Umán", "state": "Yuc." },
-  { "name": "Hunucmá", "state": "Yuc." },
-  { "name": "Motul", "state": "Yuc." },
-  { "name": "Felipe Carrillo Puerto", "state": "Q. Roo" },
-  { "name": "Bacalar", "state": "Q. Roo" },
-  { "name": "Isla Mujeres", "state": "Q. Roo" }
+  {
+    "name": "Aguascalientes",
+    "state": "Ags."
+  },
+  {
+    "name": "Asientos",
+    "state": "Ags."
+  },
+  {
+    "name": "Calvillo",
+    "state": "Ags."
+  },
+  {
+    "name": "Cosío",
+    "state": "Ags."
+  },
+  {
+    "name": "El Llano",
+    "state": "Ags."
+  },
+  {
+    "name": "Jesús María",
+    "state": "Ags."
+  },
+  {
+    "name": "Pabellón de Arteaga",
+    "state": "Ags."
+  },
+  {
+    "name": "Rincón de Romos",
+    "state": "Ags."
+  },
+  {
+    "name": "San Francisco de los Romo",
+    "state": "Ags."
+  },
+  {
+    "name": "San José de Gracia",
+    "state": "Ags."
+  },
+  {
+    "name": "Tepezalá",
+    "state": "Ags."
+  },
+  {
+    "name": "Ensenada",
+    "state": "BC"
+  },
+  {
+    "name": "Mexicali",
+    "state": "BC"
+  },
+  {
+    "name": "Playas de Rosarito",
+    "state": "BC"
+  },
+  {
+    "name": "San Felipe",
+    "state": "BC"
+  },
+  {
+    "name": "San Quintín",
+    "state": "BC"
+  },
+  {
+    "name": "Tecate",
+    "state": "BC"
+  },
+  {
+    "name": "Tijuana",
+    "state": "BC"
+  },
+  {
+    "name": "Comondú",
+    "state": "BCS"
+  },
+  {
+    "name": "La Paz",
+    "state": "BCS"
+  },
+  {
+    "name": "Loreto",
+    "state": "BCS"
+  },
+  {
+    "name": "Los Cabos",
+    "state": "BCS"
+  },
+  {
+    "name": "Mulegé",
+    "state": "BCS"
+  },
+  {
+    "name": "Calakmul",
+    "state": "Camp."
+  },
+  {
+    "name": "Calkiní",
+    "state": "Camp."
+  },
+  {
+    "name": "Campeche",
+    "state": "Camp."
+  },
+  {
+    "name": "Candelaria",
+    "state": "Camp."
+  },
+  {
+    "name": "Carmen",
+    "state": "Camp."
+  },
+  {
+    "name": "Champotón",
+    "state": "Camp."
+  },
+  {
+    "name": "Dzitbalché",
+    "state": "Camp."
+  },
+  {
+    "name": "Escárcega",
+    "state": "Camp."
+  },
+  {
+    "name": "Hecelchakán",
+    "state": "Camp."
+  },
+  {
+    "name": "Hopelchén",
+    "state": "Camp."
+  },
+  {
+    "name": "Palizada",
+    "state": "Camp."
+  },
+  {
+    "name": "Seybaplaya",
+    "state": "Camp."
+  },
+  {
+    "name": "Tenabo",
+    "state": "Camp."
+  },
+  {
+    "name": "Álvaro Obregón",
+    "state": "CDMX"
+  },
+  {
+    "name": "Azcapotzalco",
+    "state": "CDMX"
+  },
+  {
+    "name": "Benito Juárez",
+    "state": "CDMX"
+  },
+  {
+    "name": "Coyoacán",
+    "state": "CDMX"
+  },
+  {
+    "name": "Cuajimalpa de Morelos",
+    "state": "CDMX"
+  },
+  {
+    "name": "Cuauhtémoc",
+    "state": "CDMX"
+  },
+  {
+    "name": "Gustavo A. Madero",
+    "state": "CDMX"
+  },
+  {
+    "name": "Iztacalco",
+    "state": "CDMX"
+  },
+  {
+    "name": "Iztapalapa",
+    "state": "CDMX"
+  },
+  {
+    "name": "La Magdalena Contreras",
+    "state": "CDMX"
+  },
+  {
+    "name": "Miguel Hidalgo",
+    "state": "CDMX"
+  },
+  {
+    "name": "Milpa Alta",
+    "state": "CDMX"
+  },
+  {
+    "name": "Tláhuac",
+    "state": "CDMX"
+  },
+  {
+    "name": "Tlalpan",
+    "state": "CDMX"
+  },
+  {
+    "name": "Venustiano Carranza",
+    "state": "CDMX"
+  },
+  {
+    "name": "Xochimilco",
+    "state": "CDMX"
+  },
+  {
+    "name": "Ahumada",
+    "state": "Chih."
+  },
+  {
+    "name": "Aldama",
+    "state": "Chih."
+  },
+  {
+    "name": "Allende",
+    "state": "Chih."
+  },
+  {
+    "name": "Aquiles Serdán",
+    "state": "Chih."
+  },
+  {
+    "name": "Ascensión",
+    "state": "Chih."
+  },
+  {
+    "name": "Bachíniva",
+    "state": "Chih."
+  },
+  {
+    "name": "Balleza",
+    "state": "Chih."
+  },
+  {
+    "name": "Batopilas de Manuel Gómez Morín",
+    "state": "Chih."
+  },
+  {
+    "name": "Bocoyna",
+    "state": "Chih."
+  },
+  {
+    "name": "Buenaventura",
+    "state": "Chih."
+  },
+  {
+    "name": "Camargo",
+    "state": "Chih."
+  },
+  {
+    "name": "Carichí",
+    "state": "Chih."
+  },
+  {
+    "name": "Casas Grandes",
+    "state": "Chih."
+  },
+  {
+    "name": "Chihuahua",
+    "state": "Chih."
+  },
+  {
+    "name": "Chínipas",
+    "state": "Chih."
+  },
+  {
+    "name": "Coronado",
+    "state": "Chih."
+  },
+  {
+    "name": "Coyame del Sotol",
+    "state": "Chih."
+  },
+  {
+    "name": "Cuauhtémoc",
+    "state": "Chih."
+  },
+  {
+    "name": "Cusihuiriachi",
+    "state": "Chih."
+  },
+  {
+    "name": "Delicias",
+    "state": "Chih."
+  },
+  {
+    "name": "Dr. Belisario Domínguez",
+    "state": "Chih."
+  },
+  {
+    "name": "El Tule",
+    "state": "Chih."
+  },
+  {
+    "name": "Galeana",
+    "state": "Chih."
+  },
+  {
+    "name": "Gómez Farías",
+    "state": "Chih."
+  },
+  {
+    "name": "Gran Morelos",
+    "state": "Chih."
+  },
+  {
+    "name": "Guachochi",
+    "state": "Chih."
+  },
+  {
+    "name": "Guadalupe",
+    "state": "Chih."
+  },
+  {
+    "name": "Guadalupe y Calvo",
+    "state": "Chih."
+  },
+  {
+    "name": "Guazapares",
+    "state": "Chih."
+  },
+  {
+    "name": "Guerrero",
+    "state": "Chih."
+  },
+  {
+    "name": "Hidalgo del Parral",
+    "state": "Chih."
+  },
+  {
+    "name": "Huejotitán",
+    "state": "Chih."
+  },
+  {
+    "name": "Ignacio Zaragoza",
+    "state": "Chih."
+  },
+  {
+    "name": "Janos",
+    "state": "Chih."
+  },
+  {
+    "name": "Jiménez",
+    "state": "Chih."
+  },
+  {
+    "name": "Juárez",
+    "state": "Chih."
+  },
+  {
+    "name": "Julimes",
+    "state": "Chih."
+  },
+  {
+    "name": "La Cruz",
+    "state": "Chih."
+  },
+  {
+    "name": "López",
+    "state": "Chih."
+  },
+  {
+    "name": "Madera",
+    "state": "Chih."
+  },
+  {
+    "name": "Maguarichi",
+    "state": "Chih."
+  },
+  {
+    "name": "Manuel Benavides",
+    "state": "Chih."
+  },
+  {
+    "name": "Matachí",
+    "state": "Chih."
+  },
+  {
+    "name": "Matamoros",
+    "state": "Chih."
+  },
+  {
+    "name": "Meoqui",
+    "state": "Chih."
+  },
+  {
+    "name": "Morelos",
+    "state": "Chih."
+  },
+  {
+    "name": "Moris",
+    "state": "Chih."
+  },
+  {
+    "name": "Namiquipa",
+    "state": "Chih."
+  },
+  {
+    "name": "Nonoava",
+    "state": "Chih."
+  },
+  {
+    "name": "Nuevo Casas Grandes",
+    "state": "Chih."
+  },
+  {
+    "name": "Ocampo",
+    "state": "Chih."
+  },
+  {
+    "name": "Ojinaga",
+    "state": "Chih."
+  },
+  {
+    "name": "Praxedis G. Guerrero",
+    "state": "Chih."
+  },
+  {
+    "name": "Riva Palacio",
+    "state": "Chih."
+  },
+  {
+    "name": "Rosales",
+    "state": "Chih."
+  },
+  {
+    "name": "San Francisco de Borja",
+    "state": "Chih."
+  },
+  {
+    "name": "San Francisco de Conchos",
+    "state": "Chih."
+  },
+  {
+    "name": "San Francisco del Oro",
+    "state": "Chih."
+  },
+  {
+    "name": "Santa Bárbara",
+    "state": "Chih."
+  },
+  {
+    "name": "Santa Isabel",
+    "state": "Chih."
+  },
+  {
+    "name": "Satevó",
+    "state": "Chih."
+  },
+  {
+    "name": "Saucillo",
+    "state": "Chih."
+  },
+  {
+    "name": "Temósachic",
+    "state": "Chih."
+  },
+  {
+    "name": "Urique",
+    "state": "Chih."
+  },
+  {
+    "name": "Uruachi",
+    "state": "Chih."
+  },
+  {
+    "name": "Valle de Zaragoza",
+    "state": "Chih."
+  },
+  {
+    "name": "Valle del Rosario",
+    "state": "Chih."
+  },
+  {
+    "name": "Acacoyagua",
+    "state": "Chis."
+  },
+  {
+    "name": "Acala",
+    "state": "Chis."
+  },
+  {
+    "name": "Acapetahua",
+    "state": "Chis."
+  },
+  {
+    "name": "Aldama",
+    "state": "Chis."
+  },
+  {
+    "name": "Altamirano",
+    "state": "Chis."
+  },
+  {
+    "name": "Amatán",
+    "state": "Chis."
+  },
+  {
+    "name": "Amatenango de la Frontera",
+    "state": "Chis."
+  },
+  {
+    "name": "Amatenango del Valle",
+    "state": "Chis."
+  },
+  {
+    "name": "Ángel Albino Corzo",
+    "state": "Chis."
+  },
+  {
+    "name": "Arriaga",
+    "state": "Chis."
+  },
+  {
+    "name": "Bejucal de Ocampo",
+    "state": "Chis."
+  },
+  {
+    "name": "Bella Vista",
+    "state": "Chis."
+  },
+  {
+    "name": "Benemérito de las Américas",
+    "state": "Chis."
+  },
+  {
+    "name": "Berriozábal",
+    "state": "Chis."
+  },
+  {
+    "name": "Bochil",
+    "state": "Chis."
+  },
+  {
+    "name": "Cacahoatán",
+    "state": "Chis."
+  },
+  {
+    "name": "Capitán Luis Ángel Vidal",
+    "state": "Chis."
+  },
+  {
+    "name": "Catazajá",
+    "state": "Chis."
+  },
+  {
+    "name": "Chalchihuitán",
+    "state": "Chis."
+  },
+  {
+    "name": "Chamula",
+    "state": "Chis."
+  },
+  {
+    "name": "Chanal",
+    "state": "Chis."
+  },
+  {
+    "name": "Chapultenango",
+    "state": "Chis."
+  },
+  {
+    "name": "Chenalhó",
+    "state": "Chis."
+  },
+  {
+    "name": "Chiapa de Corzo",
+    "state": "Chis."
+  },
+  {
+    "name": "Chiapilla",
+    "state": "Chis."
+  },
+  {
+    "name": "Chicoasén",
+    "state": "Chis."
+  },
+  {
+    "name": "Chicomuselo",
+    "state": "Chis."
+  },
+  {
+    "name": "Chilón",
+    "state": "Chis."
+  },
+  {
+    "name": "Cintalapa de Figueroa",
+    "state": "Chis."
+  },
+  {
+    "name": "Coapilla",
+    "state": "Chis."
+  },
+  {
+    "name": "Comitán de Domínguez",
+    "state": "Chis."
+  },
+  {
+    "name": "Copainalá",
+    "state": "Chis."
+  },
+  {
+    "name": "El Bosque",
+    "state": "Chis."
+  },
+  {
+    "name": "El Parral",
+    "state": "Chis."
+  },
+  {
+    "name": "El Porvenir",
+    "state": "Chis."
+  },
+  {
+    "name": "Emiliano Zapata",
+    "state": "Chis."
+  },
+  {
+    "name": "Escuintla",
+    "state": "Chis."
+  },
+  {
+    "name": "Francisco León",
+    "state": "Chis."
+  },
+  {
+    "name": "Frontera Comalapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Frontera Hidalgo",
+    "state": "Chis."
+  },
+  {
+    "name": "Honduras de la Sierra",
+    "state": "Chis."
+  },
+  {
+    "name": "Huehuetán",
+    "state": "Chis."
+  },
+  {
+    "name": "Huitiupán",
+    "state": "Chis."
+  },
+  {
+    "name": "Huixtán",
+    "state": "Chis."
+  },
+  {
+    "name": "Huixtla",
+    "state": "Chis."
+  },
+  {
+    "name": "Ixhuatán",
+    "state": "Chis."
+  },
+  {
+    "name": "Ixtacomitán",
+    "state": "Chis."
+  },
+  {
+    "name": "Ixtapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Ixtapangajoya",
+    "state": "Chis."
+  },
+  {
+    "name": "Jiquipilas",
+    "state": "Chis."
+  },
+  {
+    "name": "Jitotol",
+    "state": "Chis."
+  },
+  {
+    "name": "Juárez",
+    "state": "Chis."
+  },
+  {
+    "name": "La Concordia",
+    "state": "Chis."
+  },
+  {
+    "name": "La Grandeza",
+    "state": "Chis."
+  },
+  {
+    "name": "La Independencia",
+    "state": "Chis."
+  },
+  {
+    "name": "La Libertad",
+    "state": "Chis."
+  },
+  {
+    "name": "La Trinitaria",
+    "state": "Chis."
+  },
+  {
+    "name": "Larráinzar",
+    "state": "Chis."
+  },
+  {
+    "name": "Las Margaritas",
+    "state": "Chis."
+  },
+  {
+    "name": "Las Rosas",
+    "state": "Chis."
+  },
+  {
+    "name": "Mapastepec",
+    "state": "Chis."
+  },
+  {
+    "name": "Maravilla Tenejapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Marqués de Comillas",
+    "state": "Chis."
+  },
+  {
+    "name": "Mazapa de Madero",
+    "state": "Chis."
+  },
+  {
+    "name": "Mazatán",
+    "state": "Chis."
+  },
+  {
+    "name": "Metapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Mezcalapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Mitontic",
+    "state": "Chis."
+  },
+  {
+    "name": "Montecristo de Guerrero",
+    "state": "Chis."
+  },
+  {
+    "name": "Motozintla",
+    "state": "Chis."
+  },
+  {
+    "name": "Nicolás Ruíz",
+    "state": "Chis."
+  },
+  {
+    "name": "Ocosingo",
+    "state": "Chis."
+  },
+  {
+    "name": "Ocotepec",
+    "state": "Chis."
+  },
+  {
+    "name": "Ocozocoautla de Espinosa",
+    "state": "Chis."
+  },
+  {
+    "name": "Ostuacán",
+    "state": "Chis."
+  },
+  {
+    "name": "Osumacinta",
+    "state": "Chis."
+  },
+  {
+    "name": "Oxchuc",
+    "state": "Chis."
+  },
+  {
+    "name": "Palenque",
+    "state": "Chis."
+  },
+  {
+    "name": "Pantelhó",
+    "state": "Chis."
+  },
+  {
+    "name": "Pantepec",
+    "state": "Chis."
+  },
+  {
+    "name": "Pichucalco",
+    "state": "Chis."
+  },
+  {
+    "name": "Pijijiapan",
+    "state": "Chis."
+  },
+  {
+    "name": "Pueblo Nuevo Solistahuacán",
+    "state": "Chis."
+  },
+  {
+    "name": "Rayón",
+    "state": "Chis."
+  },
+  {
+    "name": "Reforma",
+    "state": "Chis."
+  },
+  {
+    "name": "Rincón Chamula San Pedro",
+    "state": "Chis."
+  },
+  {
+    "name": "Sabanilla",
+    "state": "Chis."
+  },
+  {
+    "name": "Salto de Agua",
+    "state": "Chis."
+  },
+  {
+    "name": "San Andrés Duraznal",
+    "state": "Chis."
+  },
+  {
+    "name": "San Cristóbal de las Casas",
+    "state": "Chis."
+  },
+  {
+    "name": "San Fernando",
+    "state": "Chis."
+  },
+  {
+    "name": "San Juan Cancuc",
+    "state": "Chis."
+  },
+  {
+    "name": "San Lucas",
+    "state": "Chis."
+  },
+  {
+    "name": "Santiago el Pinar",
+    "state": "Chis."
+  },
+  {
+    "name": "Siltepec",
+    "state": "Chis."
+  },
+  {
+    "name": "Simojovel",
+    "state": "Chis."
+  },
+  {
+    "name": "Sitalá",
+    "state": "Chis."
+  },
+  {
+    "name": "Socoltenango",
+    "state": "Chis."
+  },
+  {
+    "name": "Solosuchiapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Soyaló",
+    "state": "Chis."
+  },
+  {
+    "name": "Suchiapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Suchiate",
+    "state": "Chis."
+  },
+  {
+    "name": "Sunuapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Tapachula",
+    "state": "Chis."
+  },
+  {
+    "name": "Tapalapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Tapilula",
+    "state": "Chis."
+  },
+  {
+    "name": "Tecpatán",
+    "state": "Chis."
+  },
+  {
+    "name": "Tenejapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Teopisca",
+    "state": "Chis."
+  },
+  {
+    "name": "Tila",
+    "state": "Chis."
+  },
+  {
+    "name": "Tonalá",
+    "state": "Chis."
+  },
+  {
+    "name": "Totolapa",
+    "state": "Chis."
+  },
+  {
+    "name": "Tumbalá",
+    "state": "Chis."
+  },
+  {
+    "name": "Tuxtla Chico",
+    "state": "Chis."
+  },
+  {
+    "name": "Tuxtla Gutiérrez",
+    "state": "Chis."
+  },
+  {
+    "name": "Tuzantán",
+    "state": "Chis."
+  },
+  {
+    "name": "Tzimol",
+    "state": "Chis."
+  },
+  {
+    "name": "Unión Juárez",
+    "state": "Chis."
+  },
+  {
+    "name": "Venustiano Carranza",
+    "state": "Chis."
+  },
+  {
+    "name": "Villa Comaltitlán",
+    "state": "Chis."
+  },
+  {
+    "name": "Villa Corzo",
+    "state": "Chis."
+  },
+  {
+    "name": "Villaflores",
+    "state": "Chis."
+  },
+  {
+    "name": "Yajalón",
+    "state": "Chis."
+  },
+  {
+    "name": "Zinacantán",
+    "state": "Chis."
+  },
+  {
+    "name": "Abasolo",
+    "state": "Coah."
+  },
+  {
+    "name": "Acuña",
+    "state": "Coah."
+  },
+  {
+    "name": "Allende",
+    "state": "Coah."
+  },
+  {
+    "name": "Arteaga",
+    "state": "Coah."
+  },
+  {
+    "name": "Candela",
+    "state": "Coah."
+  },
+  {
+    "name": "Castaños",
+    "state": "Coah."
+  },
+  {
+    "name": "Cuatro Ciénegas",
+    "state": "Coah."
+  },
+  {
+    "name": "Escobedo",
+    "state": "Coah."
+  },
+  {
+    "name": "Francisco I. Madero",
+    "state": "Coah."
+  },
+  {
+    "name": "Frontera",
+    "state": "Coah."
+  },
+  {
+    "name": "General Cepeda",
+    "state": "Coah."
+  },
+  {
+    "name": "Guerrero",
+    "state": "Coah."
+  },
+  {
+    "name": "Hidalgo",
+    "state": "Coah."
+  },
+  {
+    "name": "Jiménez",
+    "state": "Coah."
+  },
+  {
+    "name": "Juárez",
+    "state": "Coah."
+  },
+  {
+    "name": "Lamadrid",
+    "state": "Coah."
+  },
+  {
+    "name": "Matamoros",
+    "state": "Coah."
+  },
+  {
+    "name": "Monclova",
+    "state": "Coah."
+  },
+  {
+    "name": "Morelos",
+    "state": "Coah."
+  },
+  {
+    "name": "Múzquiz",
+    "state": "Coah."
+  },
+  {
+    "name": "Nadadores",
+    "state": "Coah."
+  },
+  {
+    "name": "Nava",
+    "state": "Coah."
+  },
+  {
+    "name": "Ocampo",
+    "state": "Coah."
+  },
+  {
+    "name": "Parras",
+    "state": "Coah."
+  },
+  {
+    "name": "Piedras Negras",
+    "state": "Coah."
+  },
+  {
+    "name": "Progreso",
+    "state": "Coah."
+  },
+  {
+    "name": "Ramos Arizpe",
+    "state": "Coah."
+  },
+  {
+    "name": "Sabinas",
+    "state": "Coah."
+  },
+  {
+    "name": "Sacramento",
+    "state": "Coah."
+  },
+  {
+    "name": "Saltillo",
+    "state": "Coah."
+  },
+  {
+    "name": "San Buenaventura",
+    "state": "Coah."
+  },
+  {
+    "name": "San Juan de Sabinas",
+    "state": "Coah."
+  },
+  {
+    "name": "San Pedro",
+    "state": "Coah."
+  },
+  {
+    "name": "Sierra Mojada",
+    "state": "Coah."
+  },
+  {
+    "name": "Torreón",
+    "state": "Coah."
+  },
+  {
+    "name": "Viesca",
+    "state": "Coah."
+  },
+  {
+    "name": "Villa Unión",
+    "state": "Coah."
+  },
+  {
+    "name": "Zaragoza",
+    "state": "Coah."
+  },
+  {
+    "name": "Armería",
+    "state": "Col."
+  },
+  {
+    "name": "Colima",
+    "state": "Col."
+  },
+  {
+    "name": "Comala",
+    "state": "Col."
+  },
+  {
+    "name": "Coquimatlán",
+    "state": "Col."
+  },
+  {
+    "name": "Cuauhtémoc",
+    "state": "Col."
+  },
+  {
+    "name": "Ixtlahuacán",
+    "state": "Col."
+  },
+  {
+    "name": "Manzanillo",
+    "state": "Col."
+  },
+  {
+    "name": "Minatitlán",
+    "state": "Col."
+  },
+  {
+    "name": "Tecomán",
+    "state": "Col."
+  },
+  {
+    "name": "Villa de Álvarez",
+    "state": "Col."
+  },
+  {
+    "name": "Canatlán",
+    "state": "Dgo."
+  },
+  {
+    "name": "Canelas",
+    "state": "Dgo."
+  },
+  {
+    "name": "Coneto de Comonfort",
+    "state": "Dgo."
+  },
+  {
+    "name": "Cuencamé",
+    "state": "Dgo."
+  },
+  {
+    "name": "Durango",
+    "state": "Dgo."
+  },
+  {
+    "name": "El Oro",
+    "state": "Dgo."
+  },
+  {
+    "name": "General Simón Bolívar",
+    "state": "Dgo."
+  },
+  {
+    "name": "Gómez Palacio",
+    "state": "Dgo."
+  },
+  {
+    "name": "Guadalupe Victoria",
+    "state": "Dgo."
+  },
+  {
+    "name": "Guanaceví",
+    "state": "Dgo."
+  },
+  {
+    "name": "Hidalgo",
+    "state": "Dgo."
+  },
+  {
+    "name": "Indé",
+    "state": "Dgo."
+  },
+  {
+    "name": "Lerdo",
+    "state": "Dgo."
+  },
+  {
+    "name": "Mapimí",
+    "state": "Dgo."
+  },
+  {
+    "name": "Mezquital",
+    "state": "Dgo."
+  },
+  {
+    "name": "Nazas",
+    "state": "Dgo."
+  },
+  {
+    "name": "Nombre de Dios",
+    "state": "Dgo."
+  },
+  {
+    "name": "Nuevo Ideal",
+    "state": "Dgo."
+  },
+  {
+    "name": "Ocampo",
+    "state": "Dgo."
+  },
+  {
+    "name": "Otáez",
+    "state": "Dgo."
+  },
+  {
+    "name": "Pánuco de Coronado",
+    "state": "Dgo."
+  },
+  {
+    "name": "Peñón Blanco",
+    "state": "Dgo."
+  },
+  {
+    "name": "Poanas",
+    "state": "Dgo."
+  },
+  {
+    "name": "Pueblo Nuevo",
+    "state": "Dgo."
+  },
+  {
+    "name": "Rodeo",
+    "state": "Dgo."
+  },
+  {
+    "name": "San Bernardo",
+    "state": "Dgo."
+  },
+  {
+    "name": "San Dimas",
+    "state": "Dgo."
+  },
+  {
+    "name": "San Juan de Guadalupe",
+    "state": "Dgo."
+  },
+  {
+    "name": "San Juan del Río",
+    "state": "Dgo."
+  },
+  {
+    "name": "San Luis del Cordero",
+    "state": "Dgo."
+  },
+  {
+    "name": "San Pedro del Gallo",
+    "state": "Dgo."
+  },
+  {
+    "name": "Santa Clara",
+    "state": "Dgo."
+  },
+  {
+    "name": "Santiago Papasquiaro",
+    "state": "Dgo."
+  },
+  {
+    "name": "Súchil",
+    "state": "Dgo."
+  },
+  {
+    "name": "Tamazula",
+    "state": "Dgo."
+  },
+  {
+    "name": "Tepehuanes",
+    "state": "Dgo."
+  },
+  {
+    "name": "Tlahualilo",
+    "state": "Dgo."
+  },
+  {
+    "name": "Topia",
+    "state": "Dgo."
+  },
+  {
+    "name": "Vicente Guerrero",
+    "state": "Dgo."
+  },
+  {
+    "name": "Acapulco de Juárez",
+    "state": "Gro."
+  },
+  {
+    "name": "Acatepec",
+    "state": "Gro."
+  },
+  {
+    "name": "Ahuacuotzingo",
+    "state": "Gro."
+  },
+  {
+    "name": "Ajuchitlán del Progreso",
+    "state": "Gro."
+  },
+  {
+    "name": "Alcozauca de Guerrero",
+    "state": "Gro."
+  },
+  {
+    "name": "Alpoyeca",
+    "state": "Gro."
+  },
+  {
+    "name": "Apaxtla de Castrejón",
+    "state": "Gro."
+  },
+  {
+    "name": "Arcelia",
+    "state": "Gro."
+  },
+  {
+    "name": "Atenango del Río",
+    "state": "Gro."
+  },
+  {
+    "name": "Atlamajalcingo del Monte",
+    "state": "Gro."
+  },
+  {
+    "name": "Atlixtac",
+    "state": "Gro."
+  },
+  {
+    "name": "Atoyac de Álvarez",
+    "state": "Gro."
+  },
+  {
+    "name": "Ayutla de los Libres",
+    "state": "Gro."
+  },
+  {
+    "name": "Azoyú",
+    "state": "Gro."
+  },
+  {
+    "name": "Benito Juárez",
+    "state": "Gro."
+  },
+  {
+    "name": "Buenavista de Cuéllar",
+    "state": "Gro."
+  },
+  {
+    "name": "Chilapa de Álvarez",
+    "state": "Gro."
+  },
+  {
+    "name": "Chilpancingo de los Bravo",
+    "state": "Gro."
+  },
+  {
+    "name": "Coahuayutla de José María Izazaga",
+    "state": "Gro."
+  },
+  {
+    "name": "Cochoapa el Grande",
+    "state": "Gro."
+  },
+  {
+    "name": "Cocula",
+    "state": "Gro."
+  },
+  {
+    "name": "Copala",
+    "state": "Gro."
+  },
+  {
+    "name": "Copalillo",
+    "state": "Gro."
+  },
+  {
+    "name": "Copanatoyac",
+    "state": "Gro."
+  },
+  {
+    "name": "Coyuca de Benítez",
+    "state": "Gro."
+  },
+  {
+    "name": "Coyuca de Catalán",
+    "state": "Gro."
+  },
+  {
+    "name": "Cuajinicuilapa",
+    "state": "Gro."
+  },
+  {
+    "name": "Cualác",
+    "state": "Gro."
+  },
+  {
+    "name": "Cuautepec",
+    "state": "Gro."
+  },
+  {
+    "name": "Cuetzala del Progreso",
+    "state": "Gro."
+  },
+  {
+    "name": "Cutzamala de Pinzón",
+    "state": "Gro."
+  },
+  {
+    "name": "Eduardo Neri",
+    "state": "Gro."
+  },
+  {
+    "name": "Florencio Villarreal",
+    "state": "Gro."
+  },
+  {
+    "name": "General Canuto A. Neri",
+    "state": "Gro."
+  },
+  {
+    "name": "General Heliodoro Castillo",
+    "state": "Gro."
+  },
+  {
+    "name": "Huamuxtitlán",
+    "state": "Gro."
+  },
+  {
+    "name": "Huitzuco de los Figueroa",
+    "state": "Gro."
+  },
+  {
+    "name": "Iguala de la Independencia",
+    "state": "Gro."
+  },
+  {
+    "name": "Igualapa",
+    "state": "Gro."
+  },
+  {
+    "name": "Iliatenco",
+    "state": "Gro."
+  },
+  {
+    "name": "Ixcateopan de Cuauhtémoc",
+    "state": "Gro."
+  },
+  {
+    "name": "José Joaquín de Herrera",
+    "state": "Gro."
+  },
+  {
+    "name": "Juan R. Escudero",
+    "state": "Gro."
+  },
+  {
+    "name": "Juchitán",
+    "state": "Gro."
+  },
+  {
+    "name": "La Unión de Isidoro Montes de Oca",
+    "state": "Gro."
+  },
+  {
+    "name": "Las Vigas",
+    "state": "Gro."
+  },
+  {
+    "name": "Leonardo Bravo",
+    "state": "Gro."
+  },
+  {
+    "name": "Malinaltepec",
+    "state": "Gro."
+  },
+  {
+    "name": "Marquelia",
+    "state": "Gro."
+  },
+  {
+    "name": "Mártir de Cuilapan",
+    "state": "Gro."
+  },
+  {
+    "name": "Metlatónoc",
+    "state": "Gro."
+  },
+  {
+    "name": "Mochitlán",
+    "state": "Gro."
+  },
+  {
+    "name": "Ñuu Savi",
+    "state": "Gro."
+  },
+  {
+    "name": "Olinalá",
+    "state": "Gro."
+  },
+  {
+    "name": "Ometepec",
+    "state": "Gro."
+  },
+  {
+    "name": "Pedro Ascencio Alquisiras",
+    "state": "Gro."
+  },
+  {
+    "name": "Petatlán",
+    "state": "Gro."
+  },
+  {
+    "name": "Pilcaya",
+    "state": "Gro."
+  },
+  {
+    "name": "Pungarabato",
+    "state": "Gro."
+  },
+  {
+    "name": "Quechultenango",
+    "state": "Gro."
+  },
+  {
+    "name": "San Luis Acatlán",
+    "state": "Gro."
+  },
+  {
+    "name": "San Marcos",
+    "state": "Gro."
+  },
+  {
+    "name": "San Miguel Totolapan",
+    "state": "Gro."
+  },
+  {
+    "name": "San Nicolás",
+    "state": "Gro."
+  },
+  {
+    "name": "Santa Cruz del Rincón",
+    "state": "Gro."
+  },
+  {
+    "name": "Taxco de Alarcón",
+    "state": "Gro."
+  },
+  {
+    "name": "Tecoanapa",
+    "state": "Gro."
+  },
+  {
+    "name": "Técpan de Galeana",
+    "state": "Gro."
+  },
+  {
+    "name": "Teloloapan",
+    "state": "Gro."
+  },
+  {
+    "name": "Tepecoacuilco de Trujano",
+    "state": "Gro."
+  },
+  {
+    "name": "Tetipac",
+    "state": "Gro."
+  },
+  {
+    "name": "Tixtla de Guerrero",
+    "state": "Gro."
+  },
+  {
+    "name": "Tlacoachistlahuaca",
+    "state": "Gro."
+  },
+  {
+    "name": "Tlacoapa",
+    "state": "Gro."
+  },
+  {
+    "name": "Tlalchapa",
+    "state": "Gro."
+  },
+  {
+    "name": "Tlalixtaquilla de Maldonado",
+    "state": "Gro."
+  },
+  {
+    "name": "Tlapa de Comonfort",
+    "state": "Gro."
+  },
+  {
+    "name": "Tlapehuala",
+    "state": "Gro."
+  },
+  {
+    "name": "Xalpatláhuac",
+    "state": "Gro."
+  },
+  {
+    "name": "Xochihuehuetlán",
+    "state": "Gro."
+  },
+  {
+    "name": "Xochistlahuaca",
+    "state": "Gro."
+  },
+  {
+    "name": "Zapotitlán Tablas",
+    "state": "Gro."
+  },
+  {
+    "name": "Zihuatanejo de Azueta",
+    "state": "Gro."
+  },
+  {
+    "name": "Zirándaro",
+    "state": "Gro."
+  },
+  {
+    "name": "Zitlala",
+    "state": "Gro."
+  },
+  {
+    "name": "Abasolo",
+    "state": "Gto."
+  },
+  {
+    "name": "Acámbaro",
+    "state": "Gto."
+  },
+  {
+    "name": "Apaseo el Alto",
+    "state": "Gto."
+  },
+  {
+    "name": "Apaseo el Grande",
+    "state": "Gto."
+  },
+  {
+    "name": "Atarjea",
+    "state": "Gto."
+  },
+  {
+    "name": "Celaya",
+    "state": "Gto."
+  },
+  {
+    "name": "Comonfort",
+    "state": "Gto."
+  },
+  {
+    "name": "Coroneo",
+    "state": "Gto."
+  },
+  {
+    "name": "Cortazar",
+    "state": "Gto."
+  },
+  {
+    "name": "Cuerámaro",
+    "state": "Gto."
+  },
+  {
+    "name": "Doctor Mora",
+    "state": "Gto."
+  },
+  {
+    "name": "Dolores Hidalgo Cuna de la Independencia Nacional",
+    "state": "Gto."
+  },
+  {
+    "name": "Guanajuato",
+    "state": "Gto."
+  },
+  {
+    "name": "Huanímaro",
+    "state": "Gto."
+  },
+  {
+    "name": "Irapuato",
+    "state": "Gto."
+  },
+  {
+    "name": "Jaral del Progreso",
+    "state": "Gto."
+  },
+  {
+    "name": "Jerécuaro",
+    "state": "Gto."
+  },
+  {
+    "name": "León",
+    "state": "Gto."
+  },
+  {
+    "name": "Manuel Doblado",
+    "state": "Gto."
+  },
+  {
+    "name": "Moroleón",
+    "state": "Gto."
+  },
+  {
+    "name": "Ocampo",
+    "state": "Gto."
+  },
+  {
+    "name": "Pénjamo",
+    "state": "Gto."
+  },
+  {
+    "name": "Pueblo Nuevo",
+    "state": "Gto."
+  },
+  {
+    "name": "Purísima del Rincón",
+    "state": "Gto."
+  },
+  {
+    "name": "Romita",
+    "state": "Gto."
+  },
+  {
+    "name": "Salamanca",
+    "state": "Gto."
+  },
+  {
+    "name": "Salvatierra",
+    "state": "Gto."
+  },
+  {
+    "name": "San Diego de la Unión",
+    "state": "Gto."
+  },
+  {
+    "name": "San Felipe",
+    "state": "Gto."
+  },
+  {
+    "name": "San Francisco del Rincón",
+    "state": "Gto."
+  },
+  {
+    "name": "San José de Iturbide",
+    "state": "Gto."
+  },
+  {
+    "name": "San Luis de la Paz",
+    "state": "Gto."
+  },
+  {
+    "name": "San Miguel de Allende",
+    "state": "Gto."
+  },
+  {
+    "name": "Santa Catarina",
+    "state": "Gto."
+  },
+  {
+    "name": "Santa Cruz de Juventino Rosas",
+    "state": "Gto."
+  },
+  {
+    "name": "Santiago Maravatío",
+    "state": "Gto."
+  },
+  {
+    "name": "Silao de la Victoria",
+    "state": "Gto."
+  },
+  {
+    "name": "Tarandacuao",
+    "state": "Gto."
+  },
+  {
+    "name": "Tarimoro",
+    "state": "Gto."
+  },
+  {
+    "name": "Tierra Blanca",
+    "state": "Gto."
+  },
+  {
+    "name": "Uriangato",
+    "state": "Gto."
+  },
+  {
+    "name": "Valle de Santiago",
+    "state": "Gto."
+  },
+  {
+    "name": "Victoria",
+    "state": "Gto."
+  },
+  {
+    "name": "Villagrán",
+    "state": "Gto."
+  },
+  {
+    "name": "Xichú",
+    "state": "Gto."
+  },
+  {
+    "name": "Yuriria",
+    "state": "Gto."
+  },
+  {
+    "name": "Acatlán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Acaxochitlán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Actopan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Agua Blanca de Iturbide",
+    "state": "Hgo."
+  },
+  {
+    "name": "Ajacuba",
+    "state": "Hgo."
+  },
+  {
+    "name": "Alfajayucan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Almoloya",
+    "state": "Hgo."
+  },
+  {
+    "name": "Apan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Atitalaquia",
+    "state": "Hgo."
+  },
+  {
+    "name": "Atlapexco",
+    "state": "Hgo."
+  },
+  {
+    "name": "Atotonilco de Tula",
+    "state": "Hgo."
+  },
+  {
+    "name": "Atotonilco el Grande",
+    "state": "Hgo."
+  },
+  {
+    "name": "Calnali",
+    "state": "Hgo."
+  },
+  {
+    "name": "Cardonal",
+    "state": "Hgo."
+  },
+  {
+    "name": "Chapantongo",
+    "state": "Hgo."
+  },
+  {
+    "name": "Chapulhuacán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Chilcuautla",
+    "state": "Hgo."
+  },
+  {
+    "name": "Cuautepec de Hinojosa",
+    "state": "Hgo."
+  },
+  {
+    "name": "El Arenal",
+    "state": "Hgo."
+  },
+  {
+    "name": "Eloxochitlán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Emiliano Zapata",
+    "state": "Hgo."
+  },
+  {
+    "name": "Epazoyucan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Francisco I. Madero",
+    "state": "Hgo."
+  },
+  {
+    "name": "Huasca de Ocampo",
+    "state": "Hgo."
+  },
+  {
+    "name": "Huautla",
+    "state": "Hgo."
+  },
+  {
+    "name": "Huazalingo",
+    "state": "Hgo."
+  },
+  {
+    "name": "Huehuetla",
+    "state": "Hgo."
+  },
+  {
+    "name": "Huejutla de Reyes",
+    "state": "Hgo."
+  },
+  {
+    "name": "Huichapan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Ixmiquilpan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Jacala de Ledezma",
+    "state": "Hgo."
+  },
+  {
+    "name": "Jaltocán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Juárez Hidalgo",
+    "state": "Hgo."
+  },
+  {
+    "name": "La Misión",
+    "state": "Hgo."
+  },
+  {
+    "name": "Lolotla",
+    "state": "Hgo."
+  },
+  {
+    "name": "Metepec",
+    "state": "Hgo."
+  },
+  {
+    "name": "Metztitlán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Mineral de la Reforma",
+    "state": "Hgo."
+  },
+  {
+    "name": "Mineral del Chico",
+    "state": "Hgo."
+  },
+  {
+    "name": "Mineral del Monte",
+    "state": "Hgo."
+  },
+  {
+    "name": "Mixquiahuala de Juárez",
+    "state": "Hgo."
+  },
+  {
+    "name": "Molango de Escamilla",
+    "state": "Hgo."
+  },
+  {
+    "name": "Nicolás Flores",
+    "state": "Hgo."
+  },
+  {
+    "name": "Nopala de Villagrán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Omitlán de Juárez",
+    "state": "Hgo."
+  },
+  {
+    "name": "Pachuca de Soto",
+    "state": "Hgo."
+  },
+  {
+    "name": "Pacula",
+    "state": "Hgo."
+  },
+  {
+    "name": "Pisaflores",
+    "state": "Hgo."
+  },
+  {
+    "name": "Progreso de Obregón",
+    "state": "Hgo."
+  },
+  {
+    "name": "San Agustín Metzquititlán",
+    "state": "Hgo."
+  },
+  {
+    "name": "San Agustín Tlaxiaca",
+    "state": "Hgo."
+  },
+  {
+    "name": "San Bartolo Tutotepec",
+    "state": "Hgo."
+  },
+  {
+    "name": "San Felipe Orizatlán",
+    "state": "Hgo."
+  },
+  {
+    "name": "San Salvador",
+    "state": "Hgo."
+  },
+  {
+    "name": "Santiago de Anaya",
+    "state": "Hgo."
+  },
+  {
+    "name": "Santiago Tulantepec de Lugo Guerrero",
+    "state": "Hgo."
+  },
+  {
+    "name": "Singuilucan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tasquillo",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tecozautla",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tenango de Doria",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tepeapulco",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tepehuacán de Guerrero",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tepeji del Río de Ocampo",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tepetitlán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tetepango",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tezontepec de Aldama",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tianguistengo",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tizayuca",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tlahuelilpan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tlahuiltepa",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tlanalapa",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tlanchinol",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tlaxcoapan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tolcayuca",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tula de Allende",
+    "state": "Hgo."
+  },
+  {
+    "name": "Tulancingo de Bravo",
+    "state": "Hgo."
+  },
+  {
+    "name": "Villa de Tezontepec",
+    "state": "Hgo."
+  },
+  {
+    "name": "Xochiatipan",
+    "state": "Hgo."
+  },
+  {
+    "name": "Xochicoatlán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Yahualica",
+    "state": "Hgo."
+  },
+  {
+    "name": "Zacualtipán de Ángeles",
+    "state": "Hgo."
+  },
+  {
+    "name": "Zapotlán de Juárez",
+    "state": "Hgo."
+  },
+  {
+    "name": "Zempoala",
+    "state": "Hgo."
+  },
+  {
+    "name": "Zimapán",
+    "state": "Hgo."
+  },
+  {
+    "name": "Acatic",
+    "state": "Jal."
+  },
+  {
+    "name": "Acatlán de Juárez",
+    "state": "Jal."
+  },
+  {
+    "name": "Ahualulco de Mercado",
+    "state": "Jal."
+  },
+  {
+    "name": "Amacueca",
+    "state": "Jal."
+  },
+  {
+    "name": "Amatitán",
+    "state": "Jal."
+  },
+  {
+    "name": "Ameca",
+    "state": "Jal."
+  },
+  {
+    "name": "Arandas",
+    "state": "Jal."
+  },
+  {
+    "name": "Atemajac de Brizuela",
+    "state": "Jal."
+  },
+  {
+    "name": "Atengo",
+    "state": "Jal."
+  },
+  {
+    "name": "Atenguillo",
+    "state": "Jal."
+  },
+  {
+    "name": "Atotonilco el Alto",
+    "state": "Jal."
+  },
+  {
+    "name": "Atoyac",
+    "state": "Jal."
+  },
+  {
+    "name": "Autlán de Navarro",
+    "state": "Jal."
+  },
+  {
+    "name": "Ayotlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Ayutla",
+    "state": "Jal."
+  },
+  {
+    "name": "Bolaños",
+    "state": "Jal."
+  },
+  {
+    "name": "Cabo Corrientes",
+    "state": "Jal."
+  },
+  {
+    "name": "Cañadas de Obregón",
+    "state": "Jal."
+  },
+  {
+    "name": "Casimiro Castillo",
+    "state": "Jal."
+  },
+  {
+    "name": "Chapala",
+    "state": "Jal."
+  },
+  {
+    "name": "Chimaltitán",
+    "state": "Jal."
+  },
+  {
+    "name": "Chiquilistlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Cihuatlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Cocula",
+    "state": "Jal."
+  },
+  {
+    "name": "Colotlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Concepción de Buenos Aires",
+    "state": "Jal."
+  },
+  {
+    "name": "Cuautitlán de García Barragán",
+    "state": "Jal."
+  },
+  {
+    "name": "Cuautla",
+    "state": "Jal."
+  },
+  {
+    "name": "Cuquío",
+    "state": "Jal."
+  },
+  {
+    "name": "Degollado",
+    "state": "Jal."
+  },
+  {
+    "name": "Ejutla",
+    "state": "Jal."
+  },
+  {
+    "name": "El Arenal",
+    "state": "Jal."
+  },
+  {
+    "name": "El Grullo",
+    "state": "Jal."
+  },
+  {
+    "name": "El Limón",
+    "state": "Jal."
+  },
+  {
+    "name": "El Salto",
+    "state": "Jal."
+  },
+  {
+    "name": "Encarnación de Díaz",
+    "state": "Jal."
+  },
+  {
+    "name": "Etzatlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Gómez Farías",
+    "state": "Jal."
+  },
+  {
+    "name": "Guachinango",
+    "state": "Jal."
+  },
+  {
+    "name": "Guadalajara",
+    "state": "Jal."
+  },
+  {
+    "name": "Hostotipaquillo",
+    "state": "Jal."
+  },
+  {
+    "name": "Huejúcar",
+    "state": "Jal."
+  },
+  {
+    "name": "Huejuquilla el Alto",
+    "state": "Jal."
+  },
+  {
+    "name": "Ixtlahuacán de los Membrillos",
+    "state": "Jal."
+  },
+  {
+    "name": "Ixtlahuacán del Río",
+    "state": "Jal."
+  },
+  {
+    "name": "Jalostotitlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Jamay",
+    "state": "Jal."
+  },
+  {
+    "name": "Jesús María",
+    "state": "Jal."
+  },
+  {
+    "name": "Jilotlán de los Dolores",
+    "state": "Jal."
+  },
+  {
+    "name": "Jocotepec",
+    "state": "Jal."
+  },
+  {
+    "name": "Juanacatlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Juchitlán",
+    "state": "Jal."
+  },
+  {
+    "name": "La Barca",
+    "state": "Jal."
+  },
+  {
+    "name": "La Huerta",
+    "state": "Jal."
+  },
+  {
+    "name": "La Manzanilla de la Paz",
+    "state": "Jal."
+  },
+  {
+    "name": "Lagos de Moreno",
+    "state": "Jal."
+  },
+  {
+    "name": "Magdalena",
+    "state": "Jal."
+  },
+  {
+    "name": "Mascota",
+    "state": "Jal."
+  },
+  {
+    "name": "Mazamitla",
+    "state": "Jal."
+  },
+  {
+    "name": "Mexticacán",
+    "state": "Jal."
+  },
+  {
+    "name": "Mezquitic",
+    "state": "Jal."
+  },
+  {
+    "name": "Mixtlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Ocotlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Ojuelos de Jalisco",
+    "state": "Jal."
+  },
+  {
+    "name": "Pihuamo",
+    "state": "Jal."
+  },
+  {
+    "name": "Poncitlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Puerto Vallarta",
+    "state": "Jal."
+  },
+  {
+    "name": "Quitupan",
+    "state": "Jal."
+  },
+  {
+    "name": "San Cristóbal de la Barranca",
+    "state": "Jal."
+  },
+  {
+    "name": "San Diego de Alejandría",
+    "state": "Jal."
+  },
+  {
+    "name": "San Gabriel",
+    "state": "Jal."
+  },
+  {
+    "name": "San Ignacio Cerro Gordo",
+    "state": "Jal."
+  },
+  {
+    "name": "San Juan de los Lagos",
+    "state": "Jal."
+  },
+  {
+    "name": "San Juanito de Escobedo",
+    "state": "Jal."
+  },
+  {
+    "name": "San Julián",
+    "state": "Jal."
+  },
+  {
+    "name": "San Marcos",
+    "state": "Jal."
+  },
+  {
+    "name": "San Martín de Bolaños",
+    "state": "Jal."
+  },
+  {
+    "name": "San Martín Hidalgo",
+    "state": "Jal."
+  },
+  {
+    "name": "San Miguel el Alto",
+    "state": "Jal."
+  },
+  {
+    "name": "San Pedro Tlaquepaque",
+    "state": "Jal."
+  },
+  {
+    "name": "San Sebastián del Oeste",
+    "state": "Jal."
+  },
+  {
+    "name": "Santa María de los Ángeles",
+    "state": "Jal."
+  },
+  {
+    "name": "Santa María del Oro",
+    "state": "Jal."
+  },
+  {
+    "name": "Sayula",
+    "state": "Jal."
+  },
+  {
+    "name": "Tala",
+    "state": "Jal."
+  },
+  {
+    "name": "Talpa de Allende",
+    "state": "Jal."
+  },
+  {
+    "name": "Tamazula de Gordiano",
+    "state": "Jal."
+  },
+  {
+    "name": "Tapalpa",
+    "state": "Jal."
+  },
+  {
+    "name": "Tecalitlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Techaluta de Montenegro",
+    "state": "Jal."
+  },
+  {
+    "name": "Tecolotlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Tenamaxtlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Teocaltiche",
+    "state": "Jal."
+  },
+  {
+    "name": "Teocuitatlán de Corona",
+    "state": "Jal."
+  },
+  {
+    "name": "Tepatitlán de Morelos",
+    "state": "Jal."
+  },
+  {
+    "name": "Tequila",
+    "state": "Jal."
+  },
+  {
+    "name": "Teuchitlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Tizapán el Alto",
+    "state": "Jal."
+  },
+  {
+    "name": "Tlajomulco de Zúñiga",
+    "state": "Jal."
+  },
+  {
+    "name": "Tolimán",
+    "state": "Jal."
+  },
+  {
+    "name": "Tomatlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Tonalá",
+    "state": "Jal."
+  },
+  {
+    "name": "Tonaya",
+    "state": "Jal."
+  },
+  {
+    "name": "Tonila",
+    "state": "Jal."
+  },
+  {
+    "name": "Totatiche",
+    "state": "Jal."
+  },
+  {
+    "name": "Tototlán",
+    "state": "Jal."
+  },
+  {
+    "name": "Tuxcacuesco",
+    "state": "Jal."
+  },
+  {
+    "name": "Tuxcueca",
+    "state": "Jal."
+  },
+  {
+    "name": "Tuxpan",
+    "state": "Jal."
+  },
+  {
+    "name": "Unión de San Antonio",
+    "state": "Jal."
+  },
+  {
+    "name": "Unión de Tula",
+    "state": "Jal."
+  },
+  {
+    "name": "Valle de Guadalupe",
+    "state": "Jal."
+  },
+  {
+    "name": "Valle de Juárez",
+    "state": "Jal."
+  },
+  {
+    "name": "Villa Corona",
+    "state": "Jal."
+  },
+  {
+    "name": "Villa Guerrero",
+    "state": "Jal."
+  },
+  {
+    "name": "Villa Hidalgo",
+    "state": "Jal."
+  },
+  {
+    "name": "Villa Purificación",
+    "state": "Jal."
+  },
+  {
+    "name": "Yahualica de González Gallo",
+    "state": "Jal."
+  },
+  {
+    "name": "Zacoalco de Torres",
+    "state": "Jal."
+  },
+  {
+    "name": "Zapopan",
+    "state": "Jal."
+  },
+  {
+    "name": "Zapotiltic",
+    "state": "Jal."
+  },
+  {
+    "name": "Zapotitlán de Vadillo",
+    "state": "Jal."
+  },
+  {
+    "name": "Zapotlán del Rey",
+    "state": "Jal."
+  },
+  {
+    "name": "Zapotlán el Grande",
+    "state": "Jal."
+  },
+  {
+    "name": "Zapotlanejo",
+    "state": "Jal."
+  },
+  {
+    "name": "Acambay de Ruíz Castañeda",
+    "state": "Méx."
+  },
+  {
+    "name": "Acolman",
+    "state": "Méx."
+  },
+  {
+    "name": "Aculco",
+    "state": "Méx."
+  },
+  {
+    "name": "Almoloya de Alquisiras",
+    "state": "Méx."
+  },
+  {
+    "name": "Almoloya de Juárez",
+    "state": "Méx."
+  },
+  {
+    "name": "Almoloya del Río",
+    "state": "Méx."
+  },
+  {
+    "name": "Amanalco",
+    "state": "Méx."
+  },
+  {
+    "name": "Amatepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Amecameca",
+    "state": "Méx."
+  },
+  {
+    "name": "Apaxco",
+    "state": "Méx."
+  },
+  {
+    "name": "Atenco",
+    "state": "Méx."
+  },
+  {
+    "name": "Atizapán",
+    "state": "Méx."
+  },
+  {
+    "name": "Atizapán de Zaragoza",
+    "state": "Méx."
+  },
+  {
+    "name": "Atlacomulco",
+    "state": "Méx."
+  },
+  {
+    "name": "Atlautla",
+    "state": "Méx."
+  },
+  {
+    "name": "Axapusco",
+    "state": "Méx."
+  },
+  {
+    "name": "Ayapango",
+    "state": "Méx."
+  },
+  {
+    "name": "Calimaya",
+    "state": "Méx."
+  },
+  {
+    "name": "Capulhuac",
+    "state": "Méx."
+  },
+  {
+    "name": "Chalco",
+    "state": "Méx."
+  },
+  {
+    "name": "Chapa de Mota",
+    "state": "Méx."
+  },
+  {
+    "name": "Chapultepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Chiautla",
+    "state": "Méx."
+  },
+  {
+    "name": "Chicoloapan",
+    "state": "Méx."
+  },
+  {
+    "name": "Chiconcuac",
+    "state": "Méx."
+  },
+  {
+    "name": "Chimalhuacán",
+    "state": "Méx."
+  },
+  {
+    "name": "Coacalco de Berriozábal",
+    "state": "Méx."
+  },
+  {
+    "name": "Coatepec Harinas",
+    "state": "Méx."
+  },
+  {
+    "name": "Cocotitlán",
+    "state": "Méx."
+  },
+  {
+    "name": "Coyotepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Cuautitlán",
+    "state": "Méx."
+  },
+  {
+    "name": "Cuautitlán Izcalli",
+    "state": "Méx."
+  },
+  {
+    "name": "Donato Guerra",
+    "state": "Méx."
+  },
+  {
+    "name": "Ecatepec de Morelos",
+    "state": "Méx."
+  },
+  {
+    "name": "Ecatzingo",
+    "state": "Méx."
+  },
+  {
+    "name": "El Oro",
+    "state": "Méx."
+  },
+  {
+    "name": "Huehuetoca",
+    "state": "Méx."
+  },
+  {
+    "name": "Hueypoxtla",
+    "state": "Méx."
+  },
+  {
+    "name": "Huixquilucan",
+    "state": "Méx."
+  },
+  {
+    "name": "Isidro Fabela",
+    "state": "Méx."
+  },
+  {
+    "name": "Ixtapaluca",
+    "state": "Méx."
+  },
+  {
+    "name": "Ixtapan de la Sal",
+    "state": "Méx."
+  },
+  {
+    "name": "Ixtapan del Oro",
+    "state": "Méx."
+  },
+  {
+    "name": "Ixtlahuaca",
+    "state": "Méx."
+  },
+  {
+    "name": "Jaltenco",
+    "state": "Méx."
+  },
+  {
+    "name": "Jilotepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Jilotzingo",
+    "state": "Méx."
+  },
+  {
+    "name": "Jiquipilco",
+    "state": "Méx."
+  },
+  {
+    "name": "Jocotitlán",
+    "state": "Méx."
+  },
+  {
+    "name": "Joquicingo",
+    "state": "Méx."
+  },
+  {
+    "name": "Juchitepec",
+    "state": "Méx."
+  },
+  {
+    "name": "La Paz",
+    "state": "Méx."
+  },
+  {
+    "name": "Lerma",
+    "state": "Méx."
+  },
+  {
+    "name": "Luvianos",
+    "state": "Méx."
+  },
+  {
+    "name": "Malinalco",
+    "state": "Méx."
+  },
+  {
+    "name": "Melchor Ocampo",
+    "state": "Méx."
+  },
+  {
+    "name": "Metepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Mexicaltzingo",
+    "state": "Méx."
+  },
+  {
+    "name": "Morelos",
+    "state": "Méx."
+  },
+  {
+    "name": "Naucalpan de Juárez",
+    "state": "Méx."
+  },
+  {
+    "name": "Nextlalpan",
+    "state": "Méx."
+  },
+  {
+    "name": "Nezahualcóyotl",
+    "state": "Méx."
+  },
+  {
+    "name": "Nicolás Romero",
+    "state": "Méx."
+  },
+  {
+    "name": "Nopaltepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Ocoyoacac",
+    "state": "Méx."
+  },
+  {
+    "name": "Ocuilan",
+    "state": "Méx."
+  },
+  {
+    "name": "Otumba",
+    "state": "Méx."
+  },
+  {
+    "name": "Otzoloapan",
+    "state": "Méx."
+  },
+  {
+    "name": "Otzolotepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Ozumba",
+    "state": "Méx."
+  },
+  {
+    "name": "Papalotla",
+    "state": "Méx."
+  },
+  {
+    "name": "Polotitlán",
+    "state": "Méx."
+  },
+  {
+    "name": "Rayón",
+    "state": "Méx."
+  },
+  {
+    "name": "San Antonio la Isla",
+    "state": "Méx."
+  },
+  {
+    "name": "San Felipe del Progreso",
+    "state": "Méx."
+  },
+  {
+    "name": "San José del Rincón",
+    "state": "Méx."
+  },
+  {
+    "name": "San Martín de las Pirámides",
+    "state": "Méx."
+  },
+  {
+    "name": "San Mateo Atenco",
+    "state": "Méx."
+  },
+  {
+    "name": "San Simón de Guerrero",
+    "state": "Méx."
+  },
+  {
+    "name": "Santo Tomás",
+    "state": "Méx."
+  },
+  {
+    "name": "Soyaniquilpan de Juárez",
+    "state": "Méx."
+  },
+  {
+    "name": "Sultepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Tecámac",
+    "state": "Méx."
+  },
+  {
+    "name": "Tejupilco",
+    "state": "Méx."
+  },
+  {
+    "name": "Temamatla",
+    "state": "Méx."
+  },
+  {
+    "name": "Temascalapa",
+    "state": "Méx."
+  },
+  {
+    "name": "Temascalcingo",
+    "state": "Méx."
+  },
+  {
+    "name": "Temascaltepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Temoaya",
+    "state": "Méx."
+  },
+  {
+    "name": "Tenancingo",
+    "state": "Méx."
+  },
+  {
+    "name": "Tenango del Aire",
+    "state": "Méx."
+  },
+  {
+    "name": "Tenango del Valle",
+    "state": "Méx."
+  },
+  {
+    "name": "Teoloyucan",
+    "state": "Méx."
+  },
+  {
+    "name": "Teotihuacán",
+    "state": "Méx."
+  },
+  {
+    "name": "Tepetlaoxtoc",
+    "state": "Méx."
+  },
+  {
+    "name": "Tepetlixpa",
+    "state": "Méx."
+  },
+  {
+    "name": "Tepotzotlán",
+    "state": "Méx."
+  },
+  {
+    "name": "Tequixquiac",
+    "state": "Méx."
+  },
+  {
+    "name": "Texcaltitlán",
+    "state": "Méx."
+  },
+  {
+    "name": "Texcalyacac",
+    "state": "Méx."
+  },
+  {
+    "name": "Texcoco",
+    "state": "Méx."
+  },
+  {
+    "name": "Tezoyuca",
+    "state": "Méx."
+  },
+  {
+    "name": "Tianguistenco",
+    "state": "Méx."
+  },
+  {
+    "name": "Timilpan",
+    "state": "Méx."
+  },
+  {
+    "name": "Tlalmanalco",
+    "state": "Méx."
+  },
+  {
+    "name": "Tlalnepantla de Baz",
+    "state": "Méx."
+  },
+  {
+    "name": "Tlatlaya",
+    "state": "Méx."
+  },
+  {
+    "name": "Toluca",
+    "state": "Méx."
+  },
+  {
+    "name": "Tonanitla",
+    "state": "Méx."
+  },
+  {
+    "name": "Tonatico",
+    "state": "Méx."
+  },
+  {
+    "name": "Tultepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Tultitlán",
+    "state": "Méx."
+  },
+  {
+    "name": "Valle de Bravo",
+    "state": "Méx."
+  },
+  {
+    "name": "Valle de Chalco Solidaridad",
+    "state": "Méx."
+  },
+  {
+    "name": "Villa de Allende",
+    "state": "Méx."
+  },
+  {
+    "name": "Villa del Carbón",
+    "state": "Méx."
+  },
+  {
+    "name": "Villa Guerrero",
+    "state": "Méx."
+  },
+  {
+    "name": "Villa Victoria",
+    "state": "Méx."
+  },
+  {
+    "name": "Xalatlaco",
+    "state": "Méx."
+  },
+  {
+    "name": "Xonacatlán",
+    "state": "Méx."
+  },
+  {
+    "name": "Zacazonapan",
+    "state": "Méx."
+  },
+  {
+    "name": "Zacualpan",
+    "state": "Méx."
+  },
+  {
+    "name": "Zinacantepec",
+    "state": "Méx."
+  },
+  {
+    "name": "Zumpahuacán",
+    "state": "Méx."
+  },
+  {
+    "name": "Zumpango",
+    "state": "Méx."
+  },
+  {
+    "name": "Acuitzio",
+    "state": "Mich."
+  },
+  {
+    "name": "Aguililla",
+    "state": "Mich."
+  },
+  {
+    "name": "Álvaro Obregón",
+    "state": "Mich."
+  },
+  {
+    "name": "Angamacutiro",
+    "state": "Mich."
+  },
+  {
+    "name": "Angangueo",
+    "state": "Mich."
+  },
+  {
+    "name": "Apatzingán",
+    "state": "Mich."
+  },
+  {
+    "name": "Aporo",
+    "state": "Mich."
+  },
+  {
+    "name": "Aquila",
+    "state": "Mich."
+  },
+  {
+    "name": "Ario",
+    "state": "Mich."
+  },
+  {
+    "name": "Arteaga",
+    "state": "Mich."
+  },
+  {
+    "name": "Briseñas",
+    "state": "Mich."
+  },
+  {
+    "name": "Buenavista",
+    "state": "Mich."
+  },
+  {
+    "name": "Carácuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Charapan",
+    "state": "Mich."
+  },
+  {
+    "name": "Charo",
+    "state": "Mich."
+  },
+  {
+    "name": "Chavinda",
+    "state": "Mich."
+  },
+  {
+    "name": "Cherán",
+    "state": "Mich."
+  },
+  {
+    "name": "Chilchota",
+    "state": "Mich."
+  },
+  {
+    "name": "Chinicuila",
+    "state": "Mich."
+  },
+  {
+    "name": "Chucándiro",
+    "state": "Mich."
+  },
+  {
+    "name": "Churintzio",
+    "state": "Mich."
+  },
+  {
+    "name": "Churumuco",
+    "state": "Mich."
+  },
+  {
+    "name": "Coahuayana",
+    "state": "Mich."
+  },
+  {
+    "name": "Coalcomán de Vázquez Pallares",
+    "state": "Mich."
+  },
+  {
+    "name": "Coeneo",
+    "state": "Mich."
+  },
+  {
+    "name": "Cojumatlán de Régules",
+    "state": "Mich."
+  },
+  {
+    "name": "Contepec",
+    "state": "Mich."
+  },
+  {
+    "name": "Copándaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Cotija",
+    "state": "Mich."
+  },
+  {
+    "name": "Cuitzeo",
+    "state": "Mich."
+  },
+  {
+    "name": "Ecuandureo",
+    "state": "Mich."
+  },
+  {
+    "name": "Epitacio Huerta",
+    "state": "Mich."
+  },
+  {
+    "name": "Erongarícuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Gabriel Zamora",
+    "state": "Mich."
+  },
+  {
+    "name": "Hidalgo",
+    "state": "Mich."
+  },
+  {
+    "name": "Huandacareo",
+    "state": "Mich."
+  },
+  {
+    "name": "Huaniqueo",
+    "state": "Mich."
+  },
+  {
+    "name": "Huetamo",
+    "state": "Mich."
+  },
+  {
+    "name": "Huiramba",
+    "state": "Mich."
+  },
+  {
+    "name": "Indaparapeo",
+    "state": "Mich."
+  },
+  {
+    "name": "Irimbo",
+    "state": "Mich."
+  },
+  {
+    "name": "Ixtlán",
+    "state": "Mich."
+  },
+  {
+    "name": "Jacona",
+    "state": "Mich."
+  },
+  {
+    "name": "Jiménez",
+    "state": "Mich."
+  },
+  {
+    "name": "Jiquilpan",
+    "state": "Mich."
+  },
+  {
+    "name": "José Sixto Verduzco",
+    "state": "Mich."
+  },
+  {
+    "name": "Juárez",
+    "state": "Mich."
+  },
+  {
+    "name": "Jungapeo",
+    "state": "Mich."
+  },
+  {
+    "name": "La Huacana",
+    "state": "Mich."
+  },
+  {
+    "name": "La Piedad",
+    "state": "Mich."
+  },
+  {
+    "name": "Lagunillas",
+    "state": "Mich."
+  },
+  {
+    "name": "Lázaro Cárdenas",
+    "state": "Mich."
+  },
+  {
+    "name": "Los Reyes",
+    "state": "Mich."
+  },
+  {
+    "name": "Madero",
+    "state": "Mich."
+  },
+  {
+    "name": "Maravatío",
+    "state": "Mich."
+  },
+  {
+    "name": "Marcos Castellanos",
+    "state": "Mich."
+  },
+  {
+    "name": "Morelia",
+    "state": "Mich."
+  },
+  {
+    "name": "Morelos",
+    "state": "Mich."
+  },
+  {
+    "name": "Múgica",
+    "state": "Mich."
+  },
+  {
+    "name": "Nahuatzen",
+    "state": "Mich."
+  },
+  {
+    "name": "Nocupétaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Nuevo Parangaricutiro",
+    "state": "Mich."
+  },
+  {
+    "name": "Nuevo Urecho",
+    "state": "Mich."
+  },
+  {
+    "name": "Numarán",
+    "state": "Mich."
+  },
+  {
+    "name": "Ocampo",
+    "state": "Mich."
+  },
+  {
+    "name": "Pajacuarán",
+    "state": "Mich."
+  },
+  {
+    "name": "Panindícuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Paracho",
+    "state": "Mich."
+  },
+  {
+    "name": "Parácuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Pátzcuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Penjamillo",
+    "state": "Mich."
+  },
+  {
+    "name": "Peribán",
+    "state": "Mich."
+  },
+  {
+    "name": "Purépero",
+    "state": "Mich."
+  },
+  {
+    "name": "Puruándiro",
+    "state": "Mich."
+  },
+  {
+    "name": "Queréndaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Quiroga",
+    "state": "Mich."
+  },
+  {
+    "name": "Sahuayo",
+    "state": "Mich."
+  },
+  {
+    "name": "Salvador Escalante",
+    "state": "Mich."
+  },
+  {
+    "name": "San Lucas",
+    "state": "Mich."
+  },
+  {
+    "name": "Santa Ana Maya",
+    "state": "Mich."
+  },
+  {
+    "name": "Senguio",
+    "state": "Mich."
+  },
+  {
+    "name": "Susupuato",
+    "state": "Mich."
+  },
+  {
+    "name": "Tacámbaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Tancítaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Tangamandapio",
+    "state": "Mich."
+  },
+  {
+    "name": "Tangancícuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Tanhuato",
+    "state": "Mich."
+  },
+  {
+    "name": "Taretan",
+    "state": "Mich."
+  },
+  {
+    "name": "Tarímbaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Tepalcatepec",
+    "state": "Mich."
+  },
+  {
+    "name": "Tingambato",
+    "state": "Mich."
+  },
+  {
+    "name": "Tingüindín",
+    "state": "Mich."
+  },
+  {
+    "name": "Tiquicheo de Nicolás Romero",
+    "state": "Mich."
+  },
+  {
+    "name": "Tlalpujahua",
+    "state": "Mich."
+  },
+  {
+    "name": "Tlazazalca",
+    "state": "Mich."
+  },
+  {
+    "name": "Tocumbo",
+    "state": "Mich."
+  },
+  {
+    "name": "Tumbiscatío",
+    "state": "Mich."
+  },
+  {
+    "name": "Turicato",
+    "state": "Mich."
+  },
+  {
+    "name": "Tuxpan",
+    "state": "Mich."
+  },
+  {
+    "name": "Tuzantla",
+    "state": "Mich."
+  },
+  {
+    "name": "Tzintzuntzan",
+    "state": "Mich."
+  },
+  {
+    "name": "Tzitzio",
+    "state": "Mich."
+  },
+  {
+    "name": "Uruapan",
+    "state": "Mich."
+  },
+  {
+    "name": "Venustiano Carranza",
+    "state": "Mich."
+  },
+  {
+    "name": "Villamar",
+    "state": "Mich."
+  },
+  {
+    "name": "Vista Hermosa",
+    "state": "Mich."
+  },
+  {
+    "name": "Yurécuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Zacapu",
+    "state": "Mich."
+  },
+  {
+    "name": "Zamora",
+    "state": "Mich."
+  },
+  {
+    "name": "Zináparo",
+    "state": "Mich."
+  },
+  {
+    "name": "Zinapécuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Ziracuaretiro",
+    "state": "Mich."
+  },
+  {
+    "name": "Zitácuaro",
+    "state": "Mich."
+  },
+  {
+    "name": "Amacuzac",
+    "state": "Mor."
+  },
+  {
+    "name": "Atlatlahucan",
+    "state": "Mor."
+  },
+  {
+    "name": "Axochiapan",
+    "state": "Mor."
+  },
+  {
+    "name": "Ayala",
+    "state": "Mor."
+  },
+  {
+    "name": "Coatetelco",
+    "state": "Mor."
+  },
+  {
+    "name": "Coatlán del Río",
+    "state": "Mor."
+  },
+  {
+    "name": "Cuautla",
+    "state": "Mor."
+  },
+  {
+    "name": "Cuernavaca",
+    "state": "Mor."
+  },
+  {
+    "name": "Emiliano Zapata",
+    "state": "Mor."
+  },
+  {
+    "name": "Hueyapan",
+    "state": "Mor."
+  },
+  {
+    "name": "Huitzilac",
+    "state": "Mor."
+  },
+  {
+    "name": "Jantetelco",
+    "state": "Mor."
+  },
+  {
+    "name": "Jiutepec",
+    "state": "Mor."
+  },
+  {
+    "name": "Jojutla",
+    "state": "Mor."
+  },
+  {
+    "name": "Jonacatepec de Leandro Valle",
+    "state": "Mor."
+  },
+  {
+    "name": "Mazatepec",
+    "state": "Mor."
+  },
+  {
+    "name": "Miacatlán",
+    "state": "Mor."
+  },
+  {
+    "name": "Ocuituco",
+    "state": "Mor."
+  },
+  {
+    "name": "Puente de Ixtla",
+    "state": "Mor."
+  },
+  {
+    "name": "Temixco",
+    "state": "Mor."
+  },
+  {
+    "name": "Temoac",
+    "state": "Mor."
+  },
+  {
+    "name": "Tepalcingo",
+    "state": "Mor."
+  },
+  {
+    "name": "Tepoztlán",
+    "state": "Mor."
+  },
+  {
+    "name": "Tetecala",
+    "state": "Mor."
+  },
+  {
+    "name": "Tetela del Volcán",
+    "state": "Mor."
+  },
+  {
+    "name": "Tlalnepantla",
+    "state": "Mor."
+  },
+  {
+    "name": "Tlaltizapán de Zapata",
+    "state": "Mor."
+  },
+  {
+    "name": "Tlaquiltenango",
+    "state": "Mor."
+  },
+  {
+    "name": "Tlayacapan",
+    "state": "Mor."
+  },
+  {
+    "name": "Totolapan",
+    "state": "Mor."
+  },
+  {
+    "name": "Xochitepec",
+    "state": "Mor."
+  },
+  {
+    "name": "Xoxocotla",
+    "state": "Mor."
+  },
+  {
+    "name": "Yautepec",
+    "state": "Mor."
+  },
+  {
+    "name": "Yecapixtla",
+    "state": "Mor."
+  },
+  {
+    "name": "Zacatepec",
+    "state": "Mor."
+  },
+  {
+    "name": "Zacualpan de Amilpas",
+    "state": "Mor."
+  },
+  {
+    "name": "Acaponeta",
+    "state": "Nay."
+  },
+  {
+    "name": "Ahuacatlán",
+    "state": "Nay."
+  },
+  {
+    "name": "Amatlán de Cañas",
+    "state": "Nay."
+  },
+  {
+    "name": "Bahía de Banderas",
+    "state": "Nay."
+  },
+  {
+    "name": "Compostela",
+    "state": "Nay."
+  },
+  {
+    "name": "Del Nayar",
+    "state": "Nay."
+  },
+  {
+    "name": "Huajicori",
+    "state": "Nay."
+  },
+  {
+    "name": "Ixtlán del Río",
+    "state": "Nay."
+  },
+  {
+    "name": "Jala",
+    "state": "Nay."
+  },
+  {
+    "name": "La Yesca",
+    "state": "Nay."
+  },
+  {
+    "name": "Rosamorada",
+    "state": "Nay."
+  },
+  {
+    "name": "Ruíz",
+    "state": "Nay."
+  },
+  {
+    "name": "San Blas",
+    "state": "Nay."
+  },
+  {
+    "name": "San Pedro Lagunillas",
+    "state": "Nay."
+  },
+  {
+    "name": "Santa María del Oro",
+    "state": "Nay."
+  },
+  {
+    "name": "Santiago Ixcuintla",
+    "state": "Nay."
+  },
+  {
+    "name": "Tecuala",
+    "state": "Nay."
+  },
+  {
+    "name": "Tepic",
+    "state": "Nay."
+  },
+  {
+    "name": "Tuxpan",
+    "state": "Nay."
+  },
+  {
+    "name": "Xalisco",
+    "state": "Nay."
+  },
+  {
+    "name": "Abasolo",
+    "state": "NL"
+  },
+  {
+    "name": "Agualeguas",
+    "state": "NL"
+  },
+  {
+    "name": "Allende",
+    "state": "NL"
+  },
+  {
+    "name": "Anáhuac",
+    "state": "NL"
+  },
+  {
+    "name": "Apodaca",
+    "state": "NL"
+  },
+  {
+    "name": "Aramberri",
+    "state": "NL"
+  },
+  {
+    "name": "Bustamante",
+    "state": "NL"
+  },
+  {
+    "name": "Cadereyta Jiménez",
+    "state": "NL"
+  },
+  {
+    "name": "Cerralvo",
+    "state": "NL"
+  },
+  {
+    "name": "China",
+    "state": "NL"
+  },
+  {
+    "name": "Ciénega de Flores",
+    "state": "NL"
+  },
+  {
+    "name": "Doctor Arroyo",
+    "state": "NL"
+  },
+  {
+    "name": "Doctor Coss",
+    "state": "NL"
+  },
+  {
+    "name": "Doctor González",
+    "state": "NL"
+  },
+  {
+    "name": "El Carmen",
+    "state": "NL"
+  },
+  {
+    "name": "Galeana",
+    "state": "NL"
+  },
+  {
+    "name": "García",
+    "state": "NL"
+  },
+  {
+    "name": "General Bravo",
+    "state": "NL"
+  },
+  {
+    "name": "General Escobedo",
+    "state": "NL"
+  },
+  {
+    "name": "General Terán",
+    "state": "NL"
+  },
+  {
+    "name": "General Treviño",
+    "state": "NL"
+  },
+  {
+    "name": "General Zaragoza",
+    "state": "NL"
+  },
+  {
+    "name": "General Zuazua",
+    "state": "NL"
+  },
+  {
+    "name": "Guadalupe",
+    "state": "NL"
+  },
+  {
+    "name": "Hidalgo",
+    "state": "NL"
+  },
+  {
+    "name": "Higueras",
+    "state": "NL"
+  },
+  {
+    "name": "Hualahuises",
+    "state": "NL"
+  },
+  {
+    "name": "Iturbide",
+    "state": "NL"
+  },
+  {
+    "name": "Juárez",
+    "state": "NL"
+  },
+  {
+    "name": "Lampazos de Naranjo",
+    "state": "NL"
+  },
+  {
+    "name": "Linares",
+    "state": "NL"
+  },
+  {
+    "name": "Los Aldamas",
+    "state": "NL"
+  },
+  {
+    "name": "Los Herreras",
+    "state": "NL"
+  },
+  {
+    "name": "Los Ramones",
+    "state": "NL"
+  },
+  {
+    "name": "Marín",
+    "state": "NL"
+  },
+  {
+    "name": "Melchor Ocampo",
+    "state": "NL"
+  },
+  {
+    "name": "Mier y Noriega",
+    "state": "NL"
+  },
+  {
+    "name": "Mina",
+    "state": "NL"
+  },
+  {
+    "name": "Montemorelos",
+    "state": "NL"
+  },
+  {
+    "name": "Monterrey",
+    "state": "NL"
+  },
+  {
+    "name": "Parás",
+    "state": "NL"
+  },
+  {
+    "name": "Pesquería",
+    "state": "NL"
+  },
+  {
+    "name": "Rayones",
+    "state": "NL"
+  },
+  {
+    "name": "Sabinas Hidalgo",
+    "state": "NL"
+  },
+  {
+    "name": "Salinas Victoria",
+    "state": "NL"
+  },
+  {
+    "name": "San Nicolás de los Garza",
+    "state": "NL"
+  },
+  {
+    "name": "San Pedro Garza García",
+    "state": "NL"
+  },
+  {
+    "name": "Santa Catarina",
+    "state": "NL"
+  },
+  {
+    "name": "Santiago",
+    "state": "NL"
+  },
+  {
+    "name": "Vallecillo",
+    "state": "NL"
+  },
+  {
+    "name": "Villaldama",
+    "state": "NL"
+  },
+  {
+    "name": "Abejones",
+    "state": "Oax."
+  },
+  {
+    "name": "Acatlán de Pérez Figueroa",
+    "state": "Oax."
+  },
+  {
+    "name": "Ánimas Trujano",
+    "state": "Oax."
+  },
+  {
+    "name": "Asunción Cacalotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Asunción Cuyotepeji",
+    "state": "Oax."
+  },
+  {
+    "name": "Asunción Ixtaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Asunción Nochixtlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Asunción Ocotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Asunción Tlacolulita",
+    "state": "Oax."
+  },
+  {
+    "name": "Ayoquezco de Aldama",
+    "state": "Oax."
+  },
+  {
+    "name": "Ayotzintepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Calihualá",
+    "state": "Oax."
+  },
+  {
+    "name": "Candelaria Loxicha",
+    "state": "Oax."
+  },
+  {
+    "name": "Capulálpam de Méndez",
+    "state": "Oax."
+  },
+  {
+    "name": "Chahuites",
+    "state": "Oax."
+  },
+  {
+    "name": "Chalcatongo de Hidalgo",
+    "state": "Oax."
+  },
+  {
+    "name": "Chiquihuitlán de Benito Juárez",
+    "state": "Oax."
+  },
+  {
+    "name": "Ciénega de Zimatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Ciudad Ixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Coatecas Altas",
+    "state": "Oax."
+  },
+  {
+    "name": "Coicoyán de las Flores",
+    "state": "Oax."
+  },
+  {
+    "name": "Concepción Buenavista",
+    "state": "Oax."
+  },
+  {
+    "name": "Concepción Pápalo",
+    "state": "Oax."
+  },
+  {
+    "name": "Constancia del Rosario",
+    "state": "Oax."
+  },
+  {
+    "name": "Cosolapa",
+    "state": "Oax."
+  },
+  {
+    "name": "Cosoltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Cuilápam de Guerrero",
+    "state": "Oax."
+  },
+  {
+    "name": "Cuyamecalco Villa de Zaragoza",
+    "state": "Oax."
+  },
+  {
+    "name": "El Barrio de la Soledad",
+    "state": "Oax."
+  },
+  {
+    "name": "El Espinal",
+    "state": "Oax."
+  },
+  {
+    "name": "Eloxochitlán de Flores Magón",
+    "state": "Oax."
+  },
+  {
+    "name": "Fresnillo de Trujano",
+    "state": "Oax."
+  },
+  {
+    "name": "Guadalupe de Ramírez",
+    "state": "Oax."
+  },
+  {
+    "name": "Guadalupe Etla",
+    "state": "Oax."
+  },
+  {
+    "name": "Guelatao de Juárez",
+    "state": "Oax."
+  },
+  {
+    "name": "Guevea de Humboldt",
+    "state": "Oax."
+  },
+  {
+    "name": "Heroica Ciudad de Ejutla de Crespo",
+    "state": "Oax."
+  },
+  {
+    "name": "Heroica Ciudad de Huajuapan de León",
+    "state": "Oax."
+  },
+  {
+    "name": "Heroica Ciudad de Juchitán de Zaragoza",
+    "state": "Oax."
+  },
+  {
+    "name": "Heroica Ciudad de Miahuatlán de Porfirio Díaz",
+    "state": "Oax."
+  },
+  {
+    "name": "Heroica Ciudad de Tlaxiaco",
+    "state": "Oax."
+  },
+  {
+    "name": "Heroica Villa de San Blas Atempa",
+    "state": "Oax."
+  },
+  {
+    "name": "Heroica Villa Tezoatlán de Segura y Luna, Cuna de la Independencia de Oaxaca",
+    "state": "Oax."
+  },
+  {
+    "name": "Heroico San Martín de los Cansecos",
+    "state": "Oax."
+  },
+  {
+    "name": "Huautepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Huautla de Jiménez",
+    "state": "Oax."
+  },
+  {
+    "name": "Ixpantepec Nieves",
+    "state": "Oax."
+  },
+  {
+    "name": "Ixtlán de Juárez",
+    "state": "Oax."
+  },
+  {
+    "name": "La Compañía",
+    "state": "Oax."
+  },
+  {
+    "name": "La Pe",
+    "state": "Oax."
+  },
+  {
+    "name": "La Reforma",
+    "state": "Oax."
+  },
+  {
+    "name": "La Trinidad Vista Hermosa",
+    "state": "Oax."
+  },
+  {
+    "name": "Loma Bonita",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Apasco",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Jaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Ocotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Peñasco",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Teitipac",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Tequisistlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Tlacotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Yodocono de Porfirio Díaz",
+    "state": "Oax."
+  },
+  {
+    "name": "Magdalena Zahuatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Mariscala de Juárez",
+    "state": "Oax."
+  },
+  {
+    "name": "Mártires de Tacubaya",
+    "state": "Oax."
+  },
+  {
+    "name": "Matías Romero Avendaño",
+    "state": "Oax."
+  },
+  {
+    "name": "Mazatlán Villa de Flores",
+    "state": "Oax."
+  },
+  {
+    "name": "Mesones Hidalgo",
+    "state": "Oax."
+  },
+  {
+    "name": "Mixistlán de la Reforma",
+    "state": "Oax."
+  },
+  {
+    "name": "Monjas",
+    "state": "Oax."
+  },
+  {
+    "name": "Natividad",
+    "state": "Oax."
+  },
+  {
+    "name": "Nazareno Etla",
+    "state": "Oax."
+  },
+  {
+    "name": "Nejapa de Madero",
+    "state": "Oax."
+  },
+  {
+    "name": "Nuevo Zoquiápam",
+    "state": "Oax."
+  },
+  {
+    "name": "Oaxaca de Juárez",
+    "state": "Oax."
+  },
+  {
+    "name": "Ocotlán de Morelos",
+    "state": "Oax."
+  },
+  {
+    "name": "Pinotepa de Don Luis",
+    "state": "Oax."
+  },
+  {
+    "name": "Pluma Hidalgo",
+    "state": "Oax."
+  },
+  {
+    "name": "Putla Villa de Guerrero",
+    "state": "Oax."
+  },
+  {
+    "name": "Reforma de Pineda",
+    "state": "Oax."
+  },
+  {
+    "name": "Reyes Etla",
+    "state": "Oax."
+  },
+  {
+    "name": "Rojas de Cuauhtémoc",
+    "state": "Oax."
+  },
+  {
+    "name": "Salina Cruz",
+    "state": "Oax."
+  },
+  {
+    "name": "San Agustín Amatengo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Agustín Atenango",
+    "state": "Oax."
+  },
+  {
+    "name": "San Agustín Chayuco",
+    "state": "Oax."
+  },
+  {
+    "name": "San Agustín de las Juntas",
+    "state": "Oax."
+  },
+  {
+    "name": "San Agustín Etla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Agustín Loxicha",
+    "state": "Oax."
+  },
+  {
+    "name": "San Agustín Tlacotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Agustín Yatareni",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Cabecera Nueva",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Dinicuiti",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Huaxpaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Huayápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Ixtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Lagunas",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Nuxiño",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Paxtlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Sinaxtla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Solaga",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Teotilálpam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Tepetlapa",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Yaá",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Zabache",
+    "state": "Oax."
+  },
+  {
+    "name": "San Andrés Zautla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonino Castillo Velasco",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonino el Alto",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonino Monte Verde",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonio Acutla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonio de la Cal",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonio Huitepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonio Nanahuatípam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonio Sinicahua",
+    "state": "Oax."
+  },
+  {
+    "name": "San Antonio Tepetlapa",
+    "state": "Oax."
+  },
+  {
+    "name": "San Baltazar Chichicápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Baltazar Loxicha",
+    "state": "Oax."
+  },
+  {
+    "name": "San Baltazar Yatzachi el Bajo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bartolo Coyotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bartolo Soyaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bartolo Yautepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bartolomé Ayautla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bartolomé Loxicha",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bartolomé Quialana",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bartolomé Yucuañe",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bartolomé Zoogocho",
+    "state": "Oax."
+  },
+  {
+    "name": "San Bernardo Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Carlos Yautepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Cristóbal Amatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Cristóbal Amoltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Cristóbal Lachirioag",
+    "state": "Oax."
+  },
+  {
+    "name": "San Cristóbal Suchixtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Dionisio del Mar",
+    "state": "Oax."
+  },
+  {
+    "name": "San Dionisio Ocotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Dionisio Ocotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Esteban Atatlahuca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Felipe Jalapa de Díaz",
+    "state": "Oax."
+  },
+  {
+    "name": "San Felipe Tejalápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Felipe Usila",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Cahuacuá",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Cajonos",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Chapulapa",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Chindúa",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco del Mar",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Huehuetlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Ixhuatán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Jaltepetongo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Lachigoló",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Logueche",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Nuxaño",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Ozolotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Sola",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Telixtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Teopan",
+    "state": "Oax."
+  },
+  {
+    "name": "San Francisco Tlapancingo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Gabriel Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Ildefonso Amatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Ildefonso Sola",
+    "state": "Oax."
+  },
+  {
+    "name": "San Ildefonso Villa Alta",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jacinto Amilpas",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jacinto Tlacotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jerónimo Coatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jerónimo Silacayoapilla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jerónimo Sosola",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jerónimo Taviche",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jerónimo Tecóatl",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jerónimo Tlacochahuaya",
+    "state": "Oax."
+  },
+  {
+    "name": "San Jorge Nuchita",
+    "state": "Oax."
+  },
+  {
+    "name": "San José Ayuquila",
+    "state": "Oax."
+  },
+  {
+    "name": "San José Chiltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San José del Peñasco",
+    "state": "Oax."
+  },
+  {
+    "name": "San José del Progreso",
+    "state": "Oax."
+  },
+  {
+    "name": "San José Estancia Grande",
+    "state": "Oax."
+  },
+  {
+    "name": "San José Independencia",
+    "state": "Oax."
+  },
+  {
+    "name": "San José Lachiguiri",
+    "state": "Oax."
+  },
+  {
+    "name": "San José Tenango",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Achiutla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Atepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Atatlahuca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Coixtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Cuicatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Guelache",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Jayacatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Lo de Soto",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Suchitepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Tlachichilco",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Tlacoatzintepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Tuxtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Bautista Valle Nacional",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Cacahuatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Chicomezúchil",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Chilateca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Cieneguilla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Coatzóspam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Colorado",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Comaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Cotzocón",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan de los Cués",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan del Estado",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan del Río",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Diuxi",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Evangelista Analco",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Guelavía",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Guichicovi",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Ihualtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Juquila Mixes",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Juquila Vijanos",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Lachao",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Lachigalla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Lajarcia",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Lalana",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Mazatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Ñumí",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Ozolotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Petlapa",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Quiahije",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Quiotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Sayultepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Tabaá",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Tamazola",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Teita",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Teitipac",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Tepeuxila",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Teposcolula",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Yaeé",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Yatzona",
+    "state": "Oax."
+  },
+  {
+    "name": "San Juan Yucuita",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lorenzo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lorenzo Albarradas",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lorenzo Cacaotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lorenzo Cuaunecuiltitla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lorenzo Texmelúcan",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lorenzo Victoria",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lucas Camotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lucas Ojitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lucas Quiaviní",
+    "state": "Oax."
+  },
+  {
+    "name": "San Lucas Zoquiápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Luis Amatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Marcial Ozolotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Marcos Arteaga",
+    "state": "Oax."
+  },
+  {
+    "name": "San Martín Huamelúlpam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Martín Itunyoso",
+    "state": "Oax."
+  },
+  {
+    "name": "San Martín Lachilá",
+    "state": "Oax."
+  },
+  {
+    "name": "San Martín Peras",
+    "state": "Oax."
+  },
+  {
+    "name": "San Martín Tilcajete",
+    "state": "Oax."
+  },
+  {
+    "name": "San Martín Toxpalan",
+    "state": "Oax."
+  },
+  {
+    "name": "San Martín Zacatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Cajonos",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo del Mar",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Etlatongo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Nejápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Peñasco",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Piñas",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Río Hondo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Sindihui",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Tlapiltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Yoloxochitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Mateo Yucutindoo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Melchor Betaza",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Achiutla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Ahuehuetitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Aloápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Amatitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Amatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Chicahua",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Chimalapa",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Coatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel del Puerto",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel del Río",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Ejutla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel el Grande",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Huautla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Panixtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Peras",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Piedras",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Quetzaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Santa Flor",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Soyaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Suchixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Tecomatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Tenango",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Tequixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Tilquiápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Tlacamama",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Tlacotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Tulancingo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Miguel Yotao",
+    "state": "Oax."
+  },
+  {
+    "name": "San Nicolás",
+    "state": "Oax."
+  },
+  {
+    "name": "San Nicolás Hidalgo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Coatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Cuatro Venados",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Etla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Huitzo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Huixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Macuiltianguis",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Tijaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Villa de Mitla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pablo Yaganiza",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Amuzgos",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Apóstol",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Atoyac",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Cajonos",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Comitancillo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Coxcaltepec Cántaros",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro el Alto",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Huamelula",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Huilotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Ixcatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Ixtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Jaltepetongo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Jicayán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Jocotipac",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Juchatengo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Mártir",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Mártir Quiechapa",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Mártir Yucuxaco",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Molinos",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Nopala",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Ocopetatillo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Ocotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Pochutla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Quiatoni",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Sochiápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Tapanatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Taviche",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Teozacoalco",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Teutila",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Tidaá",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Topiltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Totolápam",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro y San Pablo Ayutla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro y San Pablo Teposcolula",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro y San Pablo Tequixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Yaneri",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Yólox",
+    "state": "Oax."
+  },
+  {
+    "name": "San Pedro Yucunama",
+    "state": "Oax."
+  },
+  {
+    "name": "San Raymundo Jalpan",
+    "state": "Oax."
+  },
+  {
+    "name": "San Sebastián Abasolo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Sebastián Coatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Sebastián Ixcapa",
+    "state": "Oax."
+  },
+  {
+    "name": "San Sebastián Nicananduta",
+    "state": "Oax."
+  },
+  {
+    "name": "San Sebastián Río Hondo",
+    "state": "Oax."
+  },
+  {
+    "name": "San Sebastián Tecomaxtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "San Sebastián Teitipac",
+    "state": "Oax."
+  },
+  {
+    "name": "San Sebastián Tutla",
+    "state": "Oax."
+  },
+  {
+    "name": "San Simón Almolongas",
+    "state": "Oax."
+  },
+  {
+    "name": "San Simón Zahuatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Vicente Coatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "San Vicente Lachixío",
+    "state": "Oax."
+  },
+  {
+    "name": "San Vicente Nuñú",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Ana",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Ana Ateixtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Ana Cuauhtémoc",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Ana del Valle",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Ana Tavela",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Ana Tlapacoyan",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Ana Yareni",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Ana Zegache",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catalina Quierí",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Cuixtla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Ixtepeji",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Juquila",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Lachatao",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Loxicha",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Mechoacán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Minas",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Quiané",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Quioquitani",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Tayata",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Ticuá",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Yosonotú",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Catarina Zapoquila",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Acatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Amilpas",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz de Bravo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Itundujia",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Mixtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Nundaco",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Papalutla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Tacache de Mina",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Tacahua",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Tayata",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Xitla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Xoxocotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Cruz Zenzontepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Gertrudis",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Inés de Zaragoza",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Inés del Monte",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Inés Yatzeche",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Lucía del Camino",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Lucía Miahuatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Lucía Monteverde",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Lucía Ocotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa Magdalena Jicotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Alotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Apazco",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Atzompa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Camotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Chachoápam",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Chilchotla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Chimalapa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Colotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Cortijo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Coyotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María del Rosario",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María del Tule",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Ecatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Guelacé",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Guienagati",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Huatulco",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Huazolotitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Ipalapa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Ixcatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Jacatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Jalapa del Marqués",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Jaltianguis",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María la Asunción",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Lachixío",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Mixtequilla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Nativitas",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Nduayaco",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Ozolotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Pápalo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Peñoles",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Petapa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Quiegolani",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Sola",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Tataltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Tecomavaca",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Temaxcalapa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Temaxcaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Teopoxco",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Tepantlali",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Texcatitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Tlahuitoltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Tlalixtac",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Tonameca",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Totolapilla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Xadani",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Yalina",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Yavesía",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Yolotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Yosoyúa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Yucuhiti",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Zacatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Zaniza",
+    "state": "Oax."
+  },
+  {
+    "name": "Santa María Zoquitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Amoltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Apoala",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Apóstol",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Astata",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Atitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Ayuquililla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Cacaloxtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Camotlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Choápam",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Comaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago del Río",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Huajolotitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Huauclilla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Ihuitlán Plumas",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Ixcuintepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Ixtayutla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Jamiltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Jocotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Juxtlahuaca",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Lachiguiri",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Lalopa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Laollaga",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Laxopa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Llano Grande",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Matatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Miltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Minas",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Nacaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Nejapilla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Niltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Nundiche",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Nuyoó",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Pinotepa Nacional",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Suchilquitongo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Tamazola",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Tapextla",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Tenango",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Tepetlapa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Tetepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Texcalcingo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Textitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Tilantongo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Tillo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Tlazoyaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Xanica",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Xiacuí",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Yaitepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Yaveo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Yolomécatl",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Yosondúa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Yucuyachi",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Zacatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santiago Zoochila",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Albarradas",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Armenta",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Chihuitán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo de Morelos",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Ingenio",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Ixcatlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Nuxaá",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Ozolotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Petapa",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Roayaga",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Tehuantepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Teojomulco",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Tepuxtepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Tlatayápam",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Tomaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Tonalá",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Tonaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Xagacía",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Yanhuitlán",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Yodohino",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Domingo Zanatepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Tomás Jalieza",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Tomás Mazaltepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Tomás Ocotepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Santo Tomás Tamazulapan",
+    "state": "Oax."
+  },
+  {
+    "name": "Santos Reyes Nopala",
+    "state": "Oax."
+  },
+  {
+    "name": "Santos Reyes Pápalo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santos Reyes Tepejillo",
+    "state": "Oax."
+  },
+  {
+    "name": "Santos Reyes Yucuná",
+    "state": "Oax."
+  },
+  {
+    "name": "Silacayoápam",
+    "state": "Oax."
+  },
+  {
+    "name": "Sitio de Xitlapehua",
+    "state": "Oax."
+  },
+  {
+    "name": "Soledad Etla",
+    "state": "Oax."
+  },
+  {
+    "name": "Tamazulápam del Espíritu Santo",
+    "state": "Oax."
+  },
+  {
+    "name": "Tanetze de Zaragoza",
+    "state": "Oax."
+  },
+  {
+    "name": "Taniche",
+    "state": "Oax."
+  },
+  {
+    "name": "Tataltepec de Valdés",
+    "state": "Oax."
+  },
+  {
+    "name": "Teococuilco de Marcos Pérez",
+    "state": "Oax."
+  },
+  {
+    "name": "Teotitlán de Flores Magón",
+    "state": "Oax."
+  },
+  {
+    "name": "Teotitlán del Valle",
+    "state": "Oax."
+  },
+  {
+    "name": "Teotongo",
+    "state": "Oax."
+  },
+  {
+    "name": "Tepelmeme Villa de Morelos",
+    "state": "Oax."
+  },
+  {
+    "name": "Tlacolula de Matamoros",
+    "state": "Oax."
+  },
+  {
+    "name": "Tlacotepec Plumas",
+    "state": "Oax."
+  },
+  {
+    "name": "Tlalixtac de Cabrera",
+    "state": "Oax."
+  },
+  {
+    "name": "Totontepec Villa de Morelos",
+    "state": "Oax."
+  },
+  {
+    "name": "Trinidad Zaachila",
+    "state": "Oax."
+  },
+  {
+    "name": "Unión Hidalgo",
+    "state": "Oax."
+  },
+  {
+    "name": "Valerio Trujano",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa de Chilapa de Díaz",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa de Etla",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa de Santiago Chazumba",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa de Tamazulápam del Progreso",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa de Tututepec",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa de Zaachila",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa Díaz Ordaz",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa Hidalgo Yalálag",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa Sola de Vega",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa Talea de Castro",
+    "state": "Oax."
+  },
+  {
+    "name": "Villa Tejúpam de la Unión",
+    "state": "Oax."
+  },
+  {
+    "name": "Yaxe",
+    "state": "Oax."
+  },
+  {
+    "name": "Yogana",
+    "state": "Oax."
+  },
+  {
+    "name": "Yutanduchi de Guerrero",
+    "state": "Oax."
+  },
+  {
+    "name": "Zapotitlán Lagunas",
+    "state": "Oax."
+  },
+  {
+    "name": "Zapotitlán Palmas",
+    "state": "Oax."
+  },
+  {
+    "name": "Zimatlán de Álvarez",
+    "state": "Oax."
+  },
+  {
+    "name": "Acajete",
+    "state": "Pue."
+  },
+  {
+    "name": "Acateno",
+    "state": "Pue."
+  },
+  {
+    "name": "Acatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Acatzingo",
+    "state": "Pue."
+  },
+  {
+    "name": "Acteopan",
+    "state": "Pue."
+  },
+  {
+    "name": "Ahuacatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Ahuatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Ahuazotepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Ahuehuetitla",
+    "state": "Pue."
+  },
+  {
+    "name": "Ajalpan",
+    "state": "Pue."
+  },
+  {
+    "name": "Albino Zertuche",
+    "state": "Pue."
+  },
+  {
+    "name": "Aljojuca",
+    "state": "Pue."
+  },
+  {
+    "name": "Altepexi",
+    "state": "Pue."
+  },
+  {
+    "name": "Amixtlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Amozoc",
+    "state": "Pue."
+  },
+  {
+    "name": "Aquixtla",
+    "state": "Pue."
+  },
+  {
+    "name": "Atempan",
+    "state": "Pue."
+  },
+  {
+    "name": "Atexcal",
+    "state": "Pue."
+  },
+  {
+    "name": "Atlequizayan",
+    "state": "Pue."
+  },
+  {
+    "name": "Atlixco",
+    "state": "Pue."
+  },
+  {
+    "name": "Atoyatempan",
+    "state": "Pue."
+  },
+  {
+    "name": "Atzala",
+    "state": "Pue."
+  },
+  {
+    "name": "Atzitzihuacán",
+    "state": "Pue."
+  },
+  {
+    "name": "Atzitzintla",
+    "state": "Pue."
+  },
+  {
+    "name": "Axutla",
+    "state": "Pue."
+  },
+  {
+    "name": "Ayotoxco de Guerrero",
+    "state": "Pue."
+  },
+  {
+    "name": "Calpan",
+    "state": "Pue."
+  },
+  {
+    "name": "Caltepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Camocuautla",
+    "state": "Pue."
+  },
+  {
+    "name": "Cañada Morelos",
+    "state": "Pue."
+  },
+  {
+    "name": "Caxhuacan",
+    "state": "Pue."
+  },
+  {
+    "name": "Chalchicomula de Sesma",
+    "state": "Pue."
+  },
+  {
+    "name": "Chapulco",
+    "state": "Pue."
+  },
+  {
+    "name": "Chiautla",
+    "state": "Pue."
+  },
+  {
+    "name": "Chiautzingo",
+    "state": "Pue."
+  },
+  {
+    "name": "Chichiquila",
+    "state": "Pue."
+  },
+  {
+    "name": "Chiconcuautla",
+    "state": "Pue."
+  },
+  {
+    "name": "Chietla",
+    "state": "Pue."
+  },
+  {
+    "name": "Chigmecatitlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Chignahuapan",
+    "state": "Pue."
+  },
+  {
+    "name": "Chignautla",
+    "state": "Pue."
+  },
+  {
+    "name": "Chila",
+    "state": "Pue."
+  },
+  {
+    "name": "Chila de la Sal",
+    "state": "Pue."
+  },
+  {
+    "name": "Chilchotla",
+    "state": "Pue."
+  },
+  {
+    "name": "Chinantla",
+    "state": "Pue."
+  },
+  {
+    "name": "Coatepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Coatzingo",
+    "state": "Pue."
+  },
+  {
+    "name": "Cohetzala",
+    "state": "Pue."
+  },
+  {
+    "name": "Cohuecan",
+    "state": "Pue."
+  },
+  {
+    "name": "Coronango",
+    "state": "Pue."
+  },
+  {
+    "name": "Coxcatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Coyomeapan",
+    "state": "Pue."
+  },
+  {
+    "name": "Coyotepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Cuapiaxtla de Madero",
+    "state": "Pue."
+  },
+  {
+    "name": "Cuautempan",
+    "state": "Pue."
+  },
+  {
+    "name": "Cuautinchán",
+    "state": "Pue."
+  },
+  {
+    "name": "Cuautlancingo",
+    "state": "Pue."
+  },
+  {
+    "name": "Cuayuca de Andrade",
+    "state": "Pue."
+  },
+  {
+    "name": "Cuetzalan del Progreso",
+    "state": "Pue."
+  },
+  {
+    "name": "Cuyoaco",
+    "state": "Pue."
+  },
+  {
+    "name": "Domingo Arenas",
+    "state": "Pue."
+  },
+  {
+    "name": "Eloxochitlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Epatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Esperanza",
+    "state": "Pue."
+  },
+  {
+    "name": "Francisco Z. Mena",
+    "state": "Pue."
+  },
+  {
+    "name": "General Felipe Ángeles",
+    "state": "Pue."
+  },
+  {
+    "name": "Guadalupe",
+    "state": "Pue."
+  },
+  {
+    "name": "Guadalupe Victoria",
+    "state": "Pue."
+  },
+  {
+    "name": "Hermenegildo Galeana",
+    "state": "Pue."
+  },
+  {
+    "name": "Honey",
+    "state": "Pue."
+  },
+  {
+    "name": "Huaquechula",
+    "state": "Pue."
+  },
+  {
+    "name": "Huatlatlauca",
+    "state": "Pue."
+  },
+  {
+    "name": "Huauchinango",
+    "state": "Pue."
+  },
+  {
+    "name": "Huehuetla",
+    "state": "Pue."
+  },
+  {
+    "name": "Huehuetlán el Chico",
+    "state": "Pue."
+  },
+  {
+    "name": "Huehuetlán el Grande",
+    "state": "Pue."
+  },
+  {
+    "name": "Huejotzingo",
+    "state": "Pue."
+  },
+  {
+    "name": "Hueyapan",
+    "state": "Pue."
+  },
+  {
+    "name": "Hueytamalco",
+    "state": "Pue."
+  },
+  {
+    "name": "Hueytlalpan",
+    "state": "Pue."
+  },
+  {
+    "name": "Huitzilan de Serdán",
+    "state": "Pue."
+  },
+  {
+    "name": "Huitziltepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Ixcamilpa de Guerrero",
+    "state": "Pue."
+  },
+  {
+    "name": "Ixcaquixtla",
+    "state": "Pue."
+  },
+  {
+    "name": "Ixtacamaxtitlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Ixtepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Izúcar de Matamoros",
+    "state": "Pue."
+  },
+  {
+    "name": "Jalpan",
+    "state": "Pue."
+  },
+  {
+    "name": "Jolalpan",
+    "state": "Pue."
+  },
+  {
+    "name": "Jonotla",
+    "state": "Pue."
+  },
+  {
+    "name": "Jopala",
+    "state": "Pue."
+  },
+  {
+    "name": "Juan C. Bonilla",
+    "state": "Pue."
+  },
+  {
+    "name": "Juan Galindo",
+    "state": "Pue."
+  },
+  {
+    "name": "Juan N. Méndez",
+    "state": "Pue."
+  },
+  {
+    "name": "La Magdalena Tlatlauquitepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Lafragua",
+    "state": "Pue."
+  },
+  {
+    "name": "Libres",
+    "state": "Pue."
+  },
+  {
+    "name": "Los Reyes de Juárez",
+    "state": "Pue."
+  },
+  {
+    "name": "Mazapiltepec de Juárez",
+    "state": "Pue."
+  },
+  {
+    "name": "Mixtla",
+    "state": "Pue."
+  },
+  {
+    "name": "Molcaxac",
+    "state": "Pue."
+  },
+  {
+    "name": "Naupan",
+    "state": "Pue."
+  },
+  {
+    "name": "Nauzontla",
+    "state": "Pue."
+  },
+  {
+    "name": "Nealtican",
+    "state": "Pue."
+  },
+  {
+    "name": "Nicolás Bravo",
+    "state": "Pue."
+  },
+  {
+    "name": "Nopalucan",
+    "state": "Pue."
+  },
+  {
+    "name": "Ocotepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Ocoyucan",
+    "state": "Pue."
+  },
+  {
+    "name": "Olintla",
+    "state": "Pue."
+  },
+  {
+    "name": "Oriental",
+    "state": "Pue."
+  },
+  {
+    "name": "Pahuatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Palmar de Bravo",
+    "state": "Pue."
+  },
+  {
+    "name": "Pantepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Petlalcingo",
+    "state": "Pue."
+  },
+  {
+    "name": "Piaxtla",
+    "state": "Pue."
+  },
+  {
+    "name": "Puebla",
+    "state": "Pue."
+  },
+  {
+    "name": "Quecholac",
+    "state": "Pue."
+  },
+  {
+    "name": "Quimixtlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Rafael Lara Grajales",
+    "state": "Pue."
+  },
+  {
+    "name": "San Andrés Cholula",
+    "state": "Pue."
+  },
+  {
+    "name": "San Antonio Cañada",
+    "state": "Pue."
+  },
+  {
+    "name": "San Diego la Mesa Tochimiltzingo",
+    "state": "Pue."
+  },
+  {
+    "name": "San Felipe Teotlalcingo",
+    "state": "Pue."
+  },
+  {
+    "name": "San Felipe Tepatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "San Gabriel Chilac",
+    "state": "Pue."
+  },
+  {
+    "name": "San Gregorio Atzompa",
+    "state": "Pue."
+  },
+  {
+    "name": "San Jerónimo Tecuanipan",
+    "state": "Pue."
+  },
+  {
+    "name": "San Jerónimo Xayacatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "San José Chiapa",
+    "state": "Pue."
+  },
+  {
+    "name": "San José Miahuatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "San Juan Atenco",
+    "state": "Pue."
+  },
+  {
+    "name": "San Juan Atzompa",
+    "state": "Pue."
+  },
+  {
+    "name": "San Martín Texmelucan",
+    "state": "Pue."
+  },
+  {
+    "name": "San Martín Totoltepec",
+    "state": "Pue."
+  },
+  {
+    "name": "San Matías Tlalancaleca",
+    "state": "Pue."
+  },
+  {
+    "name": "San Miguel Ixitlán",
+    "state": "Pue."
+  },
+  {
+    "name": "San Miguel Xoxtla",
+    "state": "Pue."
+  },
+  {
+    "name": "San Nicolás Buenos Aires",
+    "state": "Pue."
+  },
+  {
+    "name": "San Nicolás de los Ranchos",
+    "state": "Pue."
+  },
+  {
+    "name": "San Pablo Anicano",
+    "state": "Pue."
+  },
+  {
+    "name": "San Pedro Cholula",
+    "state": "Pue."
+  },
+  {
+    "name": "San Pedro Yeloixtlahuaca",
+    "state": "Pue."
+  },
+  {
+    "name": "San Salvador el Seco",
+    "state": "Pue."
+  },
+  {
+    "name": "San Salvador el Verde",
+    "state": "Pue."
+  },
+  {
+    "name": "San Salvador Huixcolotla",
+    "state": "Pue."
+  },
+  {
+    "name": "San Sebastián Tlacotepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Santa Catarina Tlaltempan",
+    "state": "Pue."
+  },
+  {
+    "name": "Santa Inés Ahuatempan",
+    "state": "Pue."
+  },
+  {
+    "name": "Santa Isabel Cholula",
+    "state": "Pue."
+  },
+  {
+    "name": "Santiago Miahuatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Santo Tomás Hueyotlipan",
+    "state": "Pue."
+  },
+  {
+    "name": "Soltepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Tecali de Herrera",
+    "state": "Pue."
+  },
+  {
+    "name": "Tecamachalco",
+    "state": "Pue."
+  },
+  {
+    "name": "Tecomatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Tehuacán",
+    "state": "Pue."
+  },
+  {
+    "name": "Tehuitzingo",
+    "state": "Pue."
+  },
+  {
+    "name": "Tenampulco",
+    "state": "Pue."
+  },
+  {
+    "name": "Teopantlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Teotlalco",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepanco de López",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepango de Rodríguez",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepatlaxco de Hidalgo",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepeaca",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepemaxalco",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepeojuma",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepetzintla",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepexco",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepexi de Rodríguez",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepeyahualco",
+    "state": "Pue."
+  },
+  {
+    "name": "Tepeyahualco de Cuauhtémoc",
+    "state": "Pue."
+  },
+  {
+    "name": "Tetela de Ocampo",
+    "state": "Pue."
+  },
+  {
+    "name": "Teteles de Ávila Castillo",
+    "state": "Pue."
+  },
+  {
+    "name": "Teziutlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Tianguismanalco",
+    "state": "Pue."
+  },
+  {
+    "name": "Tilapa",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlachichuca",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlacotepec de Benito Juárez",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlacuilotepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlahuapan",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlaltenango",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlanepantla",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlaola",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlapacoya",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlapanalá",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlatlauquitepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Tlaxco",
+    "state": "Pue."
+  },
+  {
+    "name": "Tochimilco",
+    "state": "Pue."
+  },
+  {
+    "name": "Tochtepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Totoltepec de Guerrero",
+    "state": "Pue."
+  },
+  {
+    "name": "Tulcingo",
+    "state": "Pue."
+  },
+  {
+    "name": "Tuzamapan de Galeana",
+    "state": "Pue."
+  },
+  {
+    "name": "Tzicatlacoyan",
+    "state": "Pue."
+  },
+  {
+    "name": "Venustiano Carranza",
+    "state": "Pue."
+  },
+  {
+    "name": "Vicente Guerrero",
+    "state": "Pue."
+  },
+  {
+    "name": "Xayacatlán de Bravo",
+    "state": "Pue."
+  },
+  {
+    "name": "Xicotepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Xicotlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Xiutetelco",
+    "state": "Pue."
+  },
+  {
+    "name": "Xochiapulco",
+    "state": "Pue."
+  },
+  {
+    "name": "Xochiltepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Xochitlán de Vicente Suárez",
+    "state": "Pue."
+  },
+  {
+    "name": "Xochitlán Todos Santos",
+    "state": "Pue."
+  },
+  {
+    "name": "Yaonáhuac",
+    "state": "Pue."
+  },
+  {
+    "name": "Yehualtepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Zacapala",
+    "state": "Pue."
+  },
+  {
+    "name": "Zacapoaxtla",
+    "state": "Pue."
+  },
+  {
+    "name": "Zacatlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Zapotitlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Zapotitlán de Méndez",
+    "state": "Pue."
+  },
+  {
+    "name": "Zaragoza",
+    "state": "Pue."
+  },
+  {
+    "name": "Zautla",
+    "state": "Pue."
+  },
+  {
+    "name": "Zihuateutla",
+    "state": "Pue."
+  },
+  {
+    "name": "Zinacatepec",
+    "state": "Pue."
+  },
+  {
+    "name": "Zongozotla",
+    "state": "Pue."
+  },
+  {
+    "name": "Zoquiapan",
+    "state": "Pue."
+  },
+  {
+    "name": "Zoquitlán",
+    "state": "Pue."
+  },
+  {
+    "name": "Bacalar",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Benito Juárez",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Cozumel",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Felipe Carrillo Puerto",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Isla Mujeres",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "José María Morelos",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Lázaro Cárdenas",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Othón P. Blanco",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Playa del Carmen",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Puerto Morelos",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Tulum",
+    "state": "Q. Roo"
+  },
+  {
+    "name": "Amealco de Bonfil",
+    "state": "Qro."
+  },
+  {
+    "name": "Arroyo Seco",
+    "state": "Qro."
+  },
+  {
+    "name": "Cadereyta de Montes",
+    "state": "Qro."
+  },
+  {
+    "name": "Colón",
+    "state": "Qro."
+  },
+  {
+    "name": "Corregidora",
+    "state": "Qro."
+  },
+  {
+    "name": "El Marqués",
+    "state": "Qro."
+  },
+  {
+    "name": "Ezequiel Montes",
+    "state": "Qro."
+  },
+  {
+    "name": "Huimilpan",
+    "state": "Qro."
+  },
+  {
+    "name": "Jalpan de Serra",
+    "state": "Qro."
+  },
+  {
+    "name": "Landa de Matamoros",
+    "state": "Qro."
+  },
+  {
+    "name": "Pedro Escobedo",
+    "state": "Qro."
+  },
+  {
+    "name": "Peñamiller",
+    "state": "Qro."
+  },
+  {
+    "name": "Pinal de Amoles",
+    "state": "Qro."
+  },
+  {
+    "name": "Querétaro",
+    "state": "Qro."
+  },
+  {
+    "name": "San Joaquín",
+    "state": "Qro."
+  },
+  {
+    "name": "San Juan del Río",
+    "state": "Qro."
+  },
+  {
+    "name": "Tequisquiapan",
+    "state": "Qro."
+  },
+  {
+    "name": "Tolimán",
+    "state": "Qro."
+  },
+  {
+    "name": "Ahome",
+    "state": "Sin."
+  },
+  {
+    "name": "Angostura",
+    "state": "Sin."
+  },
+  {
+    "name": "Badiraguato",
+    "state": "Sin."
+  },
+  {
+    "name": "Choix",
+    "state": "Sin."
+  },
+  {
+    "name": "Concordia",
+    "state": "Sin."
+  },
+  {
+    "name": "Cosalá",
+    "state": "Sin."
+  },
+  {
+    "name": "Culiacán",
+    "state": "Sin."
+  },
+  {
+    "name": "El Fuerte",
+    "state": "Sin."
+  },
+  {
+    "name": "Eldorado",
+    "state": "Sin."
+  },
+  {
+    "name": "Elota",
+    "state": "Sin."
+  },
+  {
+    "name": "Escuinapa",
+    "state": "Sin."
+  },
+  {
+    "name": "Guasave",
+    "state": "Sin."
+  },
+  {
+    "name": "Juan José Ríos",
+    "state": "Sin."
+  },
+  {
+    "name": "Mazatlán",
+    "state": "Sin."
+  },
+  {
+    "name": "Mocorito",
+    "state": "Sin."
+  },
+  {
+    "name": "Navolato",
+    "state": "Sin."
+  },
+  {
+    "name": "Rosario",
+    "state": "Sin."
+  },
+  {
+    "name": "Salvador Alvarado",
+    "state": "Sin."
+  },
+  {
+    "name": "San Ignacio",
+    "state": "Sin."
+  },
+  {
+    "name": "Sinaloa",
+    "state": "Sin."
+  },
+  {
+    "name": "Ahualulco del Sonido 13",
+    "state": "SLP"
+  },
+  {
+    "name": "Alaquines",
+    "state": "SLP"
+  },
+  {
+    "name": "Aquismón",
+    "state": "SLP"
+  },
+  {
+    "name": "Armadillo de los Infante",
+    "state": "SLP"
+  },
+  {
+    "name": "Axtla de Terrazas",
+    "state": "SLP"
+  },
+  {
+    "name": "Cárdenas",
+    "state": "SLP"
+  },
+  {
+    "name": "Catorce",
+    "state": "SLP"
+  },
+  {
+    "name": "Cedral",
+    "state": "SLP"
+  },
+  {
+    "name": "Cerritos",
+    "state": "SLP"
+  },
+  {
+    "name": "Cerro de San Pedro",
+    "state": "SLP"
+  },
+  {
+    "name": "Charcas",
+    "state": "SLP"
+  },
+  {
+    "name": "Ciudad del Maíz",
+    "state": "SLP"
+  },
+  {
+    "name": "Ciudad Fernández",
+    "state": "SLP"
+  },
+  {
+    "name": "Ciudad Valles",
+    "state": "SLP"
+  },
+  {
+    "name": "Coxcatlán",
+    "state": "SLP"
+  },
+  {
+    "name": "Ebano",
+    "state": "SLP"
+  },
+  {
+    "name": "El Naranjo",
+    "state": "SLP"
+  },
+  {
+    "name": "Guadalcázar",
+    "state": "SLP"
+  },
+  {
+    "name": "Huehuetlán",
+    "state": "SLP"
+  },
+  {
+    "name": "Lagunillas",
+    "state": "SLP"
+  },
+  {
+    "name": "Matehuala",
+    "state": "SLP"
+  },
+  {
+    "name": "Matlapa",
+    "state": "SLP"
+  },
+  {
+    "name": "Mexquitic de Carmona",
+    "state": "SLP"
+  },
+  {
+    "name": "Moctezuma",
+    "state": "SLP"
+  },
+  {
+    "name": "Rayón",
+    "state": "SLP"
+  },
+  {
+    "name": "Rioverde",
+    "state": "SLP"
+  },
+  {
+    "name": "Salinas",
+    "state": "SLP"
+  },
+  {
+    "name": "San Antonio",
+    "state": "SLP"
+  },
+  {
+    "name": "San Ciro de Acosta",
+    "state": "SLP"
+  },
+  {
+    "name": "San Luis Potosí",
+    "state": "SLP"
+  },
+  {
+    "name": "San Martín Chalchicuautla",
+    "state": "SLP"
+  },
+  {
+    "name": "San Nicolás Tolentino",
+    "state": "SLP"
+  },
+  {
+    "name": "San Vicente Tancuayalab",
+    "state": "SLP"
+  },
+  {
+    "name": "Santa Catarina",
+    "state": "SLP"
+  },
+  {
+    "name": "Santa María del Río",
+    "state": "SLP"
+  },
+  {
+    "name": "Santo Domingo",
+    "state": "SLP"
+  },
+  {
+    "name": "Soledad de Graciano Sánchez",
+    "state": "SLP"
+  },
+  {
+    "name": "Tamasopo",
+    "state": "SLP"
+  },
+  {
+    "name": "Tamazunchale",
+    "state": "SLP"
+  },
+  {
+    "name": "Tampacán",
+    "state": "SLP"
+  },
+  {
+    "name": "Tampamolón Corona",
+    "state": "SLP"
+  },
+  {
+    "name": "Tamuín",
+    "state": "SLP"
+  },
+  {
+    "name": "Tancanhuitz",
+    "state": "SLP"
+  },
+  {
+    "name": "Tanlajás",
+    "state": "SLP"
+  },
+  {
+    "name": "Tanquián de Escobedo",
+    "state": "SLP"
+  },
+  {
+    "name": "Tierra Nueva",
+    "state": "SLP"
+  },
+  {
+    "name": "Vanegas",
+    "state": "SLP"
+  },
+  {
+    "name": "Venado",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa de Arista",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa de Arriaga",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa de Guadalupe",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa de la Paz",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa de Pozos",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa de Ramos",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa de Reyes",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa Hidalgo",
+    "state": "SLP"
+  },
+  {
+    "name": "Villa Juárez",
+    "state": "SLP"
+  },
+  {
+    "name": "Xilitla",
+    "state": "SLP"
+  },
+  {
+    "name": "Zaragoza",
+    "state": "SLP"
+  },
+  {
+    "name": "Aconchi",
+    "state": "Son."
+  },
+  {
+    "name": "Agua Prieta",
+    "state": "Son."
+  },
+  {
+    "name": "Álamos",
+    "state": "Son."
+  },
+  {
+    "name": "Altar",
+    "state": "Son."
+  },
+  {
+    "name": "Arivechi",
+    "state": "Son."
+  },
+  {
+    "name": "Arizpe",
+    "state": "Son."
+  },
+  {
+    "name": "Atil",
+    "state": "Son."
+  },
+  {
+    "name": "Bacadéhuachi",
+    "state": "Son."
+  },
+  {
+    "name": "Bacanora",
+    "state": "Son."
+  },
+  {
+    "name": "Bacerac",
+    "state": "Son."
+  },
+  {
+    "name": "Bacoachi",
+    "state": "Son."
+  },
+  {
+    "name": "Bácum",
+    "state": "Son."
+  },
+  {
+    "name": "Banámichi",
+    "state": "Son."
+  },
+  {
+    "name": "Baviácora",
+    "state": "Son."
+  },
+  {
+    "name": "Bavispe",
+    "state": "Son."
+  },
+  {
+    "name": "Benito Juárez",
+    "state": "Son."
+  },
+  {
+    "name": "Benjamín Hill",
+    "state": "Son."
+  },
+  {
+    "name": "Caborca",
+    "state": "Son."
+  },
+  {
+    "name": "Cajeme",
+    "state": "Son."
+  },
+  {
+    "name": "Cananea",
+    "state": "Son."
+  },
+  {
+    "name": "Carbó",
+    "state": "Son."
+  },
+  {
+    "name": "Cucurpe",
+    "state": "Son."
+  },
+  {
+    "name": "Cumpas",
+    "state": "Son."
+  },
+  {
+    "name": "Divisaderos",
+    "state": "Son."
+  },
+  {
+    "name": "Empalme",
+    "state": "Son."
+  },
+  {
+    "name": "Etchojoa",
+    "state": "Son."
+  },
+  {
+    "name": "Fronteras",
+    "state": "Son."
+  },
+  {
+    "name": "General Plutarco Elías Calles",
+    "state": "Son."
+  },
+  {
+    "name": "Granados",
+    "state": "Son."
+  },
+  {
+    "name": "Guaymas",
+    "state": "Son."
+  },
+  {
+    "name": "Hermosillo",
+    "state": "Son."
+  },
+  {
+    "name": "Huachinera",
+    "state": "Son."
+  },
+  {
+    "name": "Huásabas",
+    "state": "Son."
+  },
+  {
+    "name": "Huatabampo",
+    "state": "Son."
+  },
+  {
+    "name": "Huépac",
+    "state": "Son."
+  },
+  {
+    "name": "Imuris",
+    "state": "Son."
+  },
+  {
+    "name": "La Colorada",
+    "state": "Son."
+  },
+  {
+    "name": "Magdalena",
+    "state": "Son."
+  },
+  {
+    "name": "Mazatán",
+    "state": "Son."
+  },
+  {
+    "name": "Moctezuma",
+    "state": "Son."
+  },
+  {
+    "name": "Naco",
+    "state": "Son."
+  },
+  {
+    "name": "Nácori Chico",
+    "state": "Son."
+  },
+  {
+    "name": "Nacozari de García",
+    "state": "Son."
+  },
+  {
+    "name": "Navojoa",
+    "state": "Son."
+  },
+  {
+    "name": "Nogales",
+    "state": "Son."
+  },
+  {
+    "name": "Ónavas",
+    "state": "Son."
+  },
+  {
+    "name": "Opodepe",
+    "state": "Son."
+  },
+  {
+    "name": "Oquitoa",
+    "state": "Son."
+  },
+  {
+    "name": "Pitiquito",
+    "state": "Son."
+  },
+  {
+    "name": "Puerto Peñasco",
+    "state": "Son."
+  },
+  {
+    "name": "Quiriego",
+    "state": "Son."
+  },
+  {
+    "name": "Rayón",
+    "state": "Son."
+  },
+  {
+    "name": "Rosario",
+    "state": "Son."
+  },
+  {
+    "name": "Sahuaripa",
+    "state": "Son."
+  },
+  {
+    "name": "San Felipe de Jesús",
+    "state": "Son."
+  },
+  {
+    "name": "San Ignacio Río Muerto",
+    "state": "Son."
+  },
+  {
+    "name": "San Javier",
+    "state": "Son."
+  },
+  {
+    "name": "San Luis Río Colorado",
+    "state": "Son."
+  },
+  {
+    "name": "San Miguel de Horcasitas",
+    "state": "Son."
+  },
+  {
+    "name": "San Pedro de la Cueva",
+    "state": "Son."
+  },
+  {
+    "name": "Santa Ana",
+    "state": "Son."
+  },
+  {
+    "name": "Santa Cruz",
+    "state": "Son."
+  },
+  {
+    "name": "Sáric",
+    "state": "Son."
+  },
+  {
+    "name": "Soyopa",
+    "state": "Son."
+  },
+  {
+    "name": "Suaqui Grande",
+    "state": "Son."
+  },
+  {
+    "name": "Tepache",
+    "state": "Son."
+  },
+  {
+    "name": "Trincheras",
+    "state": "Son."
+  },
+  {
+    "name": "Tubutama",
+    "state": "Son."
+  },
+  {
+    "name": "Ures",
+    "state": "Son."
+  },
+  {
+    "name": "Villa Hidalgo",
+    "state": "Son."
+  },
+  {
+    "name": "Villa Pesqueira",
+    "state": "Son."
+  },
+  {
+    "name": "Yécora",
+    "state": "Son."
+  },
+  {
+    "name": "Balancán",
+    "state": "Tab."
+  },
+  {
+    "name": "Cárdenas",
+    "state": "Tab."
+  },
+  {
+    "name": "Centla",
+    "state": "Tab."
+  },
+  {
+    "name": "Centro",
+    "state": "Tab."
+  },
+  {
+    "name": "Comalcalco",
+    "state": "Tab."
+  },
+  {
+    "name": "Cunduacán",
+    "state": "Tab."
+  },
+  {
+    "name": "Emiliano Zapata",
+    "state": "Tab."
+  },
+  {
+    "name": "Huimanguillo",
+    "state": "Tab."
+  },
+  {
+    "name": "Jalapa",
+    "state": "Tab."
+  },
+  {
+    "name": "Jalpa de Méndez",
+    "state": "Tab."
+  },
+  {
+    "name": "Jonuta",
+    "state": "Tab."
+  },
+  {
+    "name": "Macuspana",
+    "state": "Tab."
+  },
+  {
+    "name": "Nacajuca",
+    "state": "Tab."
+  },
+  {
+    "name": "Paraíso",
+    "state": "Tab."
+  },
+  {
+    "name": "Tacotalpa",
+    "state": "Tab."
+  },
+  {
+    "name": "Teapa",
+    "state": "Tab."
+  },
+  {
+    "name": "Tenosique",
+    "state": "Tab."
+  },
+  {
+    "name": "Abasolo",
+    "state": "Tamps."
+  },
+  {
+    "name": "Aldama",
+    "state": "Tamps."
+  },
+  {
+    "name": "Altamira",
+    "state": "Tamps."
+  },
+  {
+    "name": "Antiguo Morelos",
+    "state": "Tamps."
+  },
+  {
+    "name": "Burgos",
+    "state": "Tamps."
+  },
+  {
+    "name": "Bustamante",
+    "state": "Tamps."
+  },
+  {
+    "name": "Camargo",
+    "state": "Tamps."
+  },
+  {
+    "name": "Casas",
+    "state": "Tamps."
+  },
+  {
+    "name": "Ciudad Madero",
+    "state": "Tamps."
+  },
+  {
+    "name": "Cruillas",
+    "state": "Tamps."
+  },
+  {
+    "name": "El Mante",
+    "state": "Tamps."
+  },
+  {
+    "name": "Gómez Farías",
+    "state": "Tamps."
+  },
+  {
+    "name": "González",
+    "state": "Tamps."
+  },
+  {
+    "name": "Güémez",
+    "state": "Tamps."
+  },
+  {
+    "name": "Guerrero",
+    "state": "Tamps."
+  },
+  {
+    "name": "Gustavo Díaz Ordaz",
+    "state": "Tamps."
+  },
+  {
+    "name": "Hidalgo",
+    "state": "Tamps."
+  },
+  {
+    "name": "Jaumave",
+    "state": "Tamps."
+  },
+  {
+    "name": "Jiménez",
+    "state": "Tamps."
+  },
+  {
+    "name": "Llera",
+    "state": "Tamps."
+  },
+  {
+    "name": "Mainero",
+    "state": "Tamps."
+  },
+  {
+    "name": "Matamoros",
+    "state": "Tamps."
+  },
+  {
+    "name": "Méndez",
+    "state": "Tamps."
+  },
+  {
+    "name": "Mier",
+    "state": "Tamps."
+  },
+  {
+    "name": "Miguel Alemán",
+    "state": "Tamps."
+  },
+  {
+    "name": "Miquihuana",
+    "state": "Tamps."
+  },
+  {
+    "name": "Nuevo Laredo",
+    "state": "Tamps."
+  },
+  {
+    "name": "Nuevo Morelos",
+    "state": "Tamps."
+  },
+  {
+    "name": "Ocampo",
+    "state": "Tamps."
+  },
+  {
+    "name": "Padilla",
+    "state": "Tamps."
+  },
+  {
+    "name": "Palmillas",
+    "state": "Tamps."
+  },
+  {
+    "name": "Reynosa",
+    "state": "Tamps."
+  },
+  {
+    "name": "Río Bravo",
+    "state": "Tamps."
+  },
+  {
+    "name": "San Carlos",
+    "state": "Tamps."
+  },
+  {
+    "name": "San Fernando",
+    "state": "Tamps."
+  },
+  {
+    "name": "San Nicolás",
+    "state": "Tamps."
+  },
+  {
+    "name": "Soto la Marina",
+    "state": "Tamps."
+  },
+  {
+    "name": "Tampico",
+    "state": "Tamps."
+  },
+  {
+    "name": "Tula",
+    "state": "Tamps."
+  },
+  {
+    "name": "Valle Hermoso",
+    "state": "Tamps."
+  },
+  {
+    "name": "Victoria",
+    "state": "Tamps."
+  },
+  {
+    "name": "Villagrán",
+    "state": "Tamps."
+  },
+  {
+    "name": "Xicoténcatl",
+    "state": "Tamps."
+  },
+  {
+    "name": "Acuamanala de Miguel Hidalgo",
+    "state": "Tlax."
+  },
+  {
+    "name": "Amaxac de Guerrero",
+    "state": "Tlax."
+  },
+  {
+    "name": "Apetatitlán de Antonio Carvajal",
+    "state": "Tlax."
+  },
+  {
+    "name": "Apizaco",
+    "state": "Tlax."
+  },
+  {
+    "name": "Atlangatepec",
+    "state": "Tlax."
+  },
+  {
+    "name": "Atltzayanca",
+    "state": "Tlax."
+  },
+  {
+    "name": "Benito Juárez",
+    "state": "Tlax."
+  },
+  {
+    "name": "Calpulalpan",
+    "state": "Tlax."
+  },
+  {
+    "name": "Chiautempan",
+    "state": "Tlax."
+  },
+  {
+    "name": "Contla de Juan Cuamatzi",
+    "state": "Tlax."
+  },
+  {
+    "name": "Cuapiaxtla",
+    "state": "Tlax."
+  },
+  {
+    "name": "Cuaxomulco",
+    "state": "Tlax."
+  },
+  {
+    "name": "El Carmen Tequexquitla",
+    "state": "Tlax."
+  },
+  {
+    "name": "Emiliano Zapata",
+    "state": "Tlax."
+  },
+  {
+    "name": "Españita",
+    "state": "Tlax."
+  },
+  {
+    "name": "Huamantla",
+    "state": "Tlax."
+  },
+  {
+    "name": "Hueyotlipan",
+    "state": "Tlax."
+  },
+  {
+    "name": "Ixtacuixtla de Mariano Matamoros",
+    "state": "Tlax."
+  },
+  {
+    "name": "Ixtenco",
+    "state": "Tlax."
+  },
+  {
+    "name": "La Magdalena Tlaltelulco",
+    "state": "Tlax."
+  },
+  {
+    "name": "Lázaro Cárdenas",
+    "state": "Tlax."
+  },
+  {
+    "name": "Mazatecochco de José María Morelos",
+    "state": "Tlax."
+  },
+  {
+    "name": "Muñoz de Domingo Arenas",
+    "state": "Tlax."
+  },
+  {
+    "name": "Nanacamilpa de Mariano Arista",
+    "state": "Tlax."
+  },
+  {
+    "name": "Natívitas",
+    "state": "Tlax."
+  },
+  {
+    "name": "Panotla",
+    "state": "Tlax."
+  },
+  {
+    "name": "Papalotla de Xicohténcatl",
+    "state": "Tlax."
+  },
+  {
+    "name": "San Damián Texóloc",
+    "state": "Tlax."
+  },
+  {
+    "name": "San Francisco Tetlanohcan",
+    "state": "Tlax."
+  },
+  {
+    "name": "San Jerónimo Zacualpan",
+    "state": "Tlax."
+  },
+  {
+    "name": "San José Teacalco",
+    "state": "Tlax."
+  },
+  {
+    "name": "San Juan Huactzinco",
+    "state": "Tlax."
+  },
+  {
+    "name": "San Lorenzo Axocomanitla",
+    "state": "Tlax."
+  },
+  {
+    "name": "San Lucas Tecopilco",
+    "state": "Tlax."
+  },
+  {
+    "name": "San Pablo del Monte",
+    "state": "Tlax."
+  },
+  {
+    "name": "Sanctórum de Lázaro Cárdenas",
+    "state": "Tlax."
+  },
+  {
+    "name": "Santa Ana Nopalucan",
+    "state": "Tlax."
+  },
+  {
+    "name": "Santa Apolonia Teacalco",
+    "state": "Tlax."
+  },
+  {
+    "name": "Santa Catarina Ayometla",
+    "state": "Tlax."
+  },
+  {
+    "name": "Santa Cruz Quilehtla",
+    "state": "Tlax."
+  },
+  {
+    "name": "Santa Cruz Tlaxcala",
+    "state": "Tlax."
+  },
+  {
+    "name": "Santa Isabel Xiloxoxtla",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tenancingo",
+    "state": "Tlax."
+  },
+  {
+    "name": "Teolocholco",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tepetitla de Lardizábal",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tepeyanco",
+    "state": "Tlax."
+  },
+  {
+    "name": "Terrenate",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tetla de la Solidaridad",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tetlatlahuca",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tlaxcala",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tlaxco",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tocatlán",
+    "state": "Tlax."
+  },
+  {
+    "name": "Totolac",
+    "state": "Tlax."
+  },
+  {
+    "name": "Tzompantepec",
+    "state": "Tlax."
+  },
+  {
+    "name": "Xaloztoc",
+    "state": "Tlax."
+  },
+  {
+    "name": "Xaltocan",
+    "state": "Tlax."
+  },
+  {
+    "name": "Xicohtzinco",
+    "state": "Tlax."
+  },
+  {
+    "name": "Yauhquemehcan",
+    "state": "Tlax."
+  },
+  {
+    "name": "Zacatelco",
+    "state": "Tlax."
+  },
+  {
+    "name": "Ziltlaltépec de Trinidad Sánchez Santos",
+    "state": "Tlax."
+  },
+  {
+    "name": "Acajete",
+    "state": "Ver."
+  },
+  {
+    "name": "Acatlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Acayucan",
+    "state": "Ver."
+  },
+  {
+    "name": "Actopan",
+    "state": "Ver."
+  },
+  {
+    "name": "Acula",
+    "state": "Ver."
+  },
+  {
+    "name": "Acultzingo",
+    "state": "Ver."
+  },
+  {
+    "name": "Agua Dulce",
+    "state": "Ver."
+  },
+  {
+    "name": "Álamo Temapache",
+    "state": "Ver."
+  },
+  {
+    "name": "Alpatláhuac",
+    "state": "Ver."
+  },
+  {
+    "name": "Alto Lucero de Gutiérrez Barrios",
+    "state": "Ver."
+  },
+  {
+    "name": "Altotonga",
+    "state": "Ver."
+  },
+  {
+    "name": "Alvarado",
+    "state": "Ver."
+  },
+  {
+    "name": "Amatitlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Amatlán de los Reyes",
+    "state": "Ver."
+  },
+  {
+    "name": "Angel R. Cabada",
+    "state": "Ver."
+  },
+  {
+    "name": "Apazapan",
+    "state": "Ver."
+  },
+  {
+    "name": "Aquila",
+    "state": "Ver."
+  },
+  {
+    "name": "Astacinga",
+    "state": "Ver."
+  },
+  {
+    "name": "Atlahuilco",
+    "state": "Ver."
+  },
+  {
+    "name": "Atoyac",
+    "state": "Ver."
+  },
+  {
+    "name": "Atzacan",
+    "state": "Ver."
+  },
+  {
+    "name": "Atzalan",
+    "state": "Ver."
+  },
+  {
+    "name": "Ayahualulco",
+    "state": "Ver."
+  },
+  {
+    "name": "Banderilla",
+    "state": "Ver."
+  },
+  {
+    "name": "Benito Juárez",
+    "state": "Ver."
+  },
+  {
+    "name": "Boca del Río",
+    "state": "Ver."
+  },
+  {
+    "name": "Calcahualco",
+    "state": "Ver."
+  },
+  {
+    "name": "Camarón de Tejeda",
+    "state": "Ver."
+  },
+  {
+    "name": "Camerino Z. Mendoza",
+    "state": "Ver."
+  },
+  {
+    "name": "Carlos A. Carrillo",
+    "state": "Ver."
+  },
+  {
+    "name": "Carrillo Puerto",
+    "state": "Ver."
+  },
+  {
+    "name": "Castillo de Teayo",
+    "state": "Ver."
+  },
+  {
+    "name": "Catemaco",
+    "state": "Ver."
+  },
+  {
+    "name": "Cazones de Herrera",
+    "state": "Ver."
+  },
+  {
+    "name": "Cerro Azul",
+    "state": "Ver."
+  },
+  {
+    "name": "Chacaltianguis",
+    "state": "Ver."
+  },
+  {
+    "name": "Chalma",
+    "state": "Ver."
+  },
+  {
+    "name": "Chiconamel",
+    "state": "Ver."
+  },
+  {
+    "name": "Chiconquiaco",
+    "state": "Ver."
+  },
+  {
+    "name": "Chicontepec",
+    "state": "Ver."
+  },
+  {
+    "name": "Chinameca",
+    "state": "Ver."
+  },
+  {
+    "name": "Chinampa de Gorostiza",
+    "state": "Ver."
+  },
+  {
+    "name": "Chocamán",
+    "state": "Ver."
+  },
+  {
+    "name": "Chontla",
+    "state": "Ver."
+  },
+  {
+    "name": "Chumatlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Citlaltépetl",
+    "state": "Ver."
+  },
+  {
+    "name": "Coacoatzintla",
+    "state": "Ver."
+  },
+  {
+    "name": "Coahuitlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Coatepec",
+    "state": "Ver."
+  },
+  {
+    "name": "Coatzacoalcos",
+    "state": "Ver."
+  },
+  {
+    "name": "Coatzintla",
+    "state": "Ver."
+  },
+  {
+    "name": "Coetzala",
+    "state": "Ver."
+  },
+  {
+    "name": "Colipa",
+    "state": "Ver."
+  },
+  {
+    "name": "Comapa",
+    "state": "Ver."
+  },
+  {
+    "name": "Córdoba",
+    "state": "Ver."
+  },
+  {
+    "name": "Cosamaloapan de Carpio",
+    "state": "Ver."
+  },
+  {
+    "name": "Cosautlán de Carvajal",
+    "state": "Ver."
+  },
+  {
+    "name": "Coscomatepec",
+    "state": "Ver."
+  },
+  {
+    "name": "Cosoleacaque",
+    "state": "Ver."
+  },
+  {
+    "name": "Cotaxtla",
+    "state": "Ver."
+  },
+  {
+    "name": "Coxquihui",
+    "state": "Ver."
+  },
+  {
+    "name": "Coyutla",
+    "state": "Ver."
+  },
+  {
+    "name": "Cuichapa",
+    "state": "Ver."
+  },
+  {
+    "name": "Cuitláhuac",
+    "state": "Ver."
+  },
+  {
+    "name": "El Higo",
+    "state": "Ver."
+  },
+  {
+    "name": "Emiliano Zapata",
+    "state": "Ver."
+  },
+  {
+    "name": "Espinal",
+    "state": "Ver."
+  },
+  {
+    "name": "Filomeno Mata",
+    "state": "Ver."
+  },
+  {
+    "name": "Fortín",
+    "state": "Ver."
+  },
+  {
+    "name": "Gutiérrez Zamora",
+    "state": "Ver."
+  },
+  {
+    "name": "Hidalgotitlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Huatusco",
+    "state": "Ver."
+  },
+  {
+    "name": "Huayacocotla",
+    "state": "Ver."
+  },
+  {
+    "name": "Hueyapan de Ocampo",
+    "state": "Ver."
+  },
+  {
+    "name": "Huiloapan de Cuauhtémoc",
+    "state": "Ver."
+  },
+  {
+    "name": "Ignacio de la Llave",
+    "state": "Ver."
+  },
+  {
+    "name": "Ilamatlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Isla",
+    "state": "Ver."
+  },
+  {
+    "name": "Ixcatepec",
+    "state": "Ver."
+  },
+  {
+    "name": "Ixhuacán de los Reyes",
+    "state": "Ver."
+  },
+  {
+    "name": "Ixhuatlán de Madero",
+    "state": "Ver."
+  },
+  {
+    "name": "Ixhuatlán del Café",
+    "state": "Ver."
+  },
+  {
+    "name": "Ixhuatlán del Sureste",
+    "state": "Ver."
+  },
+  {
+    "name": "Ixhuatlancillo",
+    "state": "Ver."
+  },
+  {
+    "name": "Ixmatlahuacan",
+    "state": "Ver."
+  },
+  {
+    "name": "Ixtaczoquitlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Jalacingo",
+    "state": "Ver."
+  },
+  {
+    "name": "Jalcomulco",
+    "state": "Ver."
+  },
+  {
+    "name": "Jáltipan",
+    "state": "Ver."
+  },
+  {
+    "name": "Jamapa",
+    "state": "Ver."
+  },
+  {
+    "name": "Jesús Carranza",
+    "state": "Ver."
+  },
+  {
+    "name": "Jilotepec",
+    "state": "Ver."
+  },
+  {
+    "name": "José Azueta",
+    "state": "Ver."
+  },
+  {
+    "name": "Juan Rodríguez Clara",
+    "state": "Ver."
+  },
+  {
+    "name": "Juchique de Ferrer",
+    "state": "Ver."
+  },
+  {
+    "name": "La Antigua",
+    "state": "Ver."
+  },
+  {
+    "name": "La Perla",
+    "state": "Ver."
+  },
+  {
+    "name": "Landero y Coss",
+    "state": "Ver."
+  },
+  {
+    "name": "Las Choapas",
+    "state": "Ver."
+  },
+  {
+    "name": "Las Minas",
+    "state": "Ver."
+  },
+  {
+    "name": "Las Vigas de Ramírez",
+    "state": "Ver."
+  },
+  {
+    "name": "Lerdo de Tejada",
+    "state": "Ver."
+  },
+  {
+    "name": "Los Reyes",
+    "state": "Ver."
+  },
+  {
+    "name": "Magdalena",
+    "state": "Ver."
+  },
+  {
+    "name": "Maltrata",
+    "state": "Ver."
+  },
+  {
+    "name": "Manlio Fabio Altamirano",
+    "state": "Ver."
+  },
+  {
+    "name": "Mariano Escobedo",
+    "state": "Ver."
+  },
+  {
+    "name": "Martínez de la Torre",
+    "state": "Ver."
+  },
+  {
+    "name": "Mecatlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Mecayapan",
+    "state": "Ver."
+  },
+  {
+    "name": "Medellín de Bravo",
+    "state": "Ver."
+  },
+  {
+    "name": "Miahuatlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Minatitlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Misantla",
+    "state": "Ver."
+  },
+  {
+    "name": "Mixtla de Altamirano",
+    "state": "Ver."
+  },
+  {
+    "name": "Moloacán",
+    "state": "Ver."
+  },
+  {
+    "name": "Nanchital de Lázaro Cárdenas del Río",
+    "state": "Ver."
+  },
+  {
+    "name": "Naolinco",
+    "state": "Ver."
+  },
+  {
+    "name": "Naranjal",
+    "state": "Ver."
+  },
+  {
+    "name": "Naranjos Amatlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Nautla",
+    "state": "Ver."
+  },
+  {
+    "name": "Nogales",
+    "state": "Ver."
+  },
+  {
+    "name": "Oluta",
+    "state": "Ver."
+  },
+  {
+    "name": "Omealca",
+    "state": "Ver."
+  },
+  {
+    "name": "Orizaba",
+    "state": "Ver."
+  },
+  {
+    "name": "Otatitlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Oteapan",
+    "state": "Ver."
+  },
+  {
+    "name": "Ozuluama de Mascareñas",
+    "state": "Ver."
+  },
+  {
+    "name": "Pajapan",
+    "state": "Ver."
+  },
+  {
+    "name": "Pánuco",
+    "state": "Ver."
+  },
+  {
+    "name": "Papantla",
+    "state": "Ver."
+  },
+  {
+    "name": "Paso de Ovejas",
+    "state": "Ver."
+  },
+  {
+    "name": "Paso del Macho",
+    "state": "Ver."
+  },
+  {
+    "name": "Perote",
+    "state": "Ver."
+  },
+  {
+    "name": "Platón Sánchez",
+    "state": "Ver."
+  },
+  {
+    "name": "Playa Vicente",
+    "state": "Ver."
+  },
+  {
+    "name": "Poza Rica de Hidalgo",
+    "state": "Ver."
+  },
+  {
+    "name": "Pueblo Viejo",
+    "state": "Ver."
+  },
+  {
+    "name": "Puente Nacional",
+    "state": "Ver."
+  },
+  {
+    "name": "Rafael Delgado",
+    "state": "Ver."
+  },
+  {
+    "name": "Rafael Lucio",
+    "state": "Ver."
+  },
+  {
+    "name": "Río Blanco",
+    "state": "Ver."
+  },
+  {
+    "name": "Saltabarranca",
+    "state": "Ver."
+  },
+  {
+    "name": "San Andrés Tenejapan",
+    "state": "Ver."
+  },
+  {
+    "name": "San Andrés Tuxtla",
+    "state": "Ver."
+  },
+  {
+    "name": "San Juan Evangelista",
+    "state": "Ver."
+  },
+  {
+    "name": "San Rafael",
+    "state": "Ver."
+  },
+  {
+    "name": "Santiago Sochiapan",
+    "state": "Ver."
+  },
+  {
+    "name": "Santiago Tuxtla",
+    "state": "Ver."
+  },
+  {
+    "name": "Sayula de Alemán",
+    "state": "Ver."
+  },
+  {
+    "name": "Sochiapa",
+    "state": "Ver."
+  },
+  {
+    "name": "Soconusco",
+    "state": "Ver."
+  },
+  {
+    "name": "Soledad Atzompa",
+    "state": "Ver."
+  },
+  {
+    "name": "Soledad de Doblado",
+    "state": "Ver."
+  },
+  {
+    "name": "Soteapan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tamalín",
+    "state": "Ver."
+  },
+  {
+    "name": "Tamiahua",
+    "state": "Ver."
+  },
+  {
+    "name": "Tampico Alto",
+    "state": "Ver."
+  },
+  {
+    "name": "Tancoco",
+    "state": "Ver."
+  },
+  {
+    "name": "Tantima",
+    "state": "Ver."
+  },
+  {
+    "name": "Tantoyuca",
+    "state": "Ver."
+  },
+  {
+    "name": "Tatahuicapan de Juárez",
+    "state": "Ver."
+  },
+  {
+    "name": "Tatatila",
+    "state": "Ver."
+  },
+  {
+    "name": "Tecolutla",
+    "state": "Ver."
+  },
+  {
+    "name": "Tehuipango",
+    "state": "Ver."
+  },
+  {
+    "name": "Tempoal",
+    "state": "Ver."
+  },
+  {
+    "name": "Tenampa",
+    "state": "Ver."
+  },
+  {
+    "name": "Tenochtitlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Teocelo",
+    "state": "Ver."
+  },
+  {
+    "name": "Tepatlaxco",
+    "state": "Ver."
+  },
+  {
+    "name": "Tepetlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Tepetzintla",
+    "state": "Ver."
+  },
+  {
+    "name": "Tequila",
+    "state": "Ver."
+  },
+  {
+    "name": "Texcatepec",
+    "state": "Ver."
+  },
+  {
+    "name": "Texhuacán",
+    "state": "Ver."
+  },
+  {
+    "name": "Texistepec",
+    "state": "Ver."
+  },
+  {
+    "name": "Tezonapa",
+    "state": "Ver."
+  },
+  {
+    "name": "Tierra Blanca",
+    "state": "Ver."
+  },
+  {
+    "name": "Tihuatlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlachichilco",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlacojalpan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlacolulan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlacotalpan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlacotepec de Mejía",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlalixcoyan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlalnelhuayocan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlaltetela",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlapacoyan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlaquilpa",
+    "state": "Ver."
+  },
+  {
+    "name": "Tlilapan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tomatlán",
+    "state": "Ver."
+  },
+  {
+    "name": "Tonayán",
+    "state": "Ver."
+  },
+  {
+    "name": "Totutla",
+    "state": "Ver."
+  },
+  {
+    "name": "Tres Valles",
+    "state": "Ver."
+  },
+  {
+    "name": "Tuxpan",
+    "state": "Ver."
+  },
+  {
+    "name": "Tuxtilla",
+    "state": "Ver."
+  },
+  {
+    "name": "Ursulo Galván",
+    "state": "Ver."
+  },
+  {
+    "name": "Uxpanapa",
+    "state": "Ver."
+  },
+  {
+    "name": "Vega de Alatorre",
+    "state": "Ver."
+  },
+  {
+    "name": "Veracruz",
+    "state": "Ver."
+  },
+  {
+    "name": "Villa Aldama",
+    "state": "Ver."
+  },
+  {
+    "name": "Xalapa",
+    "state": "Ver."
+  },
+  {
+    "name": "Xico",
+    "state": "Ver."
+  },
+  {
+    "name": "Xoxocotla",
+    "state": "Ver."
+  },
+  {
+    "name": "Yanga",
+    "state": "Ver."
+  },
+  {
+    "name": "Yecuatla",
+    "state": "Ver."
+  },
+  {
+    "name": "Zacualpan",
+    "state": "Ver."
+  },
+  {
+    "name": "Zaragoza",
+    "state": "Ver."
+  },
+  {
+    "name": "Zentla",
+    "state": "Ver."
+  },
+  {
+    "name": "Zongolica",
+    "state": "Ver."
+  },
+  {
+    "name": "Zontecomatlán de López y Fuentes",
+    "state": "Ver."
+  },
+  {
+    "name": "Zozocolco de Hidalgo",
+    "state": "Ver."
+  },
+  {
+    "name": "Abalá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Acanceh",
+    "state": "Yuc."
+  },
+  {
+    "name": "Akil",
+    "state": "Yuc."
+  },
+  {
+    "name": "Baca",
+    "state": "Yuc."
+  },
+  {
+    "name": "Bokobá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Buctzotz",
+    "state": "Yuc."
+  },
+  {
+    "name": "Cacalchén",
+    "state": "Yuc."
+  },
+  {
+    "name": "Calotmul",
+    "state": "Yuc."
+  },
+  {
+    "name": "Cansahcab",
+    "state": "Yuc."
+  },
+  {
+    "name": "Cantamayec",
+    "state": "Yuc."
+  },
+  {
+    "name": "Celestún",
+    "state": "Yuc."
+  },
+  {
+    "name": "Cenotillo",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chacsinkín",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chankom",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chapab",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chemax",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chichimilá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chicxulub Pueblo",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chikindzonot",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chocholá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Chumayel",
+    "state": "Yuc."
+  },
+  {
+    "name": "Conkal",
+    "state": "Yuc."
+  },
+  {
+    "name": "Cuncunul",
+    "state": "Yuc."
+  },
+  {
+    "name": "Cuzamá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Dzan",
+    "state": "Yuc."
+  },
+  {
+    "name": "Dzemul",
+    "state": "Yuc."
+  },
+  {
+    "name": "Dzidzantún",
+    "state": "Yuc."
+  },
+  {
+    "name": "Dzilam de Bravo",
+    "state": "Yuc."
+  },
+  {
+    "name": "Dzilam González",
+    "state": "Yuc."
+  },
+  {
+    "name": "Dzitás",
+    "state": "Yuc."
+  },
+  {
+    "name": "Dzoncauich",
+    "state": "Yuc."
+  },
+  {
+    "name": "Espita",
+    "state": "Yuc."
+  },
+  {
+    "name": "Halachó",
+    "state": "Yuc."
+  },
+  {
+    "name": "Hocabá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Hoctún",
+    "state": "Yuc."
+  },
+  {
+    "name": "Homún",
+    "state": "Yuc."
+  },
+  {
+    "name": "Huhí",
+    "state": "Yuc."
+  },
+  {
+    "name": "Hunucmá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Ixil",
+    "state": "Yuc."
+  },
+  {
+    "name": "Izamal",
+    "state": "Yuc."
+  },
+  {
+    "name": "Kanasín",
+    "state": "Yuc."
+  },
+  {
+    "name": "Kantunil",
+    "state": "Yuc."
+  },
+  {
+    "name": "Kaua",
+    "state": "Yuc."
+  },
+  {
+    "name": "Kinchil",
+    "state": "Yuc."
+  },
+  {
+    "name": "Kopomá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Mama",
+    "state": "Yuc."
+  },
+  {
+    "name": "Maní",
+    "state": "Yuc."
+  },
+  {
+    "name": "Maxcanú",
+    "state": "Yuc."
+  },
+  {
+    "name": "Mayapán",
+    "state": "Yuc."
+  },
+  {
+    "name": "Mérida",
+    "state": "Yuc."
+  },
+  {
+    "name": "Mocochá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Motul",
+    "state": "Yuc."
+  },
+  {
+    "name": "Muna",
+    "state": "Yuc."
+  },
+  {
+    "name": "Muxupip",
+    "state": "Yuc."
+  },
+  {
+    "name": "Opichén",
+    "state": "Yuc."
+  },
+  {
+    "name": "Oxkutzcab",
+    "state": "Yuc."
+  },
+  {
+    "name": "Panabá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Peto",
+    "state": "Yuc."
+  },
+  {
+    "name": "Progreso",
+    "state": "Yuc."
+  },
+  {
+    "name": "Quintana Roo",
+    "state": "Yuc."
+  },
+  {
+    "name": "Río Lagartos",
+    "state": "Yuc."
+  },
+  {
+    "name": "Sacalum",
+    "state": "Yuc."
+  },
+  {
+    "name": "Samahil",
+    "state": "Yuc."
+  },
+  {
+    "name": "San Felipe",
+    "state": "Yuc."
+  },
+  {
+    "name": "Sanahcat",
+    "state": "Yuc."
+  },
+  {
+    "name": "Santa Elena",
+    "state": "Yuc."
+  },
+  {
+    "name": "Seyé",
+    "state": "Yuc."
+  },
+  {
+    "name": "Sinanché",
+    "state": "Yuc."
+  },
+  {
+    "name": "Sotuta",
+    "state": "Yuc."
+  },
+  {
+    "name": "Sucilá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Sudzal",
+    "state": "Yuc."
+  },
+  {
+    "name": "Suma",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tahdziú",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tahmek",
+    "state": "Yuc."
+  },
+  {
+    "name": "Teabo",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tecoh",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tekal de Venegas",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tekantó",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tekax",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tekit",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tekom",
+    "state": "Yuc."
+  },
+  {
+    "name": "Telchac Pueblo",
+    "state": "Yuc."
+  },
+  {
+    "name": "Telchac Puerto",
+    "state": "Yuc."
+  },
+  {
+    "name": "Temax",
+    "state": "Yuc."
+  },
+  {
+    "name": "Temozón",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tepakán",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tetiz",
+    "state": "Yuc."
+  },
+  {
+    "name": "Teya",
+    "state": "Yuc."
+  },
+  {
+    "name": "Ticul",
+    "state": "Yuc."
+  },
+  {
+    "name": "Timucuy",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tinum",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tixcacalcupul",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tixkokob",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tixméhuac",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tixpéhual",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tizimín",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tunkás",
+    "state": "Yuc."
+  },
+  {
+    "name": "Tzucacab",
+    "state": "Yuc."
+  },
+  {
+    "name": "Uayma",
+    "state": "Yuc."
+  },
+  {
+    "name": "Ucú",
+    "state": "Yuc."
+  },
+  {
+    "name": "Umán",
+    "state": "Yuc."
+  },
+  {
+    "name": "Valladolid",
+    "state": "Yuc."
+  },
+  {
+    "name": "Xocchel",
+    "state": "Yuc."
+  },
+  {
+    "name": "Yaxcabá",
+    "state": "Yuc."
+  },
+  {
+    "name": "Yaxkukul",
+    "state": "Yuc."
+  },
+  {
+    "name": "Yobaín",
+    "state": "Yuc."
+  },
+  {
+    "name": "Apozol",
+    "state": "Zac."
+  },
+  {
+    "name": "Apulco",
+    "state": "Zac."
+  },
+  {
+    "name": "Atolinga",
+    "state": "Zac."
+  },
+  {
+    "name": "Benito Juárez",
+    "state": "Zac."
+  },
+  {
+    "name": "Calera",
+    "state": "Zac."
+  },
+  {
+    "name": "Cañitas de Felipe Pescador",
+    "state": "Zac."
+  },
+  {
+    "name": "Chalchihuites",
+    "state": "Zac."
+  },
+  {
+    "name": "Concepción del Oro",
+    "state": "Zac."
+  },
+  {
+    "name": "Cuauhtémoc",
+    "state": "Zac."
+  },
+  {
+    "name": "El Plateado de Joaquín Amaro",
+    "state": "Zac."
+  },
+  {
+    "name": "El Salvador",
+    "state": "Zac."
+  },
+  {
+    "name": "Fresnillo",
+    "state": "Zac."
+  },
+  {
+    "name": "Genaro Codina",
+    "state": "Zac."
+  },
+  {
+    "name": "General Enrique Estrada",
+    "state": "Zac."
+  },
+  {
+    "name": "General Francisco R. Murguía",
+    "state": "Zac."
+  },
+  {
+    "name": "General Pánfilo Natera",
+    "state": "Zac."
+  },
+  {
+    "name": "Guadalupe",
+    "state": "Zac."
+  },
+  {
+    "name": "Huanusco",
+    "state": "Zac."
+  },
+  {
+    "name": "Jalpa",
+    "state": "Zac."
+  },
+  {
+    "name": "Jerez",
+    "state": "Zac."
+  },
+  {
+    "name": "Jiménez del Teul",
+    "state": "Zac."
+  },
+  {
+    "name": "Juan Aldama",
+    "state": "Zac."
+  },
+  {
+    "name": "Juchipila",
+    "state": "Zac."
+  },
+  {
+    "name": "Loreto",
+    "state": "Zac."
+  },
+  {
+    "name": "Luis Moya",
+    "state": "Zac."
+  },
+  {
+    "name": "Mazapil",
+    "state": "Zac."
+  },
+  {
+    "name": "Melchor Ocampo",
+    "state": "Zac."
+  },
+  {
+    "name": "Mezquital del Oro",
+    "state": "Zac."
+  },
+  {
+    "name": "Miguel Auza",
+    "state": "Zac."
+  },
+  {
+    "name": "Momax",
+    "state": "Zac."
+  },
+  {
+    "name": "Monte Escobedo",
+    "state": "Zac."
+  },
+  {
+    "name": "Morelos",
+    "state": "Zac."
+  },
+  {
+    "name": "Moyahua de Estrada",
+    "state": "Zac."
+  },
+  {
+    "name": "Nochistlán de Mejía",
+    "state": "Zac."
+  },
+  {
+    "name": "Noria de Ángeles",
+    "state": "Zac."
+  },
+  {
+    "name": "Ojocaliente",
+    "state": "Zac."
+  },
+  {
+    "name": "Pánuco",
+    "state": "Zac."
+  },
+  {
+    "name": "Pinos",
+    "state": "Zac."
+  },
+  {
+    "name": "Río Grande",
+    "state": "Zac."
+  },
+  {
+    "name": "Sain Alto",
+    "state": "Zac."
+  },
+  {
+    "name": "Santa María de la Paz",
+    "state": "Zac."
+  },
+  {
+    "name": "Sombrerete",
+    "state": "Zac."
+  },
+  {
+    "name": "Susticacán",
+    "state": "Zac."
+  },
+  {
+    "name": "Tabasco",
+    "state": "Zac."
+  },
+  {
+    "name": "Tepechitlán",
+    "state": "Zac."
+  },
+  {
+    "name": "Tepetongo",
+    "state": "Zac."
+  },
+  {
+    "name": "Teúl de González Ortega",
+    "state": "Zac."
+  },
+  {
+    "name": "Tlaltenango de Sánchez Román",
+    "state": "Zac."
+  },
+  {
+    "name": "Trancoso",
+    "state": "Zac."
+  },
+  {
+    "name": "Trinidad García de la Cadena",
+    "state": "Zac."
+  },
+  {
+    "name": "Valparaíso",
+    "state": "Zac."
+  },
+  {
+    "name": "Vetagrande",
+    "state": "Zac."
+  },
+  {
+    "name": "Villa de Cos",
+    "state": "Zac."
+  },
+  {
+    "name": "Villa García",
+    "state": "Zac."
+  },
+  {
+    "name": "Villa González Ortega",
+    "state": "Zac."
+  },
+  {
+    "name": "Villa Hidalgo",
+    "state": "Zac."
+  },
+  {
+    "name": "Villanueva",
+    "state": "Zac."
+  },
+  {
+    "name": "Zacatecas",
+    "state": "Zac."
+  }
 ]

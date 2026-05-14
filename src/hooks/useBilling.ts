@@ -38,19 +38,42 @@ export interface RegisterMembershipPaymentInput {
   member_id: string;
   membership_type_id: string;
   payment_method: PaymentMethod;
-  amount: number;
+  // amount es lo que el FE muestra al operador como total a cobrar; el
+  // backend lo deriva del MembershipType + flags. Lo enviamos sólo para
+  // ergonomía (retrocompat con clientes que firmaban un "monto"). Vacío
+  // en clientes nuevos también funciona.
+  amount?: number;
   discount_amount?: number;
   discount_reason?: string;
   partial_amount?: number;
+  // Operator overrides para cobros extra. Cuando undefined, BE decide
+  // automáticamente (basado en member.enrollment_paid + frecuencia de
+  // mantenimiento).
+  charge_enrollment?: boolean;
+  charge_maintenance?: boolean;
+  // Montos efectivos (override del snapshot del plan si > 0). El FE los
+  // resuelve desde gym.charge_settings cuando el plan trae fee=0.
+  enrollment_amount?: number;
+  maintenance_amount?: number;
   payment_date: string;
   notes?: string;
 }
 
+// Espeja registerPaymentResp del backend (payment_controller.go). Es un
+// shape flat — el FE armaba antes un `payment` anidado por error, pero el
+// wire real nunca lo trajo.
 export interface RegisterMembershipPaymentResponse {
-  payment: Payment;
-  membership_id: string;
-  new_expiry_date: string;
+  payment_id: string;
+  folio: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  paid: number;
   balance_pending: number;
+  new_membership_id: string;
+  new_expiry: string;
+  enrollment_charged: boolean;
+  maintenance_charged: boolean;
   pending_offline_sync?: boolean;
 }
 
@@ -61,17 +84,25 @@ export interface SettleBalanceInput {
   notes?: string;
 }
 
+// Espeja settleResp del backend (payment_controller.go).
 export interface SettleBalanceResponse {
-  payment: Payment;
-  remaining_balance: number;
+  settlement_id: string;
+  folio: string;
+  new_balance_pending: number;
 }
 
 export type RefundMoneyReturn = "cash" | "transfer" | "none";
 
+// RefundInput espeja refundReq del backend (payment_controller.go). El FE
+// usa una abstracción "money_returned" (cash/transfer/none) en la UI; el
+// modal lo mapea a `payment_method` antes de enviarlo. Para el caso
+// "none" (no se devuelve dinero, ej. cortesía) usa el método del pago
+// original — la auditoría queda con "refund de pago en X" aunque no
+// haya salido cash.
 export interface RefundInput {
   reason: string;
-  revert_membership: boolean;
-  money_returned: RefundMoneyReturn;
+  payment_method: PaymentMethod;
+  revert_membership?: boolean;
 }
 
 export interface PaymentHistoryFilters {
@@ -135,16 +166,31 @@ export function useSettleBalance(paymentID: string) {
   return useMutation({
     mutationFn: (input: SettleBalanceInput) =>
       api.post<SettleBalanceResponse>(`/api/v1/payments/${paymentID}/settle`, input),
-    onSuccess: (res) => invalidateMember(qc, res.payment.member_id),
+    // settleResp del backend no incluye member_id. Como no sabemos a
+    // qué socio pertenece el pago padre desde acá, invalidamos las
+    // claves de billing + members globalmente — react-query refetch
+    // sólo las queries actualmente montadas, así que el costo es nulo
+    // si no hay nadie suscrito.
+    onSuccess: () => invalidateMember(qc, null),
   });
+}
+
+// refundResp del backend devuelve {refund_id, folio, amount, reverted_membership} —
+// NO Payment ni member_id. Tipamos amplio + invalidación global para no
+// crashear el onSuccess.
+export interface RefundResponse {
+  refund_id: string;
+  folio: string;
+  amount: number;
+  reverted_membership: boolean;
 }
 
 export function useRefund(paymentID: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: RefundInput) =>
-      api.post<Payment>(`/api/v1/payments/${paymentID}/refund`, input),
-    onSuccess: (res) => invalidateMember(qc, res.member_id),
+      api.post<RefundResponse>(`/api/v1/payments/${paymentID}/refund`, input),
+    onSuccess: () => invalidateMember(qc, null),
   });
 }
 

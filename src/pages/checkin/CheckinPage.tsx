@@ -34,7 +34,7 @@ export default function CheckinPage() {
   const methods = useCheckinMethods();
   const recents = useRecentCheckins();
 
-  const fingerprintAvailable = !!bio.data?.reader?.connected;
+  const fingerprintAvailable = !!bio.data?.connected;
   const pinAvailable = methods.data?.pin_available ?? false;
 
   const initialMethod: Method = fingerprintAvailable ? "fingerprint" : pinAvailable ? "pin" : "manual";
@@ -233,7 +233,7 @@ export default function CheckinPage() {
 
       <footer className="border-t border-border px-6 py-2 flex items-center justify-between text-xs text-muted-foreground">
         <span>{operator?.full_name ? t.page.operator(operator.full_name) : ""}</span>
-        {bio.data && !bio.data.reader?.connected && (
+        {bio.data && !bio.data.connected && (
           <span className="text-warning">{t.reader.disconnectedBanner}</span>
         )}
       </footer>

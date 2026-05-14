@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -18,7 +19,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { MemberPhotoLightbox } from "@/components/members/MemberPhotoLightbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -35,9 +36,6 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { daysFromToday } from "@/lib/dates";
 import { members as t } from "@/strings/members";
 import { cn } from "@/lib/utils";
-import { getAvatarPalette, getInitials } from "@/lib/avatar";
-import { MemberDetailSheet } from "@/components/members/MemberDetailSheet";
-import { MemberCreateDialog } from "@/components/members/MemberCreateDialog";
 import { StatCard } from "@/components/shared/StatCard";
 import {
   DataTable,
@@ -102,13 +100,14 @@ interface StatusInfo {
 
 function statusInfo(item: MemberListItem): StatusInfo {
   const ms = item.current_membership;
-  const days = ms ? daysFromToday(ms.expiry_date) : null;
+  // daysFromToday tolera undefined → null; sólo úsalo cuando hay expiry.
+  const days = ms?.expiry_date ? daysFromToday(ms.expiry_date) : null;
   switch (item.access_status) {
     case "allowed_active":
       return {
         label: "Activo",
         variant: "success",
-        detail: ms ? `Renueva ${fmtDayMonth(ms.expiry_date)}` : "—",
+        detail: ms?.expiry_date ? `Renueva ${fmtDayMonth(ms.expiry_date)}` : "—",
       };
     case "allowed_expiring_soon": {
       const n = days ?? 0;
@@ -126,6 +125,15 @@ function statusInfo(item: MemberListItem): StatusInfo {
         detail: n === 0 ? "Vence hoy" : n === 1 ? "1 día vencido" : `${n} días vencido`,
       };
     }
+    case "denied_unpaid_enrollment":
+      // Socio inscrito sin primer pago — la membresía existe en
+      // pending_payment. Mismo bucket visual que vencidos (acción:
+      // cobrar) pero con copy distinta para que el operador entienda.
+      return {
+        label: "Sin primer pago",
+        variant: "destructive",
+        detail: "Cobrar para activar",
+      };
     case "denied_no_membership":
       return { label: "Sin plan", variant: "outline", detail: "Aún no se ha cobrado" };
     case "denied_inactive":
@@ -143,8 +151,7 @@ export default function MembersPage() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(readPageSize());
 
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [createOpen, setCreateOpen] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setPage(1);
@@ -194,7 +201,7 @@ export default function MembersPage() {
         actions={
           <Button
             size="lg"
-            onClick={() => setCreateOpen(true)}
+            onClick={() => navigate("/members/new")}
             className="h-10 rounded-md font-semibold shadow-sm"
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -332,7 +339,7 @@ export default function MembersPage() {
             }
             action={
               !hasFilters && (
-                <Button onClick={() => setCreateOpen(true)} className="rounded-md">
+                <Button onClick={() => navigate("/members/new")} className="rounded-md">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo socio
                 </Button>
@@ -354,7 +361,7 @@ export default function MembersPage() {
                 <MemberRow
                   key={it.member.id}
                   item={it}
-                  onClick={() => setSelectedId(it.member.id)}
+                  onClick={() => navigate(`/members/${it.member.id}`)}
                   planMap={planMap}
                 />
               ))}
@@ -411,13 +418,6 @@ export default function MembersPage() {
         </div>
       )}
 
-      <MemberDetailSheet
-        memberId={selectedId}
-        onClose={() => setSelectedId(null)}
-        planMap={planMap}
-      />
-
-      <MemberCreateDialog open={createOpen} onOpenChange={setCreateOpen} />
     </div>
   );
 }
@@ -432,24 +432,24 @@ function MemberRow({ item, onClick }: MemberRowProps) {
   const m = item.member;
   const ms = item.current_membership;
   const status = statusInfo(item);
-  const palette = getAvatarPalette(m.full_name);
-
   const showPay =
-    item.access_status === "denied_expired" || item.access_status === "allowed_expiring_soon";
+    item.access_status === "denied_expired" ||
+    item.access_status === "denied_unpaid_enrollment" ||
+    item.access_status === "allowed_expiring_soon";
 
   return (
     <DataTableRow onClick={onClick} className="group">
-      {/* Avatar — color por hash del nombre, NO por estado. */}
+      {/* Avatar — clic abre lightbox con la foto en grande sin navegar
+          al detalle (stopPropagation evita el row-click). El color del
+          fallback sigue siendo por hash del nombre, NO por estado. */}
       <DataTableCell className="w-12 pl-5 pr-0">
-        <Avatar className="h-10 w-10">
-          {m.photo_url && <AvatarImage src={m.photo_url} alt="" />}
-          <AvatarFallback
-            className="text-xs font-semibold"
-            style={{ backgroundColor: palette.bg, color: palette.text }}
-          >
-            {getInitials(m.full_name)}
-          </AvatarFallback>
-        </Avatar>
+        <MemberPhotoLightbox
+          memberId={m.id}
+          fullName={m.full_name}
+          avatarClassName="h-10 w-10"
+          fallbackClassName="text-xs"
+          stopPropagation
+        />
       </DataTableCell>
 
       {/* Member */}

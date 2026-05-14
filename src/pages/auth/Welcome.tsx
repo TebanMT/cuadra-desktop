@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Check, Copy, Download, Globe, KeyRound } from "lucide-react";
 import { toast } from "sonner";
 import { AuthShell } from "@/components/shared/AuthShell";
@@ -18,9 +18,7 @@ interface PairingStatus {
 }
 
 export default function Welcome() {
-  const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [autoRedirected, setAutoRedirected] = useState(false);
   const [copied, setCopied] = useState(false);
   // Initial null = checking. Once resolved we either redirect (paired)
   // or render the install-flow steps. Hiding the flow until we know
@@ -28,22 +26,14 @@ export default function Welcome() {
   // paired and the operator should see Login.
   const [checkingPairing, setCheckingPairing] = useState(true);
 
-  // If the installer dropped a `?bootstrap=` token in the launch URL,
-  // jump straight to the redeem screen with the token pre-filled.
-  useEffect(() => {
-    const code = params.get("bootstrap");
-    if (code && !autoRedirected) {
-      setAutoRedirected(true);
-      navigate(`/auth/redeem-installer?token=${encodeURIComponent(code)}`, { replace: true });
-    }
-  }, [params, navigate, autoRedirected]);
-
   // Pairing-status guard: ask the sidecar whether this laptop has a
-  // cached_login row. If it does, the install flow doesn't apply —
-  // send the operator to Login (with an optional `?email=` hint so
-  // the email field is pre-filled). If the sidecar is unreachable we
-  // fall through to the welcome view; redeem-installer requires the
-  // sidecar anyway, so the operator will hit the same wall there.
+  // cached_login row. If paired, route to the PIN grid (default after the
+  // auth-refactor) — it'll either show the owner/operators with PINs or
+  // an empty-state link to email-login when nobody has a PIN yet. We no
+  // longer pass `?email=` since the grid hides email by design; the
+  // email-login fallback page falls back to a blank field, which is fine
+  // (the operator only reaches email-login when they need to recover and
+  // typing their email once is acceptable).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -54,8 +44,7 @@ export default function Welcome() {
         );
         if (cancelled) return;
         if (status.paired) {
-          const qs = status.email ? `?email=${encodeURIComponent(status.email)}` : "";
-          navigate(`/auth/login${qs}`, { replace: true });
+          navigate("/auth/login", { replace: true });
           return;
         }
       } catch {
@@ -156,13 +145,7 @@ export default function Welcome() {
           </CardContent>
         </Card>
 
-        <div className="text-center text-sm text-muted-foreground pt-2">
-          ¿Ya tienes cuenta en esta computadora?{" "}
-          <Link to="/auth/login" className="text-primary hover:underline">
-            Iniciar sesión
-          </Link>
-        </div>
-        <div className="text-center text-xs text-muted-foreground">
+        <div className="text-center text-xs text-muted-foreground pt-2">
           ¿Quieres ver los planes primero?{" "}
           <a
             href={`${DASHBOARD_URL}/pricing`}

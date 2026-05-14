@@ -14,6 +14,8 @@ interface LoginResponse {
   user_id: string;
   full_name: string;
   email: string;
+  phone?: string | null;
+  has_pin?: boolean;
   role: "owner" | "operator";
   gym_id: string;
   gym_name: string | null;
@@ -38,7 +40,9 @@ export function useLogin() {
         user_id: data.user_id,
         full_name: data.full_name,
         email: data.email,
+        phone: data.phone ?? null,
         role: data.role,
+        has_pin: data.has_pin ?? false,
       };
       const gym: AuthGym = {
         gym_id: data.gym_id,
@@ -86,6 +90,8 @@ interface RedeemInstallerResponse {
   gym_id: string;
   full_name: string;
   email: string;
+  phone?: string | null;
+  has_pin?: boolean;
   role: "owner" | "operator";
   gym_name: string | null;
   access_token: string;
@@ -117,7 +123,9 @@ export function useRedeemInstallerBootstrap() {
           user_id: data.user_id,
           full_name: data.full_name,
           email: data.email,
+          phone: data.phone ?? null,
           role: data.role,
+          has_pin: data.has_pin ?? false,
         },
         {
           gym_id: data.gym_id,
@@ -154,7 +162,9 @@ export function useSignup() {
           user_id: data.user_id,
           full_name: input.full_name,
           email: input.email,
+          phone: null,
           role: "owner",
+          has_pin: false,
         },
         {
           gym_id: data.gym_id,
@@ -209,6 +219,114 @@ export function useUpdateMe() {
     onSuccess: (updated) => {
       if (gym) setSession(updated, gym);
     },
+  });
+}
+
+// useRefreshIdentity fuerza una re-lectura de los datos del gym y del
+// dueño desde el cloud (saltándose el cache local del sidecar) y
+// re-mirrorea el SQLite local. Útil cuando el mirror inicial quedó con
+// datos viejos (bug histórico) o el primer pull del sync agent aún no
+// termina y el dueño ve nombre vacío / phone null en el desktop.
+//
+// El sidecar usa su sk_live_* para hablar con cloud — no necesita el
+// JWT del operador. Por eso esta acción es operacionalmente segura
+// incluso si los tokens del operador están medio rotos (post-reset).
+export function useRefreshIdentity() {
+  const setSession = useAuthStore((s) => s.setSession);
+
+  return useMutation({
+    mutationFn: () =>
+      api.post<MeResponse>("/api/v1/auth/me/refresh", {}, { skipAuth: true }),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["gym", "profile"] });
+      queryClient.invalidateQueries({ queryKey: ["auth", "operators"] });
+      setSession(data.user, data.gym);
+    },
+  });
+}
+
+// ── PIN login (auth-refactor v0.7) ─────────────────────────────────────────
+//
+// Two surfaces:
+//   - useOperatorsForLogin: unauthenticated read of the local operators
+//     grid the kiosk renders. Always reads from the sidecar (offline).
+//   - useLoginPIN: POST /auth/login-pin — validates the PIN against the
+//     local users row and mints local JWTs.
+
+export interface OperatorForLogin {
+  user_id: string;
+  full_name: string;
+  role: "owner" | "operator";
+  has_pin: boolean;
+}
+
+import { useQuery } from "@tanstack/react-query";
+
+export function useOperatorsForLogin() {
+  return useQuery({
+    queryKey: ["auth", "operators"],
+    queryFn: async () => {
+      const data = await api.get<{ operators: OperatorForLogin[] }>(
+        "/api/v1/auth/operators",
+        { skipAuth: true, retry: 0 }
+      );
+      return data.operators;
+    },
+    // Fresh enough for the login grid; refetch when the user tabs back so a
+    // newly-set PIN shows up without a manual reload.
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
+  });
+}
+
+export function useLoginPIN() {
+  const setSession = useAuthStore((s) => s.setSession);
+  return useMutation({
+    mutationFn: async (input: { user_id: string; pin: string }) => {
+      const data = await api.post<LoginResponse>(
+        "/api/v1/auth/login-pin",
+        input,
+        { skipAuth: true, retry: 0 }
+      );
+      await setTokens(data.access_token, data.refresh_token);
+      setSession(
+        {
+          user_id: data.user_id,
+          full_name: data.full_name,
+          email: data.email,
+          phone: data.phone ?? null,
+          role: data.role,
+        },
+        {
+          gym_id: data.gym_id,
+          name: data.gym_name,
+          setup_completed: data.setup_completed,
+          trial_ends_at: data.trial_ends_at,
+          subscription_plan: data.subscription_plan,
+          subscription_status: data.subscription_status ?? "active",
+          subscription_ends_at: data.subscription_ends_at ?? null,
+        }
+      );
+      return data;
+    },
+  });
+}
+
+// useAssignSelfPIN — POST /auth/me/pin. The desktop calls this after an
+// email+password login for the owner that doesn't yet have a PIN, or from
+// "Mi perfil" to change an existing one. Requires online (the cloud is the
+// source of truth and the projector syncs the value down to local SQLite).
+export function useAssignSelfPIN() {
+  return useMutation({
+    mutationFn: (input: { pin: string }) =>
+      api.post<{ has_pin: boolean }>("/api/v1/auth/me/pin", input),
+  });
+}
+
+export function useClearSelfPIN() {
+  return useMutation({
+    mutationFn: () =>
+      api.delete<{ has_pin: boolean }>("/api/v1/auth/me/pin"),
   });
 }
 

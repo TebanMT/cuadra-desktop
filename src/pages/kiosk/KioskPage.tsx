@@ -57,7 +57,7 @@ export default function KioskPage() {
   // precisión al minuto. Reduce wakeups + repaints en el OS host.
   const [now, setNow] = useState(() => new Date());
 
-  const fingerprintAvailable = !!bio.data?.reader?.connected;
+  const fingerprintAvailable = !!bio.data?.connected;
   const pinAvailable = methods.data?.pin_available ?? false;
 
   // Clock tick al cambio de minuto. El primer setTimeout calcula los ms
@@ -220,7 +220,7 @@ export default function KioskPage() {
           >
             {t.page.todayCount(count.data?.count_today ?? 0)}
           </div>
-          {bio.data && !bio.data.reader?.connected && (
+          {bio.data && !bio.data.connected && (
             <div className="text-xs text-warning bg-warning/10 px-2 py-1 rounded-md font-medium">
               {t.reader.disconnectedBanner}
             </div>

@@ -6,13 +6,14 @@ export type MemberSort = "name" | "expiry" | "created_at";
 export type SortDir = "asc" | "desc";
 
 export type MemberStatus = "active" | "inactive" | "lost";
-export type MembershipStatus = "active" | "expired" | "replaced" | "cancelled";
+export type MembershipStatus = "active" | "expired" | "replaced" | "cancelled" | "pending_payment";
 export type AccessStatus =
   | "allowed_active"
   | "allowed_expiring_soon"
   | "denied_expired"
   | "denied_inactive"
-  | "denied_no_membership";
+  | "denied_no_membership"
+  | "denied_unpaid_enrollment";
 
 export interface Member {
   id: string;
@@ -28,6 +29,9 @@ export interface Member {
   enrollment_paid: boolean;
   last_maintenance_paid?: string;
   has_pin: boolean;
+  // PIN de 4 dígitos visible en el perfil. Vacío sólo en sócios viejos
+  // (pre-auto-assign) o cuando la generación falló al inscribir.
+  pin?: string;
   last_contact_attempt_at?: string;
   created_at: string;
 }
@@ -38,7 +42,8 @@ export interface MembershipSummary {
   type_name: string;
   price: number;
   start_date: string;
-  expiry_date: string;
+  // Vacío cuando status = "pending_payment" (sin primer pago todavía).
+  expiry_date?: string;
   status: MembershipStatus;
   duration_days_snapshot: number;
 }
@@ -83,15 +88,36 @@ export interface CreateMemberInput {
   start_date?: string;
   allow_duplicate_phone?: boolean;
   charge_first_payment?: boolean;
+  charge_enrollment?: boolean;
+  charge_maintenance?: boolean;
+  // Montos efectivos a cobrar (plan-fee resuelto, con fallback al
+  // default del gym). Si el backend no los recibe, usa los del plan.
+  enrollment_amount?: number;
+  maintenance_amount?: number;
   payment_method?: "cash" | "transfer" | "card";
+}
+
+export interface PinDispatch {
+  dispatched: boolean;
+  skipped_reason?: string;
+  recipient_phone?: string;
 }
 
 export interface CreateMemberResponse {
   member_id: string;
   membership_id: string;
   folio: string;
-  expiry_date: string;
+  // Vacío cuando el socio quedó en pending_payment (sin primer pago).
+  expiry_date?: string;
+  membership_status: MembershipStatus;
   pending_first_payment: boolean;
+  // PIN de 4 dígitos auto-asignado al inscribir. Lo enseñamos al
+  // operador en el éxito para que lo escriba en la credencial.
+  pin?: string;
+  // Estado del envío automático por WhatsApp. Si dispatched=true el FE
+  // muestra "enviado a {recipient_phone}"; si false, copia "escríbelo
+  // en la credencial".
+  pin_dispatch?: PinDispatch;
 }
 
 export interface UpdateMemberInput {
@@ -125,6 +151,7 @@ export interface LockExpiryResponse {
 export interface AssignPinResponse {
   member_id: string;
   pin: string;
+  pin_dispatch?: PinDispatch;
 }
 
 const KEYS = {

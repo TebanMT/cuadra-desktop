@@ -7,7 +7,12 @@ export interface AuthUser {
   user_id: string;
   full_name: string;
   email: string;
+  phone: string | null;
   role: Role;
+  // has_pin: derived server-side from users.pin_hash. Drives the
+  // "Crear PIN" vs "Cambiar PIN" toggle on the profile page. Defaults
+  // to false on older responses that haven't been redeployed yet.
+  has_pin: boolean;
 }
 
 export type SubscriptionStatus = "active" | "past_due" | "cancelled";

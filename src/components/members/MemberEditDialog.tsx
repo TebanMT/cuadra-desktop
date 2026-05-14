@@ -59,6 +59,7 @@ export function MemberEditDialog({ memberId, initial, open, onOpenChange }: Prop
         </DialogHeader>
         <MemberForm
           mode="edit"
+          memberId={memberId}
           initial={{
             full_name: initial.full_name,
             phone: initial.phone,

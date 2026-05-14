@@ -62,12 +62,20 @@ export function SettleBalanceModal({
         payment_method: method,
         payment_date: todayIso(),
       });
-      toast.success(t.settle.success(fmtMoney(res.remaining_balance)));
+      toast.success(t.settle.success(fmtMoney(res.new_balance_pending)));
       onOpenChange(false);
     } catch (err) {
+      // Log completo a la consola — el BE manda `exception` pero a
+      // veces vienen errores transitorios (network, sidecar dormido)
+      // sin esa forma. Lo loggeamos completo para poder diagnosticar.
+      // eslint-disable-next-line no-console
+      console.error("[settle-balance] failed", err);
       if (err instanceof ApiError) {
         const data = err.details as Record<string, unknown> | null;
-        setError((data?.exception as string | undefined) || t.settle.errors.generic);
+        const apiMsg = (data?.exception as string | undefined) || err.message;
+        // Mostrar el mensaje real del BE si lo trae; el fallback
+        // genérico sólo cuando la respuesta no es interpretable.
+        setError(apiMsg || t.settle.errors.generic);
       } else {
         setError(t.settle.errors.generic);
       }

@@ -42,7 +42,10 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-const APP_DIR_NAME: &str = "app.tinta.desktop";
+// pub: el módulo sidecar también lo usa para colocar tinta.db y el
+// cache de fotos bajo el mismo paraguas por-OS (~/Library/Application
+// Support/app.tinta.desktop, %APPDATA%\app.tinta.desktop, …).
+pub const APP_DIR_NAME: &str = "app.tinta.desktop";
 const SECRETS_FILE: &str = "secrets.json";
 
 #[derive(thiserror::Error, Debug)]

@@ -1,4 +1,38 @@
 export const auth = {
+  // Grilla de operadores con PIN — el flujo primario en recepción tras el
+  // refactor de auth. Email + password sigue accesible como link discreto
+  // "iniciar sesión con correo" para recuperación (PIN olvidado, primer
+  // login antes de tener PIN configurado).
+  pinLogin: {
+    title: "¿Quién entra?",
+    subtitle: "Toca tu nombre y escribe tu PIN.",
+    setupBadge: "Configura tu PIN",
+    emptyState: "Todavía no hay operadores con PIN. Inicia sesión con tu correo para configurarlo.",
+    emailLoginCta: "Iniciar sesión con correo",
+    enterPin: "Escribe tu PIN",
+    pinFor: (name: string) => `PIN de ${name}`,
+    cancel: "Cancelar",
+    setupCta: "Crear PIN",
+    errors: {
+      invalid: "PIN incorrecto.",
+      notSet: "Este usuario todavía no tiene PIN configurado.",
+      tooManyAttempts: "Demasiados intentos. Toca otro operador o usa tu correo.",
+      generic: "No pudimos validar el PIN. Vuelve a intentar.",
+      loadFailed: "No pudimos cargar los operadores. Revisa que la app esté corriendo.",
+    },
+  },
+  setupPin: {
+    title: "Crea tu PIN de recepción",
+    subtitle: "Lo usarás para entrar rápido desde esta computadora.",
+    skipCta: "Más tarde",
+    submit: "Guardar PIN",
+    confirmLabel: "Confirma tu PIN",
+    successToast: "PIN configurado. La próxima vez tócalo para entrar.",
+    errors: {
+      mismatch: "Los dos PINs no coinciden.",
+      generic: "No pudimos guardar el PIN. Vuelve a intentar.",
+    },
+  },
   login: {
     title: "Bienvenido",
     subtitle: "Inicia sesión para entrar a tu Tinta.",
@@ -7,6 +41,7 @@ export const auth = {
     rememberMe: "Mantenerme conectado",
     submit: "Entrar",
     forgot: "¿Olvidaste tu contraseña?",
+    backToPin: "← Volver al PIN",
     errors: {
       invalidCredentials: "Correo o contraseña incorrectos.",
       inactive: "Tu cuenta está desactivada. Contacta al dueño del gym.",

@@ -1,7 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-export type MaintenanceFrequency = "monthly" | "annual";
+// Espeja el CHECK de schema (migration postgres/010 + sqlite/007).
+// Si crece, sincronizar con MembershipTypeForm + la página de
+// Membresías + el validador del backend (allowedFrequencies en
+// membership_type.go).
+export type MaintenanceFrequency =
+  | "monthly"
+  | "bimonthly"
+  | "quarterly"
+  | "semiannual"
+  | "annual";
 
 export interface MembershipType {
   id: string;

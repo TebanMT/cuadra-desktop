@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -45,7 +46,6 @@ import {
   SectionCard,
 } from "@/components/shared/PagePrimitives";
 import { MemberSearchInput } from "@/components/checkin/MemberSearchInput";
-import { MemberDetailSheet } from "@/components/members/MemberDetailSheet";
 import { PaymentModal } from "@/components/billing/PaymentModal";
 import { ReceiptViewer } from "@/components/billing/ReceiptViewer";
 import {
@@ -148,6 +148,7 @@ function rowAccent(p: Payment): string | null {
 }
 
 export default function CobrosPage() {
+  const navigate = useNavigate();
   const [period, setPeriod] = useState<Period>("today");
   const [customFrom, setCustomFrom] = useState<string>(todayIso());
   const [customTo, setCustomTo] = useState<string>(todayIso());
@@ -158,7 +159,6 @@ export default function CobrosPage() {
   const [pickedMemberId, setPickedMemberId] = useState<string | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
 
-  const [detailMemberId, setDetailMemberId] = useState<string | null>(null);
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [receiptFolio, setReceiptFolio] = useState<string | undefined>(undefined);
 
@@ -402,7 +402,7 @@ export default function CobrosPage() {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setDetailMemberId(p.member_id);
+                            navigate(`/members/${p.member_id}`);
                           }}
                           className="text-sm font-medium text-foreground hover:underline text-left"
                         >
@@ -520,11 +520,6 @@ export default function CobrosPage() {
           onOpenChange={closePayment}
         />
       )}
-
-      <MemberDetailSheet
-        memberId={detailMemberId}
-        onClose={() => setDetailMemberId(null)}
-      />
 
       <ReceiptViewer
         paymentId={receiptId}

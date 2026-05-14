@@ -4,36 +4,52 @@ import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useAssignPin } from "@/hooks/useMembers";
+import { useAssignPin, type PinDispatch } from "@/hooks/useMembers";
 import { ApiError } from "@/lib/api";
 import { members as t } from "@/strings/members";
 
 interface Props {
   memberId: string;
   memberName: string;
+  /** Initial PIN already present on the member — when set, opens directly
+   * showing that PIN so the operator can read / copy it before deciding
+   * whether to regenerate. */
+  initialPin?: string;
   open: boolean;
   onOpenChange(open: boolean): void;
 }
 
-export function AssignPinModal({ memberId, memberName, open, onOpenChange }: Props) {
+export function AssignPinModal({ memberId, memberName, initialPin, open, onOpenChange }: Props) {
   const assign = useAssignPin(memberId);
   const [pin, setPin] = useState<string | null>(null);
+  // dispatch refleja el último resultado del envío por WhatsApp tras un
+  // generate. Null en la apertura inicial (PIN existente sin acción)
+  // porque el `initialPin` ya fue notificado al inscribir.
+  const [dispatch, setDispatch] = useState<PinDispatch | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open) {
-      setPin(null);
       setError(null);
-      generate();
+      setDispatch(null);
+      // If the socio already has a PIN, show it as-is without re-rolling.
+      // Operator decides via "Generar nuevo PIN" whether to regenerate.
+      if (initialPin) {
+        setPin(initialPin);
+      } else {
+        setPin(null);
+        generate();
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, initialPin]);
 
   async function generate() {
     setError(null);
     try {
       const res = await assign.mutateAsync();
       setPin(res.pin);
+      setDispatch(res.pin_dispatch ?? null);
     } catch (err) {
       if (err instanceof ApiError) {
         const data = err.details as Record<string, unknown> | null;
@@ -58,7 +74,7 @@ export function AssignPinModal({ memberId, memberName, open, onOpenChange }: Pro
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>{t.pin.title}</DialogTitle>
+          <DialogTitle>{initialPin ? t.pin.titleChange : t.pin.title}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -78,6 +94,18 @@ export function AssignPinModal({ memberId, memberName, open, onOpenChange }: Pro
               {assign.isPending && !pin ? <Loader2 className="h-8 w-8 animate-spin inline-block" /> : pin || "····"}
             </div>
           </div>
+
+          {dispatch && (
+            <p className="text-xs text-center text-muted-foreground">
+              {dispatch.dispatched && dispatch.recipient_phone
+                ? t.pin.sentToWhatsApp(dispatch.recipient_phone)
+                : dispatch.skipped_reason === "whatsapp_not_connected"
+                ? t.pin.notSentNoWhatsApp
+                : dispatch.skipped_reason === "no_member_phone"
+                ? t.pin.notSentNoPhone
+                : t.pin.notSent}
+            </p>
+          )}
 
           <p className="text-xs text-muted-foreground text-center">{t.pin.disclaimer}</p>
 

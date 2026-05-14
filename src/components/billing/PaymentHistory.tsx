@@ -61,6 +61,18 @@ function MethodIcon({ method }: { method: PaymentMethod | null }) {
   return <span className="text-muted-foreground">—</span>;
 }
 
+// MethodCell — icono + nombre. Sin método legible (caso "—") cae al
+// guion para no romper alineación con el resto de la tabla.
+function MethodCell({ method }: { method: PaymentMethod | null }) {
+  const label = method ? t.payment.methods[method] : null;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-sm">
+      <MethodIcon method={method} />
+      {label && <span>{label}</span>}
+    </span>
+  );
+}
+
 export function PaymentHistory({ memberId, memberName }: Props) {
   const role = useAuthStore((s) => s.user?.role);
   const isOwner = role === "owner";
@@ -174,9 +186,19 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                     <TableCell className="text-sm">
                       {t.history.concepts[p.concept] || p.concept}
                       {p.balance_pending > 0 && (
-                        <span className="ml-1 text-xs text-warning">
-                          • {t.history.pendingFlag(fmtMoney(p.balance_pending))}
-                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            // El row entero abre el comprobante; aquí
+                            // queremos abrir el modal de liquidar sin
+                            // que el row también dispare.
+                            e.stopPropagation();
+                            setSettleTarget(p);
+                          }}
+                          className="ml-1 text-xs text-warning underline-offset-2 hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded"
+                        >
+                          • {t.history.pendingFlag(fmtMoney(p.balance_pending))} · {t.history.pendingSettle}
+                        </button>
                       )}
                     </TableCell>
                     <TableCell
@@ -188,7 +210,7 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                       {fmtMoney(p.amount)}
                     </TableCell>
                     <TableCell>
-                      <MethodIcon method={p.payment_method} />
+                      <MethodCell method={p.payment_method} />
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground max-w-[12rem] truncate">
                       {p.notes || "—"}

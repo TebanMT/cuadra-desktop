@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { Loader2, Fingerprint, Check, AlertCircle } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Loader2, Fingerprint, Check, AlertCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -11,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { useRegisterFingerprint } from "@/hooks/useBiometric";
+import { useRegisterFingerprint, type CollisionMember } from "@/hooks/useBiometric";
 import { checkin as t } from "@/strings/checkin";
 
 type Stage = "consent" | "capturing";
@@ -24,6 +25,7 @@ interface Props {
 }
 
 export function RegisterFingerprintModal({ memberId, memberName, open, onOpenChange }: Props) {
+  const navigate = useNavigate();
   const [stage, setStage] = useState<Stage>("consent");
   const [accepted, setAccepted] = useState(false);
 
@@ -75,7 +77,12 @@ export function RegisterFingerprintModal({ memberId, memberName, open, onOpenCha
             total={fp.progress.captures_total}
             status={fp.progress.status}
             error={fp.progress.error}
+            collisionMember={fp.progress.collisionMember}
             onCancel={close}
+            onSeeExisting={(id) => {
+              close();
+              navigate(`/members/${id}`);
+            }}
             onRetry={() => {
               fp.reset();
               startCapture();
@@ -136,18 +143,45 @@ function CaptureStep({
   total,
   status,
   error,
+  collisionMember,
   onCancel,
+  onSeeExisting,
   onRetry,
 }: {
   done: number;
   total: number;
   status: "idle" | "waiting" | "capturing" | "success" | "failed";
   error?: string;
+  collisionMember?: CollisionMember;
   onCancel(): void;
+  onSeeExisting(id: string): void;
   onRetry(): void;
 }) {
   const failed = status === "failed";
   const success = status === "success";
+  const collision = failed && error === "collision" && collisionMember;
+
+  // Collision: the captured finger matches an enrolled template for another
+  // socio. Show a distinct triangular warning + steer the operator toward the
+  // existing profile or cancelling out.
+  if (collision && collisionMember) {
+    return (
+      <div className="space-y-4">
+        <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-full ring-8 bg-warning/10 text-warning ring-warning/30">
+          <AlertTriangle className="h-20 w-20" strokeWidth={1.4} />
+        </div>
+        <p className="text-center font-medium">{t.fingerprint.errorCollision(collisionMember.name)}</p>
+        <div className="flex flex-col-reverse gap-2 pt-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={onCancel} type="button">
+            {t.fingerprint.collisionCancel}
+          </Button>
+          <Button onClick={() => onSeeExisting(collisionMember.id)} type="button">
+            {t.fingerprint.seeExisting(collisionMember.name)}
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

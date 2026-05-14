@@ -1,9 +1,18 @@
-import { useState } from "react";
-import { Loader2, Plus, Pencil, BadgeMinus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, Loader2, Plus, Pencil, BadgeMinus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -17,23 +26,113 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
-import { formatMoney } from "@/lib/utils";
+import { cn, formatMoney } from "@/lib/utils";
 import {
   useCreateMembershipType,
   useDeactivateMembershipType,
   useMembershipTypes,
   useUpdateMembershipType,
+  type MaintenanceFrequency,
   type MembershipType,
   type UpsertMembershipTypeInput,
 } from "@/hooks/useMembershipTypes";
+import { useGymChargeSettings, useUpdateGymChargeSettings } from "@/hooks/useGymChargeSettings";
 import { members as t } from "@/strings/members";
 import { MembershipTypeForm } from "@/components/settings/MembershipTypeForm";
+
+// Gym-level feature flags. Fuente de verdad: `gyms.charge_settings`
+// en BE (JSONB que sincroniza entre dispositivos del mismo gym via
+// el sync agent). Migración suave del LS legacy la hace
+// useGymChargeSettings en su primer fetch.
+
+const FREQ_VALUES: MaintenanceFrequency[] = [
+  "monthly",
+  "bimonthly",
+  "quarterly",
+  "semiannual",
+  "annual",
+];
+
+// Etiquetas para el Select de frecuencia + cualquier display futuro.
+// Espeja el orden de FREQ_VALUES (más frecuente → menos).
+const FREQ_OPTIONS: { value: MaintenanceFrequency; label: string }[] = [
+  { value: "monthly", label: t.types.freqMonthly },
+  { value: "bimonthly", label: t.types.freqBimonthly },
+  { value: "quarterly", label: t.types.freqQuarterly },
+  { value: "semiannual", label: t.types.freqSemiannual },
+  { value: "annual", label: t.types.freqAnnual },
+];
 
 export default function MembershipTypesPage() {
   const types = useMembershipTypes(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<MembershipType | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<MembershipType | null>(null);
+
+  // Carga del backend. Antes esto vivía en localStorage; ahora la
+  // fuente de verdad es `gyms.charge_settings`. El hook hace migración
+  // suave del LS legacy en su primer fetch.
+  const chargeSettings = useGymChargeSettings();
+  const updateCharge = useUpdateGymChargeSettings();
+
+  // Estado local del form, hidratado con la respuesta del backend.
+  const [chargeEnrollment, setChargeEnrollment] = useState(false);
+  const [chargeMaintenance, setChargeMaintenance] = useState(false);
+  const [maintFreq, setMaintFreq] = useState<MaintenanceFrequency>("monthly");
+  const [enrollmentAmount, setEnrollmentAmount] = useState("");
+  const [maintenanceAmount, setMaintenanceAmount] = useState("");
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (hydratedRef.current) return;
+    if (!chargeSettings.data) return;
+    const d = chargeSettings.data;
+    setChargeEnrollment(!!d.charges_enrollment);
+    setChargeMaintenance(!!d.charges_maintenance);
+    if (d.maintenance_frequency && (FREQ_VALUES as string[]).includes(d.maintenance_frequency)) {
+      setMaintFreq(d.maintenance_frequency as MaintenanceFrequency);
+    }
+    if (typeof d.enrollment_amount === "number") {
+      setEnrollmentAmount(String(d.enrollment_amount));
+    }
+    if (typeof d.maintenance_amount === "number") {
+      setMaintenanceAmount(String(d.maintenance_amount));
+    }
+    hydratedRef.current = true;
+  }, [chargeSettings.data]);
+
+  // Indicador "✓ Guardado": se prende tras cualquier cambio en los
+  // settings y se apaga solo 2.2s después de la última edición.
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // Persistencia debounced al backend. Disparamos un PATCH 600ms
+  // después del último cambio para no pegarle al server por cada
+  // keystroke en los inputs numéricos.
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    const handle = setTimeout(() => {
+      const eAmt = parseFloat(enrollmentAmount);
+      const mAmt = parseFloat(maintenanceAmount);
+      updateCharge.mutate(
+        {
+          charges_enrollment: chargeEnrollment,
+          charges_maintenance: chargeMaintenance,
+          enrollment_amount: Number.isFinite(eAmt) && eAmt >= 0 ? eAmt : 0,
+          maintenance_amount: Number.isFinite(mAmt) && mAmt >= 0 ? mAmt : 0,
+          maintenance_frequency: maintFreq,
+        },
+        { onSuccess: () => setSavedAt(Date.now()) },
+      );
+    }, 600);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chargeEnrollment, chargeMaintenance, maintFreq, enrollmentAmount, maintenanceAmount]);
+
+  useEffect(() => {
+    if (savedAt === null) return;
+    const tHandle = setTimeout(() => setSavedAt(null), 2200);
+    return () => clearTimeout(tHandle);
+  }, [savedAt]);
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -55,6 +154,123 @@ export default function MembershipTypesPage() {
           <Plus className="h-4 w-4 mr-2" />
           {t.types.addNew}
         </Button>
+      </div>
+
+      {/* Gym-level settings: el dueño habilita las features que su gym
+          cobra. Layout en 2 columnas para que el card no empuje la
+          tabla cuando ambos toggles están activos. La frecuencia usa
+          un Select (no radio) para no inflar verticalmente cuando se
+          expande con las 5 opciones. */}
+      <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm p-5 space-y-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-1 min-w-0">
+            <h2 className="text-base font-semibold tracking-tight">{t.types.gymSettingsTitle}</h2>
+            <p className="text-xs text-muted-foreground">{t.types.gymSettingsHint}</p>
+          </div>
+          {/* Pill "Guardado" — sale tras cada cambio y se desvanece a
+              los 2s. La animación combina fade + slide para que el
+              dueño la note sin que sea ruidosa. */}
+          <span
+            aria-live="polite"
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium",
+              "bg-moss-100 text-moss-700 dark:bg-moss-500/20 dark:text-moss-100",
+              "transition-all duration-300",
+              savedAt
+                ? "opacity-100 translate-y-0"
+                : "opacity-0 -translate-y-1 pointer-events-none",
+            )}
+          >
+            <Check className="h-3 w-3" />
+            Guardado
+          </span>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          {/* Inscripción */}
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">{t.types.chargeEnrollment}</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {t.types.chargeEnrollmentHint}
+                </div>
+              </div>
+              <Switch
+                checked={chargeEnrollment}
+                onCheckedChange={(v) => setChargeEnrollment(!!v)}
+              />
+            </label>
+            {chargeEnrollment && (
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  id="gym-enrollment-amount"
+                  inputMode="decimal"
+                  className="pl-7 h-9"
+                  placeholder="Monto"
+                  value={enrollmentAmount}
+                  onChange={(e) => setEnrollmentAmount(e.target.value.replace(/[^\d.]/g, ""))}
+                  aria-label={t.types.form.enrollmentAmount}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Mantenimiento */}
+          <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+            <label className="flex items-center justify-between gap-3 cursor-pointer">
+              <div className="min-w-0">
+                <div className="text-sm font-medium">{t.types.chargeMaintenance}</div>
+                <div className="text-[11px] text-muted-foreground truncate">
+                  {t.types.chargeMaintenanceHint}
+                </div>
+              </div>
+              <Switch
+                checked={chargeMaintenance}
+                onCheckedChange={(v) => setChargeMaintenance(!!v)}
+              />
+            </label>
+            {chargeMaintenance && (
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                  <Input
+                    id="gym-maintenance-amount"
+                    inputMode="decimal"
+                    className="pl-7 h-9"
+                    placeholder="Monto"
+                    value={maintenanceAmount}
+                    onChange={(e) => setMaintenanceAmount(e.target.value.replace(/[^\d.]/g, ""))}
+                    aria-label={t.types.form.maintenanceAmount}
+                  />
+                </div>
+                <Select
+                  value={maintFreq}
+                  onValueChange={(v) => setMaintFreq(v as MaintenanceFrequency)}
+                >
+                  <SelectTrigger className="h-9 w-[120px]" aria-label={t.types.maintenanceFrequency}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {FREQ_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {(chargeEnrollment || chargeMaintenance) && (
+          <p className="text-[11px] text-muted-foreground">
+            Estos montos se usan como default al crear planes nuevos. Cada plan
+            los puede ajustar al editarlo.
+          </p>
+        )}
       </div>
 
       {types.error && (
@@ -124,10 +340,23 @@ export default function MembershipTypesPage() {
         </Table>
       </div>
 
-      <CreateDialog open={createOpen} onOpenChange={setCreateOpen} />
+      <CreateDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        chargeEnrollment={chargeEnrollment}
+        chargeMaintenance={chargeMaintenance}
+        maintenanceFrequency={maintFreq}
+        defaultEnrollmentAmount={parseFloat(enrollmentAmount) || 0}
+        defaultMaintenanceAmount={parseFloat(maintenanceAmount) || 0}
+      />
       <EditDialog
         type={editing}
         onClose={() => setEditing(null)}
+        chargeEnrollment={chargeEnrollment}
+        chargeMaintenance={chargeMaintenance}
+        maintenanceFrequency={maintFreq}
+        defaultEnrollmentAmount={parseFloat(enrollmentAmount) || 0}
+        defaultMaintenanceAmount={parseFloat(maintenanceAmount) || 0}
       />
       <DeactivateConfirm
         type={confirmDeactivate}
@@ -137,7 +366,28 @@ export default function MembershipTypesPage() {
   );
 }
 
-function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange(o: boolean): void }) {
+interface DialogFlagsProps {
+  chargeEnrollment: boolean;
+  chargeMaintenance: boolean;
+  maintenanceFrequency: "monthly" | "annual";
+  // Defaults gym-level que pre-llenan el form al crear planes nuevos.
+  // En edición se ignoran (el form usa los amounts del plan).
+  defaultEnrollmentAmount: number;
+  defaultMaintenanceAmount: number;
+}
+
+function CreateDialog({
+  open,
+  onOpenChange,
+  chargeEnrollment,
+  chargeMaintenance,
+  maintenanceFrequency,
+  defaultEnrollmentAmount,
+  defaultMaintenanceAmount,
+}: {
+  open: boolean;
+  onOpenChange(o: boolean): void;
+} & DialogFlagsProps) {
   const create = useCreateMembershipType();
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -170,6 +420,11 @@ function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange(o: b
         </DialogHeader>
         <MembershipTypeForm
           submitting={create.isPending}
+          chargeEnrollment={chargeEnrollment}
+          chargeMaintenance={chargeMaintenance}
+          maintenanceFrequency={maintenanceFrequency}
+          defaultEnrollmentAmount={defaultEnrollmentAmount}
+          defaultMaintenanceAmount={defaultMaintenanceAmount}
           onSubmit={submit}
           onCancel={() => handleClose(false)}
           serverError={serverError}
@@ -179,7 +434,15 @@ function CreateDialog({ open, onOpenChange }: { open: boolean; onOpenChange(o: b
   );
 }
 
-function EditDialog({ type, onClose }: { type: MembershipType | null; onClose(): void }) {
+function EditDialog({
+  type,
+  onClose,
+  chargeEnrollment,
+  chargeMaintenance,
+  maintenanceFrequency,
+  defaultEnrollmentAmount,
+  defaultMaintenanceAmount,
+}: { type: MembershipType | null; onClose(): void } & DialogFlagsProps) {
   const update = useUpdateMembershipType(type?.id ?? "");
   const [serverError, setServerError] = useState<string | null>(null);
 
@@ -218,6 +481,11 @@ function EditDialog({ type, onClose }: { type: MembershipType | null; onClose():
           <MembershipTypeForm
             initial={type}
             submitting={update.isPending}
+            chargeEnrollment={chargeEnrollment}
+            chargeMaintenance={chargeMaintenance}
+            maintenanceFrequency={maintenanceFrequency}
+            defaultEnrollmentAmount={defaultEnrollmentAmount}
+            defaultMaintenanceAmount={defaultMaintenanceAmount}
             onSubmit={submit}
             onCancel={onClose}
             serverError={serverError}
