@@ -32,6 +32,7 @@ import {
   type PaymentConcept,
   type PaymentMethod,
 } from "@/hooks/useBilling";
+import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { fmtDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -76,6 +77,7 @@ function MethodCell({ method }: { method: PaymentMethod | null }) {
 export function PaymentHistory({ memberId, memberName }: Props) {
   const role = useAuthStore((s) => s.user?.role);
   const isOwner = role === "owner";
+  const money = useMoneyVisibility();
 
   const [concept, setConcept] = useState<PaymentConcept | "all">("all");
   const [from, setFrom] = useState("");
@@ -197,7 +199,7 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                           }}
                           className="ml-1 text-xs text-warning underline-offset-2 hover:underline focus:outline-none focus:ring-1 focus:ring-ring rounded"
                         >
-                          • {t.history.pendingFlag(fmtMoney(p.balance_pending))} · {t.history.pendingSettle}
+                          • {t.history.pendingFlag(money.fmt(p.balance_pending))} · {t.history.pendingSettle}
                         </button>
                       )}
                     </TableCell>
@@ -207,7 +209,7 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                         isNeg && "text-destructive"
                       )}
                     >
-                      {fmtMoney(p.amount)}
+                      {money.fmt(p.amount)}
                     </TableCell>
                     <TableCell>
                       <MethodCell method={p.payment_method} />

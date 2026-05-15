@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, AlertTriangle, X, Loader2, Fingerprint, Shield } from "lucide-react";
+import { Check, AlertTriangle, X, Loader2, Fingerprint, Shield, CalendarClock } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { fmtDate } from "@/lib/dates";
 import { checkin as t } from "@/strings/checkin";
 import type { CheckinEvent } from "@/hooks/useCheckin";
 
@@ -20,6 +21,11 @@ export interface FeedbackState {
   kind: FeedbackKind;
   memberName?: string;
   daysUntilExpiry?: number | null;
+  // ISO date (YYYY-MM-DD) o full timestamp. Se muestra como pill "Vence:
+  // 12 jun 2026" cuando hay una membership en juego (vigente, por
+  // vencer, vencida). Da contexto explícito además del "vence en N
+  // días" del detalle textual.
+  expiryDate?: string | null;
   override?: boolean;
   detail?: string;
 }
@@ -37,6 +43,7 @@ export function eventToFeedback(ev: CheckinEvent): FeedbackState {
     kind: map[ev.result] ?? "denied_not_found",
     memberName: ev.member_name ?? undefined,
     daysUntilExpiry: ev.days_until_expiry,
+    expiryDate: ev.expiry_date,
     override: ev.manual_override,
   };
 }
@@ -206,6 +213,20 @@ export function CheckinFeedback({ state, size = "lg", idleMessage, className }: 
             {detail}
           </p>
         )}
+        {state.expiryDate && shouldShowExpiryPill(state.kind) && (
+          <span
+            key={`expiry-${animationKey}`}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-medium motion-safe:animate-kiosk-pop-in",
+              tone === "success" && "bg-success/15 text-success",
+              tone === "warning" && "bg-warning/20 text-warning",
+              tone === "denied" && "bg-destructive/15 text-destructive"
+            )}
+          >
+            <CalendarClock className="h-4 w-4" />
+            {t.feedback.expiryPill(fmtDate(state.expiryDate))}
+          </span>
+        )}
         {state.override && (
           <span
             className={cn(
@@ -218,6 +239,17 @@ export function CheckinFeedback({ state, size = "lg", idleMessage, className }: 
         )}
       </div>
     </div>
+  );
+}
+
+// Mostrar la pill de vencimiento solo cuando hay un evento de check-in
+// con una membership relevante: vigentes, por vencer, vencidos. Los
+// "sin membresía / no encontrado" no tienen expiry que mostrar.
+function shouldShowExpiryPill(kind: FeedbackKind): boolean {
+  return (
+    kind === "success_active" ||
+    kind === "success_expiring_soon" ||
+    kind === "denied_expired"
   );
 }
 

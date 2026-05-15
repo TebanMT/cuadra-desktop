@@ -7,6 +7,7 @@ export const checkin = {
     typeAtLeast: "Escribe al menos 2 letras.",
     operator: (name: string) => `Operador: ${name}`,
     openKiosk: "Modo kiosko",
+    goToKiosk: "Ir al kiosko",
     todayCount: (n: number) => `Check-ins hoy: ${n}`,
     recent: "Últimos ingresos",
     recentEmpty: "Aún no hay ingresos hoy.",
@@ -37,6 +38,7 @@ export const checkin = {
     deniedNoMembership: "Sin membresía activa. Pasa con recepción.",
     deniedNotFound: "No encontré a este socio. Vuelve a intentar.",
     overrideBadge: "Permitido por operador",
+    expiryPill: (date: string) => `Vence: ${date}`,
   },
   pinPad: {
     title: "Pon tu PIN para entrar",

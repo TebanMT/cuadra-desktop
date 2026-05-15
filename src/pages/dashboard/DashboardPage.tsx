@@ -1,17 +1,17 @@
+import { useCallback, useState } from "react";
 import { Link } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Activity,
-  ArrowDown,
-  ArrowUp,
   ArrowUpRight,
   CalendarClock,
   ChevronRight,
   CircleDollarSign,
-  Minus,
+  Maximize2,
   TrendingDown,
   Users,
+  X,
 } from "lucide-react";
 import {
   Area,
@@ -23,14 +23,18 @@ import {
   YAxis,
 } from "recharts";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useDashboard } from "@/hooks/useReports";
+import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { fmtMoney } from "@/hooks/useBilling";
 import { fmtDate } from "@/lib/dates";
+import { openKioskWindow } from "@/lib/kioskWindow";
 import { dashboard as t } from "@/strings/dashboard";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/shared/StatCard";
 import { SectionCard } from "@/components/shared/PagePrimitives";
+import { deltaText } from "@/lib/kpi";
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   cash: "Efectivo",
@@ -49,6 +53,7 @@ const CONCEPT_LABEL: Record<string, string> = {
 export default function DashboardPage() {
   const user = useAuthStore((s) => s.user);
   const dashboard = useDashboard();
+  const money = useMoneyVisibility();
   const today = new Date();
   const nameLooksWrong =
     !user?.full_name || user.full_name.includes("@") || user.full_name.length < 3;
@@ -81,6 +86,8 @@ export default function DashboardPage() {
         </div>
       </header>
 
+      <KioskOnboardingCard />
+
       {dashboard.isLoading && <DashboardSkeleton />}
 
       {dashboard.error && (
@@ -89,7 +96,69 @@ export default function DashboardPage() {
         </Alert>
       )}
 
-      {dashboard.data && <DashboardContent data={dashboard.data} />}
+      {dashboard.data && <DashboardContent data={dashboard.data} hideAmounts={money.hidden} />}
+    </div>
+  );
+}
+
+const KIOSK_ONBOARDING_KEY = "tinta:onboarding.kiosk_card_dismissed";
+
+function KioskOnboardingCard() {
+  // Una vez descartada (botón X o "Abrir modo kiosko") la card no
+  // vuelve. La persistencia es por device — en una recepción nueva el
+  // operador la verá la primera vez aunque ya la haya visto en otra.
+  const [dismissed, setDismissed] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.localStorage.getItem(KIOSK_ONBOARDING_KEY) === "1";
+  });
+
+  if (dismissed) return null;
+
+  function dismiss() {
+    window.localStorage.setItem(KIOSK_ONBOARDING_KEY, "1");
+    setDismissed(true);
+  }
+
+  function open() {
+    dismiss();
+    openKioskWindow();
+  }
+
+  return (
+    <div className="relative rounded-xl border border-brick-200 bg-brick-50 dark:border-brick-500/30 dark:bg-brick-500/10 p-5">
+      <button
+        type="button"
+        onClick={dismiss}
+        aria-label={t.kioskCard.dismiss}
+        className="absolute top-3 right-3 inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-background/60 hover:text-foreground transition-colors"
+      >
+        <X className="h-4 w-4" />
+      </button>
+      <div className="flex items-start gap-4">
+        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brick-500 text-white">
+          <Maximize2 className="h-5 w-5" strokeWidth={2.25} />
+        </div>
+        <div className="flex-1 min-w-0 space-y-2">
+          <div>
+            <h2 className="text-base font-semibold text-foreground">
+              {t.kioskCard.title}
+            </h2>
+            <p className="text-sm text-muted-foreground">{t.kioskCard.body}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 pt-1">
+            <Button size="sm" onClick={open} className="rounded-md">
+              <Maximize2 className="h-4 w-4" />
+              {t.kioskCard.cta}
+            </Button>
+            <span className="text-xs text-muted-foreground">
+              {t.kioskCard.shortcutHint}{" "}
+              <kbd className="inline-flex items-center rounded border border-border bg-background px-1.5 py-0.5 font-mono text-[11px] font-medium tabular-nums">
+                {t.kioskCard.shortcut}
+              </kbd>
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -127,13 +196,28 @@ function DashboardSkeleton() {
   );
 }
 
-function DashboardContent({ data }: { data: NonNullable<ReturnType<typeof useDashboard>["data"]> }) {
+function DashboardContent({
+  data,
+  hideAmounts,
+}: {
+  data: NonNullable<ReturnType<typeof useDashboard>["data"]>;
+  hideAmounts: boolean;
+}) {
   const recoverableCount = data.recoverable.value;
+  // maskMoney centraliza el comportamiento del ojo: si está oculto,
+  // devuelve "$•••"; si no, el monto formateado. Lo usan el KPI mensual,
+  // la columna $ de últimos cobros y los tickers del eje Y de la gráfica.
+  const maskMoney = useCallback(
+    (formatted: string) => (hideAmounts ? t.privacy.masked : formatted),
+    [hideAmounts]
+  );
 
   return (
     <>
-      {/* KPI Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {/* KPI Grid — 5 tiles: en pantallas medianas wrappea a 2 filas (3+2);
+          en lg+ entran en una sola fila de 5. El de Egresos vive al lado
+          de Ingresos para que el dueño los lea en pareja. */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title={t.kpis.activeMembers}
           value={data.active_members.value.toLocaleString("es-MX")}
@@ -144,11 +228,27 @@ function DashboardContent({ data }: { data: NonNullable<ReturnType<typeof useDas
         />
         <StatCard
           title={t.kpis.incomeMonth}
-          value={fmtMoney(data.income_month.value)}
+          value={maskMoney(fmtMoney(data.income_month.value))}
           icon={CircleDollarSign}
           tone="success"
-          delta={deltaText(data.income_month)}
-          hint={data.income_month.delta_pct !== null ? t.kpis.vsLastPeriod : undefined}
+          delta={hideAmounts ? null : deltaText(data.income_month)}
+          hint={
+            !hideAmounts && data.income_month.delta_pct !== null
+              ? t.kpis.vsLastPeriod
+              : undefined
+          }
+        />
+        <StatCard
+          title={t.kpis.expensesMonth}
+          value={maskMoney(fmtMoney(data.expenses_month.value))}
+          icon={TrendingDown}
+          tone={data.expenses_month.value > 0 ? "danger" : "neutral"}
+          delta={hideAmounts ? null : deltaText(data.expenses_month)}
+          hint={
+            !hideAmounts && data.expenses_month.delta_pct !== null
+              ? t.kpis.vsLastPeriod
+              : t.kpis.expensesHint
+          }
         />
         <StatCard
           title={t.kpis.expiringWeek}
@@ -197,7 +297,9 @@ function DashboardContent({ data }: { data: NonNullable<ReturnType<typeof useDas
                   axisLine={false}
                 />
                 <YAxis
-                  tickFormatter={(v) => fmtMoney(v).replace(".00", "")}
+                  tickFormatter={(v) =>
+                    hideAmounts ? t.privacy.masked : fmtMoney(v).replace(".00", "")
+                  }
                   fontSize={12}
                   width={70}
                   stroke="hsl(var(--muted-foreground))"
@@ -205,7 +307,7 @@ function DashboardContent({ data }: { data: NonNullable<ReturnType<typeof useDas
                   axisLine={false}
                 />
                 <Tooltip
-                  formatter={(v: number) => [fmtMoney(v), "Ingreso"]}
+                  formatter={(v: number) => [maskMoney(fmtMoney(v)), "Ingreso"]}
                   labelFormatter={(v) => fmtDate(v as string)}
                   contentStyle={{
                     borderRadius: 8,
@@ -232,7 +334,7 @@ function DashboardContent({ data }: { data: NonNullable<ReturnType<typeof useDas
       {/* 2-column grid: attention + payments */}
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <RecentPaymentsCard items={data.recent_payments} />
+          <RecentPaymentsCard items={data.recent_payments} hideAmounts={hideAmounts} />
         </div>
         <AttentionCard summary={data.attention_summary} />
       </div>
@@ -240,28 +342,6 @@ function DashboardContent({ data }: { data: NonNullable<ReturnType<typeof useDas
   );
 }
 
-interface DeltaKpi {
-  value: number;
-  delta: number | null;
-  delta_pct: number | null;
-}
-
-function deltaText(kpi: DeltaKpi): React.ReactNode {
-  if (kpi.delta_pct === null && kpi.delta === null) return null;
-  const pct = kpi.delta_pct;
-  const trend = pct === null || Math.abs(pct) < 0.01 ? "flat" : pct > 0 ? "up" : "down";
-  const Icon = trend === "up" ? ArrowUp : trend === "down" ? ArrowDown : Minus;
-  const text =
-    pct !== null
-      ? `${pct > 0 ? "+" : ""}${pct.toFixed(0)}%`
-      : `${kpi.delta! > 0 ? "+" : ""}${kpi.delta}`;
-  return (
-    <span className="inline-flex items-center gap-0.5">
-      <Icon className="h-3 w-3" strokeWidth={2.5} />
-      {text}
-    </span>
-  );
-}
 
 interface AttentionSummary {
   expiring_soon: number;
@@ -344,7 +424,13 @@ interface RecentPayment {
   concept: string;
 }
 
-function RecentPaymentsCard({ items }: { items: RecentPayment[] }) {
+function RecentPaymentsCard({
+  items,
+  hideAmounts,
+}: {
+  items: RecentPayment[];
+  hideAmounts: boolean;
+}) {
   return (
     <SectionCard
       title={t.recentPayments.title}
@@ -386,7 +472,9 @@ function RecentPaymentsCard({ items }: { items: RecentPayment[] }) {
                 </div>
               </div>
               <span className="tabular text-sm font-bold text-foreground shrink-0">
-                {p.amount < 0 ? (
+                {hideAmounts ? (
+                  <span className="text-muted-foreground">{t.privacy.masked}</span>
+                ) : p.amount < 0 ? (
                   <span className="text-destructive inline-flex items-center gap-1">
                     <TrendingDown className="h-3.5 w-3.5" />
                     {fmtMoney(p.amount)}

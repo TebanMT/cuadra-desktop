@@ -8,6 +8,7 @@ import {
   LogIn as Door,
   LogOut,
   Package,
+  Receipt,
   Settings,
   ShoppingCart,
   Trophy,
@@ -21,10 +22,12 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useLogout } from "@/hooks/useAuth";
 
 // Sidebar agrupado por frecuencia de uso. Los items diarios (Inicio,
-// Atención, Check-in, Cobros, Venta rápida, Socios) van arriba en
-// "Operación". El catálogo (planes, productos) es de set-up y revisión
-// puntual. Programas (Retos) es opcional según el gym. Reportes y
-// Ajustes quedan abajo porque son admin / mensual.
+// Check-in, Cobros, Venta rápida, Socios) van arriba en "Operación".
+// Atención queda al final del grupo: es lo que se revisa al terminar
+// el turno o al inicio del día, no la primera acción. El catálogo
+// (planes, productos) es de set-up y revisión puntual. Programas
+// (Retos) es opcional según el gym. Reportes y Ajustes quedan abajo
+// porque son admin / mensual.
 // En estado colapsado (sidebar hover-off) los headers de grupo
 // desaparecen y queda sólo una línea divisoria para preservar la
 // jerarquía visual sin invadir el ancho de 70px.
@@ -33,11 +36,11 @@ const NAV_GROUPS = [
     label: shell.navGroups.operation,
     items: [
       { to: "/", icon: LayoutDashboard, label: shell.nav.dashboard, end: true },
-      { to: "/attention-required", icon: Bell, label: shell.nav.attention },
       { to: "/checkin", icon: Door, label: shell.nav.checkin },
       { to: "/billing", icon: CreditCard, label: shell.nav.billing },
       { to: "/sales", icon: ShoppingCart, label: shell.nav.sales },
       { to: "/members", icon: Users, label: shell.nav.members },
+      { to: "/attention-required", icon: Bell, label: shell.nav.attention },
     ],
   },
   {
@@ -48,6 +51,7 @@ const NAV_GROUPS = [
       // ventas, no merece estar enterrado.
       { to: "/settings/membership-types", icon: CreditCard, label: shell.nav.membershipTypes },
       { to: "/products", icon: Package, label: shell.nav.products },
+      { to: "/expenses", icon: Receipt, label: shell.nav.expenses },
     ],
   },
   {

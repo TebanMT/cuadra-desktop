@@ -17,6 +17,7 @@ import { useBiometricStatus } from "@/hooks/useBiometric";
 import { useSyncStatus, levelOf } from "@/hooks/useSyncStatus";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";
+import { closeCurrentWindow, isCurrentWindowKiosk } from "@/lib/kioskWindow";
 import { checkin as t } from "@/strings/checkin";
 
 const AUTOFADE_MS = 3500;
@@ -286,7 +287,17 @@ export default function KioskPage() {
       <KioskExitDialog
         open={exitOpen}
         onOpenChange={setExitOpen}
-        onAuthorized={() => navigate("/checkin")}
+        onAuthorized={async () => {
+          // En producción, el kiosko vive en su propia WebviewWindow —
+          // cerrar la ventana lo saca del modo kiosko sin afectar la main.
+          // En el flujo legacy (navegación directa a /kiosk en la main),
+          // volvemos al checkin.
+          if (await isCurrentWindowKiosk()) {
+            await closeCurrentWindow();
+          } else {
+            navigate("/checkin");
+          }
+        }}
       />
     </div>
   );

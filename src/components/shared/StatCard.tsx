@@ -111,9 +111,15 @@ export function StatCard({
       </div>
 
       {/* Número central — sans-serif (NO Fraunces), tabular, ink-900 en
-          light, paper-50 en dark. */}
+          light, paper-50 en dark. truncate + title como red de seguridad:
+          cuando un monto largo ($XX,XXX.XX) cae en un grid de 5-6 cols a
+          breakpoints intermedios, se cortaba fuera del card. Ahora el
+          número se trunca con elipsis y el hover muestra el valor
+          completo. text size escala con el viewport — 2xl en mobile,
+          3xl en md+, 4xl sólo en xl+ donde el card ya tiene aire. */}
       <p
-        className="mt-3 text-3xl sm:text-4xl font-bold tabular text-ink-900 dark:text-paper-50 leading-none"
+        title={typeof value === "string" || typeof value === "number" ? String(value) : undefined}
+        className="mt-3 text-2xl sm:text-3xl xl:text-4xl font-bold tabular text-ink-900 dark:text-paper-50 leading-none truncate"
         style={{ letterSpacing: "-0.02em" }}
       >
         {value}

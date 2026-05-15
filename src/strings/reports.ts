@@ -3,6 +3,9 @@ export const reports = {
     title: "Reportes",
     subtitle: "Analiza tu gym por períodos y exporta lo que necesites.",
     periodLabel: "Período",
+    customFromLabel: "Desde",
+    customToLabel: "Hasta",
+    customInvalid: "Selecciona desde y hasta para ver el reporte.",
     error: "No pudimos cargar el reporte.",
     empty: "Sin movimientos en este período.",
     exportPdf: "Descargar PDF",
@@ -19,22 +22,43 @@ export const reports = {
     last_month: "Mes pasado",
     "3_months": "Últimos 3 meses",
     year: "Este año",
+    custom: "Personalizado",
   },
   kpis: {
+    net: "Utilidad del período",
+    netHint: "Ingresos − mercancía − gastos",
     income: "Ingresos",
     newMembers: "Socios nuevos",
     checkins: "Check-ins",
     refunds: "Devoluciones",
+    inventoryCost: "Egresos por mercancía",
+    expensesGeneral: "Otros gastos",
+    criticalStock: "Stock crítico",
+    criticalStockHint: (out: number, low: number) =>
+      out > 0
+        ? `${out} sin stock · ${low} bajo mínimo`
+        : low > 0
+        ? `${low} bajo mínimo`
+        : "Todo en orden",
   },
   charts: {
     incomeByDay: "Ingresos por día",
+    incomeVsExpensesByDay: "Ingresos vs egresos por día",
+    incomeVsExpensesHint: "Línea azul: ingresos · línea roja: egresos",
     checkinsByDay: "Check-ins por día",
+    legendIncome: "Ingresos",
+    legendExpenses: "Egresos",
   },
   byMethod: {
     title: "Por método de pago",
     cash: "Efectivo",
     transfer: "Transferencias",
     card: "Tarjeta",
+  },
+  byCategory: {
+    title: "Gastos por categoría",
+    description: "Desglose de los egresos generales del período.",
+    empty: "Sin gastos clasificados en este período.",
   },
   topMembers: {
     title: "Socios que más pagaron",
@@ -44,8 +68,19 @@ export const reports = {
       payments: "# Pagos",
       total: "Total",
     },
-    paymentsCount: (n: number) =>
-      n === 1 ? "1 pago" : `${n} pagos`,
+    paymentsCount: (n: number) => (n === 1 ? "1 pago" : `${n} pagos`),
+  },
+  topProducts: {
+    title: "Productos más vendidos",
+    description: "Ranking por revenue del período.",
+    empty: "Sin ventas de productos en este período.",
+    columns: {
+      product: "Producto",
+      quantity: "Unidades",
+      revenue: "Revenue",
+    },
+    quantityValue: (n: number) =>
+      n === 1 ? "1 unidad" : `${n.toLocaleString("es-MX")} unidades`,
   },
   recentPayments: {
     title: "Cobros del período",
@@ -57,5 +92,56 @@ export const reports = {
       method: "Método",
       amount: "Monto",
     },
+  },
+  inventoryCosts: {
+    title: "Compras de inventario",
+    description: "Mercancía que entró con costo capturado en el período.",
+    empty: "Sin compras registradas en este período.",
+    hint: "Captura el costo al cargar mercancía para que aparezca aquí.",
+    totalLabel: "Total egresado:",
+    columns: {
+      date: "Fecha",
+      product: "Producto",
+      qty: "Unidades",
+      costUnit: "Costo unit.",
+      costTotal: "Total",
+      reason: "Nota",
+    },
+  },
+  expensesSection: {
+    title: "Gastos del período",
+    description: "Renta, servicios, sueldos y otros egresos generales.",
+    empty: "Sin gastos registrados en este período.",
+    hint: "Ve a Gastos para capturar uno.",
+    totalLabel: "Total egresado:",
+    columns: {
+      date: "Fecha",
+      category: "Categoría",
+      description: "Descripción",
+      method: "Método",
+      amount: "Monto",
+    },
+  },
+  expenseCategories: {
+    renta: "Renta",
+    servicios: "Servicios",
+    mantenimiento: "Mantenimiento",
+    sueldos: "Sueldos",
+    marketing: "Marketing",
+    mercaderia_externa: "Mercadería externa",
+    otros: "Otros",
+  } as Record<string, string>,
+  expenseMethods: {
+    cash: "Efectivo",
+    transfer: "Transferencia",
+    card: "Tarjeta",
+  } as Record<string, string>,
+  drillDown: {
+    incomeTitle: (day: string) => `Cobros del ${day}`,
+    incomeEmpty: "Sin cobros ese día.",
+    checkinsTitle: (day: string) => `Check-ins del ${day}`,
+    checkinsEmpty: "Sin check-ins ese día.",
+    close: "Cerrar",
+    loading: "Cargando…",
   },
 };

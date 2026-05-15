@@ -21,9 +21,30 @@ export const sales = {
         transfer: "Transferencia",
         card: "Tarjeta",
       },
+      methodHints: {
+        cash: "E",
+        transfer: "T",
+        card: "C",
+      },
       submit: (amount: string) => `Cobrar ${amount}`,
+      submitWithDebt: (paid: string, debt: string) => `Cobrar ${paid} · queda ${debt}`,
       remove: "Quitar",
       qtyLabel: "Cantidad",
+    },
+    change: {
+      label: "Te dieron",
+      result: (amount: string) => `Cambio: ${amount}`,
+      shortfall: (amount: string) => `Falta: ${amount}`,
+      exact: "Exacto",
+      placeholder: "0",
+    },
+    credit: {
+      toggle: "Dejar saldo a deber (fiado)",
+      requiresMember: "Asocia un socio para poder fiar.",
+      paidLabel: "Cobrado ahora",
+      balanceLabel: (amount: string) => `Queda a deber: ${amount}`,
+      paidExceedsTotal: "El monto cobrado no puede ser mayor al total.",
+      paidMustBePositive: "Debes cobrar al menos algo ahora.",
     },
     badges: {
       out: "0✕",
@@ -33,8 +54,29 @@ export const sales = {
     tooltips: {
       out: "Sin stock",
       low: "Stock bajo",
-      rightClick: "Click derecho para cantidad personalizada",
+      rightClick: "Click derecho o mantén presionado para cantidad personalizada",
     },
+    searchPlaceholder: "Buscar producto…",
+    noSearchResults: "Sin productos que coincidan.",
+    showOutOfStock: "Ver agotados",
+    restock: {
+      title: (name: string) => `Registrar mercancía — ${name}`,
+      description:
+        "El sistema dice que no quedan. Si te llegaron unidades sin registrar, anótalas aquí y se agregan al carrito.",
+      qtyLabel: "¿Cuántas te llegaron?",
+      costLabel: "Costo unitario (opcional)",
+      costHint: "Cuánto pagaste por cada una. Queda en el historial de egresos.",
+      reasonDefault: "Recibido en venta",
+      submit: "Registrar y agregar",
+      cancel: "Cancelar",
+      success: (qty: number, name: string) =>
+        qty === 1 ? `${name} agregado al stock y al carrito.` : `${qty} ${name} agregados al stock y al carrito.`,
+      errors: {
+        qtyInvalid: "La cantidad debe ser mayor a cero.",
+        generic: "No pudimos registrar la mercancía.",
+      },
+    },
+    outOfStockTap: "Sin stock — toca para registrar",
     quantityModal: {
       title: (name: string) => `Cantidad — ${name}`,
       label: "¿Cuántos vas a vender?",
@@ -56,7 +98,7 @@ export const sales = {
     },
     offline: "Sin conexión: la venta se guarda localmente y se sincroniza después.",
     keyboard: {
-      hint: "Tip: escribe la primera letra del producto + Enter para agregar.",
+      hint: "Atajos: E = efectivo, T = transferencia, C = tarjeta · Esc limpia el carrito.",
     },
   },
 };

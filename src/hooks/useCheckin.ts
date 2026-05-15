@@ -195,6 +195,22 @@ export function useRecentCheckins() {
   return { items, prepend };
 }
 
+// useMemberCheckins lista las asistencias del socio para la pestaña
+// "Asistencia" del detalle. Limit 50 — suficiente para ver el patrón de
+// uso reciente sin paginar; gyms con socios muy activos pueden subirlo
+// más adelante si hace falta.
+export function useMemberCheckins(memberID: string | null | undefined, limit = 50) {
+  return useQuery<RecentCheckinsResponse>({
+    queryKey: ["checkins", "by-member", memberID, limit],
+    queryFn: () =>
+      api.get<RecentCheckinsResponse>(`/api/v1/members/${memberID}/checkins`, {
+        query: { limit },
+      }),
+    enabled: !!memberID,
+    staleTime: 10_000,
+  });
+}
+
 interface VerifyOperatorInput {
   password: string;
 }

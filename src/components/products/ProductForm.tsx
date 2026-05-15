@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { Image as ImageIcon, Loader2, X as XIcon } from "lucide-react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useEffect, useRef, useState } from "react";
+import { Camera, Image as ImageIcon, Loader2, Upload, X as XIcon } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +7,8 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { isTauri } from "@/lib/utils";
+import { CameraCaptureModal } from "@/components/shared/CameraCaptureModal";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
 import { products as t } from "@/strings/products";
 import { DEFAULT_CATEGORIES } from "@/hooks/useProducts";
 
@@ -18,19 +18,38 @@ export interface ProductFormValues {
   name: string;
   category: string;
   price: string;
+  // `stock` representa el stock inicial en modo create y el stock
+  // actual (display) en modo edit. En modo edit el backend ignora
+  // este valor — los ajustes pasan por /adjust-stock.
   stock: string;
-  min_stock: string;
-  photo_url: string;
+  // Renombrado de `min_stock` → `stock_minimum` para que coincida con
+  // el shape JSON que el backend espera (createProductReq /
+  // updateProductReq en product_controller.go). El nombre viejo se
+  // descartaba silenciosamente.
+  stock_minimum: string;
+  // Costo unitario al momento de crear el producto. Sólo se usa en
+  // modo create — viaja como `initial_cost` al backend y se persiste
+  // en stock_movements (el movement_type='restock' inicial). No hay
+  // campo análogo en update porque las llegadas posteriores se
+  // registran por separado vía /adjust-stock.
+  initial_cost: string;
+  image_url: string;
 }
 
+// Payload que ProductForm.onSubmit emite. `initial_stock`,
+// `stock_minimum` e `initial_cost` matchean los JSON keys esperados
+// por el backend en createProductReq. En update ignoramos
+// `initial_stock`/`initial_cost` (no están en updateProductReq) en
+// la capa de ProductsPage.
 export interface ProductFormSubmitPayload {
   values: {
     name: string;
     category: string;
     price: number;
-    stock: number;
-    min_stock: number;
-    photo_url?: string;
+    initial_stock: number;
+    stock_minimum: number;
+    initial_cost?: number;
+    image_url?: string;
   };
   addAnother: boolean;
 }
@@ -43,9 +62,12 @@ interface Props {
   onSubmit(payload: ProductFormSubmitPayload): void;
   onCancel(): void;
   serverError?: string | null;
+  productId?: string;
 }
 
 const CUSTOM_VALUE = "__custom";
+const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
+const ALLOWED_EXT = ["jpg", "jpeg", "png", "webp"] as const;
 
 const schema = z.object({
   name: z
@@ -55,7 +77,7 @@ const schema = z.object({
     .max(100, t.form.errors.nameLength),
   price: z.number({ invalid_type_error: t.form.errors.priceInvalid }).positive(t.form.errors.priceInvalid),
   stock: z.number({ invalid_type_error: t.form.errors.stockNegative }).int().min(0, t.form.errors.stockNegative),
-  min_stock: z.number({ invalid_type_error: t.form.errors.minStockNegative }).int().min(0, t.form.errors.minStockNegative),
+  stock_minimum: z.number({ invalid_type_error: t.form.errors.minStockNegative }).int().min(0, t.form.errors.minStockNegative),
   category: z.string().min(1, t.form.errors.categoryRequired),
 });
 
@@ -64,8 +86,9 @@ const emptyValues: ProductFormValues = {
   category: "Bebidas",
   price: "",
   stock: "0",
-  min_stock: "0",
-  photo_url: "",
+  stock_minimum: "0",
+  initial_cost: "",
+  image_url: "",
 };
 
 export function ProductForm({
@@ -76,11 +99,25 @@ export function ProductForm({
   onSubmit,
   onCancel,
   serverError,
+  productId,
 }: Props) {
   const [values, setValues] = useState<ProductFormValues>({ ...emptyValues, ...initial });
   const [error, setError] = useState<string | null>(null);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
   const [addAnother, setAddAnother] = useState(false);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  // hasCamera: detección barata por capability del navegador. Tauri en
+  // Mac/Windows expone getUserMedia igual que un Chromium normal, así
+  // que el botón se muestra. En entornos sin enumerateDevices (raros)
+  // lo escondemos para no ofrecer algo que va a fallar al click.
+  const [hasCamera, setHasCamera] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setHasCamera(false);
+    }
+  }, []);
 
   const allCategories = Array.from(
     new Set([...DEFAULT_CATEGORIES, ...(knownCategories ?? []), values.category].filter(Boolean))
@@ -97,22 +134,40 @@ export function ProductForm({
     setValues((v) => ({ ...v, [key]: val }));
   }
 
-  async function pickPhoto() {
+  // pickPhoto / onFilePicked — mismo patrón que MemberForm: <input
+  // type="file"> nativo + FileReader → data URL. Tauri usa Chromium /
+  // WebKit y soporta el picker igual que web, así que evitamos
+  // divergencia. La data URL queda en values.image_url; el sync agent
+  // del sidecar la detecta (filas con image_url LIKE 'data:%'), sube
+  // los bytes a R2 y reemplaza la columna con un object_key.
+  function pickPhoto() {
     setPhotoErr(null);
-    if (!isTauri()) {
+    fileInputRef.current?.click();
+  }
+
+  function onFilePicked(e: React.ChangeEvent<HTMLInputElement>) {
+    setPhotoErr(null);
+    const file = e.target.files?.[0];
+    // Reset value para que seleccionar el mismo archivo dos veces
+    // dispare onChange.
+    e.target.value = "";
+    if (!file) return;
+    const ext = file.name.split(".").pop()?.toLowerCase() ?? "";
+    if (!(ALLOWED_EXT as readonly string[]).includes(ext)) {
       setPhotoErr(t.form.errors.photoFormat);
       return;
     }
-    try {
-      const selected = await openDialog({
-        multiple: false,
-        filters: [{ name: "Imagen", extensions: ["jpg", "jpeg", "png", "webp"] }],
-      });
-      if (!selected || typeof selected !== "string") return;
-      update("photo_url", selected);
-    } catch {
-      setPhotoErr(t.form.errors.photoFormat);
+    if (file.size > MAX_PHOTO_BYTES) {
+      setPhotoErr(t.form.errors.photoTooBig);
+      return;
     }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result === "string") update("image_url", result);
+    };
+    reader.onerror = () => setPhotoErr(t.form.errors.photoFormat);
+    reader.readAsDataURL(file);
   }
 
   function handleSubmit(e: React.FormEvent) {
@@ -121,13 +176,20 @@ export function ProductForm({
 
     const price = parseFloat(values.price);
     const stock = parseInt(values.stock || "0", 10);
-    const min_stock = parseInt(values.min_stock || "0", 10);
+    const stock_minimum = parseInt(values.stock_minimum || "0", 10);
+    // Costo opcional: vacío → undefined (BE acepta omisión). El
+    // parseFloat de "" da NaN, así que filtramos.
+    const initial_cost_parsed = values.initial_cost ? parseFloat(values.initial_cost) : undefined;
+    const initial_cost =
+      typeof initial_cost_parsed === "number" && !Number.isNaN(initial_cost_parsed) && initial_cost_parsed > 0
+        ? initial_cost_parsed
+        : undefined;
 
     const parsed = schema.safeParse({
       name: values.name,
       price,
       stock,
-      min_stock,
+      stock_minimum,
       category: values.category.trim(),
     });
 
@@ -141,9 +203,12 @@ export function ProductForm({
         name: parsed.data.name,
         category: parsed.data.category,
         price: parsed.data.price,
-        stock: parsed.data.stock,
-        min_stock: parsed.data.min_stock,
-        photo_url: values.photo_url || undefined,
+        // El form expone "stock" pero el backend espera initial_stock
+        // en create (ignorado en update, lo hace /adjust-stock).
+        initial_stock: parsed.data.stock,
+        stock_minimum: parsed.data.stock_minimum,
+        initial_cost,
+        image_url: values.image_url || undefined,
       },
       addAnother: mode === "create" ? addAnother : false,
     });
@@ -167,7 +232,14 @@ export function ProductForm({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      {/* En modo edit, Stock NO es editable desde este form: el backend
+          rechaza cambios de stock en PATCH /products/:id (ADR-002 /
+          DA-24.1 — los ajustes pasan por /adjust-stock para que queden
+          trazados en stock_movements). El operador tiene el botón
+          "Ajustar stock" en la tabla que abre AdjustStockModal con las
+          opciones correctas (llegada, merma, conteo). Mostrar un input
+          aquí sería UX trampa: el cambio se descartaría silenciosamente. */}
+      <div className={mode === "create" ? "grid grid-cols-2 gap-3" : ""}>
         <div className="space-y-2">
           <Label htmlFor="p-price">{t.form.fields.price} *</Label>
           <Input
@@ -180,19 +252,44 @@ export function ProductForm({
             onChange={(e) => update("price", e.target.value)}
           />
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="p-stock">{t.form.fields.stock} *</Label>
-          <Input
-            id="p-stock"
-            type="number"
-            inputMode="numeric"
-            min={0}
-            step={1}
-            value={values.stock}
-            onChange={(e) => update("stock", e.target.value)}
-          />
-        </div>
+        {mode === "create" && (
+          <div className="space-y-2">
+            <Label htmlFor="p-stock">{t.form.fields.stock} *</Label>
+            <Input
+              id="p-stock"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              step={1}
+              value={values.stock}
+              onChange={(e) => update("stock", e.target.value)}
+            />
+          </div>
+        )}
       </div>
+
+      {/* Costo unitario — solo en create. Opcional: si el operador no
+          lo conoce, lo deja vacío y el stock_movement inicial queda
+          sin costo. El que sí lo escribe permite que el reporte de
+          egresos refleje cuánto desembolsó para llenar el inventario
+          de arranque. Llegadas posteriores capturan su costo vía
+          AdjustStockModal (movement_type='restock'). */}
+      {mode === "create" && (
+        <div className="space-y-2">
+          <Label htmlFor="p-cost">{t.form.fields.initialCost}</Label>
+          <Input
+            id="p-cost"
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            placeholder="0.00"
+            value={values.initial_cost}
+            onChange={(e) => update("initial_cost", e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">{t.form.initialCostHint}</p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label htmlFor="p-cat">{t.form.fields.category} *</Label>
@@ -245,28 +342,51 @@ export function ProductForm({
 
       <div className="space-y-2">
         <Label>{t.form.fields.photo}</Label>
-        <div className="flex items-center gap-3">
-          <div className="h-16 w-16 rounded-md border bg-muted flex items-center justify-center overflow-hidden">
-            {values.photo_url ? (
-              <img src={values.photo_url} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <ImageIcon className="h-6 w-6 text-muted-foreground" />
-            )}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative h-16 w-16 rounded-md border bg-muted flex items-center justify-center overflow-hidden">
+            <ImageIcon className="h-6 w-6 text-muted-foreground" />
+            <ProductPhoto
+              productId={productId}
+              imageUrl={values.image_url}
+              className="absolute inset-0 h-full w-full object-cover"
+            />
           </div>
           <Button type="button" variant="outline" size="sm" onClick={pickPhoto}>
+            <Upload className="h-4 w-4 mr-2" />
             {t.form.chooseFile}
           </Button>
-          {values.photo_url && (
+          {hasCamera && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setPhotoErr(null);
+                setCameraOpen(true);
+              }}
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              {t.form.takePhoto}
+            </Button>
+          )}
+          {values.image_url && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => update("photo_url", "")}
+              onClick={() => update("image_url", "")}
             >
               <XIcon className="h-4 w-4" />
               {t.form.removePhoto}
             </Button>
           )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={onFilePicked}
+          />
         </div>
         <p className="text-xs text-muted-foreground">{t.form.photoHint}</p>
         {photoErr && <p className="text-xs text-destructive">{photoErr}</p>}
@@ -280,8 +400,8 @@ export function ProductForm({
           inputMode="numeric"
           min={0}
           step={1}
-          value={values.min_stock}
-          onChange={(e) => update("min_stock", e.target.value)}
+          value={values.stock_minimum}
+          onChange={(e) => update("stock_minimum", e.target.value)}
         />
         <p className="text-xs text-muted-foreground">{t.form.minStockHint}</p>
       </div>
@@ -305,6 +425,14 @@ export function ProductForm({
           {t.form.submit}
         </Button>
       </div>
+
+      <CameraCaptureModal
+        open={cameraOpen}
+        onOpenChange={setCameraOpen}
+        onCapture={(dataUrl) => update("image_url", dataUrl)}
+        title="Capturar foto del producto"
+      />
     </form>
   );
 }
+

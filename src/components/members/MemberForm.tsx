@@ -26,7 +26,7 @@ import { previewExpiry, todayIso } from "@/lib/dates";
 import { getAvatarPalette, getInitials } from "@/lib/avatar";
 import { members as t } from "@/strings/members";
 import { MemberPhoto, useMemberPhotoSrc } from "./MemberPhoto";
-import { CameraCaptureModal } from "./CameraCaptureModal";
+import { CameraCaptureModal } from "@/components/shared/CameraCaptureModal";
 
 export type FormMode = "create" | "edit";
 
@@ -698,6 +698,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
         open={cameraOpen}
         onOpenChange={setCameraOpen}
         onCapture={(dataUrl) => update("photo_url", dataUrl)}
+        title="Capturar foto del socio"
       />
     </form>
   );

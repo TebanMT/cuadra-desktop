@@ -275,9 +275,13 @@ export function useReceiptPdf(paymentID: string | null | undefined) {
   return { ...query, objectUrl };
 }
 
-export function fmtMoney(amount: number): string {
-  const sign = amount < 0 ? "-" : "";
-  const v = Math.abs(amount);
+export function fmtMoney(amount: number | null | undefined): string {
+  // El backend puede mandar `null`/ausente para totales en días sin
+  // actividad (p.ej. caja del día sin movimientos). Sin este guard
+  // `Math.abs(undefined)` → NaN → la UI mostraba "$NaN".
+  const n = typeof amount === "number" && Number.isFinite(amount) ? amount : 0;
+  const sign = n < 0 ? "-" : "";
+  const v = Math.abs(n);
   return `${sign}$${v.toLocaleString("es-MX", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,

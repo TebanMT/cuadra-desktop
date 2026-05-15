@@ -1,15 +1,20 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import {
   Bell,
   ChevronRight,
+  DollarSign,
+  Eye,
+  EyeOff,
   Fingerprint,
+  LogIn as Door,
   LogOut,
   Moon,
-  Search,
   Settings,
+  ShoppingCart,
   Sun,
   User,
+  UserPlus,
 } from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -23,13 +28,20 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useLogout } from "@/hooks/useAuth";
 import { useBiometricStatus } from "@/hooks/useBiometric";
+import { useHotkeys } from "@/hooks/useHotkeys";
 import { useTheme } from "@/hooks/useTheme";
 import { useAttentionRequired } from "@/hooks/useReports";
+import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
+import { countAttentionItems } from "@/lib/attention";
+import { openKioskWindow } from "@/lib/kioskWindow";
+import { QuickPayModal } from "@/components/billing/QuickPayModal";
 import { Badge } from "@/components/ui/badge";
 import { getAvatarPalette, getInitials } from "@/lib/avatar";
+import { cn } from "@/lib/utils";
 import { shell } from "@/strings/shell";
 import { checkin as ct } from "@/strings/checkin";
 import { SyncIndicator } from "./SyncIndicator";
+import { GlobalSearch } from "./GlobalSearch";
 
 const ROUTE_LABELS: Record<string, string> = {
   "": "Dashboard",
@@ -78,20 +90,20 @@ export function TopBar() {
   const bio = useBiometricStatus();
   const { resolved, toggle } = useTheme();
   const attention = useAttentionRequired();
+  const money = useMoneyVisibility();
   const readerDisconnected = bio.data?.available === true && !bio.data?.connected;
 
-  const [searchValue, setSearchValue] = useState("");
+  const [payOpen, setPayOpen] = useState(false);
 
   const initials = getInitials(user?.full_name);
   const palette = getAvatarPalette(user?.full_name);
 
   const breadcrumbs = buildBreadcrumbs(location.pathname);
 
-  const attentionCount =
-    (attention.data?.expiring_soon?.length ?? 0) +
-    (attention.data?.expired_recoverable?.length ?? 0) +
-    (attention.data?.low_stock?.length ?? 0) +
-    (attention.data?.pending_balance?.length ?? 0);
+  // Mismo conteo que usa la página: socios deduplicados por member_id +
+  // productos con stock bajo. Sin dedup la campanita decía "5" cuando la
+  // página mostraba 3 socios (uno con tres issues).
+  const attentionCount = countAttentionItems(attention.data);
 
   // Cmd/Ctrl+K to focus the search
   useEffect(() => {
@@ -106,12 +118,23 @@ export function TopBar() {
     return () => window.removeEventListener("keydown", handler);
   }, []);
 
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    const v = searchValue.trim();
-    if (!v) return;
-    navigate(`/members?q=${encodeURIComponent(v)}`);
-  }
+  // Atajos globales de la toolbar (P/C/V/N). Viven en el TopBar porque
+  // el TopBar se monta una sola vez en DashboardLayout y aquí están los
+  // handlers (modal de pago, abrir kiosko, navegación). Así los atajos
+  // funcionan en todas las rutas — igual que los botones que los
+  // publicitan con el badge en la esquina.
+  const hotkeys = useMemo(
+    () => ({
+      p: () => setPayOpen(true),
+      c: () => {
+        openKioskWindow();
+      },
+      v: () => navigate("/sales"),
+      n: () => navigate("/members/new"),
+    }),
+    [navigate]
+  );
+  useHotkeys(hotkeys);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 border-b border-border bg-background/85 backdrop-blur-sm px-6">
@@ -149,21 +172,66 @@ export function TopBar() {
 
       {/* Right cluster */}
       <div className="flex items-center gap-2">
-        {/* Global search */}
-        <form onSubmit={handleSearchSubmit} className="relative hidden md:block w-72 lg:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-          <input
-            id="global-search"
-            type="search"
-            placeholder="Buscar socio, producto…"
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            className="w-full h-9 rounded-md border border-input bg-background pl-9 pr-14 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 transition-shadow"
+        {/* Quick actions — siempre accesibles desde cualquier pantalla.
+            Icon-only para no robar ancho; tooltip muestra label + kbd. */}
+        <div className="hidden md:flex items-center gap-1 mr-1 pr-2 border-r border-border">
+          <QuickActionButton
+            onClick={() => setPayOpen(true)}
+            icon={DollarSign}
+            label="Cobrar"
+            kbd="P"
+            tone="brand"
           />
-          <kbd className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border border-border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground">
-            ⌘K
-          </kbd>
-        </form>
+          <QuickActionButton
+            onClick={() => openKioskWindow()}
+            icon={Door}
+            label="Abrir kiosko"
+            kbd="C"
+          />
+          <QuickActionButton
+            onClick={() => navigate("/sales")}
+            icon={ShoppingCart}
+            label="Venta rápida"
+            kbd="V"
+          />
+          <QuickActionButton
+            onClick={() => navigate("/members/new")}
+            icon={UserPlus}
+            label="Nuevo socio"
+            kbd="N"
+          />
+        </div>
+
+        {/* Global search — combobox con dropdown live (socios + productos).
+            Mantiene id="global-search" para que Cmd/Ctrl+K siga enfocando. */}
+        <GlobalSearch />
+
+        {/* Money visibility toggle — global, persistido. Mismo estado para
+            dashboard, /reports, /cash-close, /billing, etc. Cuando está
+            "oculto" pintamos el icono en brick + un punto indicador para
+            que el operador note que está activo (antes pasaba inadvertido
+            en muted gris y la gente olvidaba que tenía los montos
+            escondidos). */}
+        <button
+          type="button"
+          onClick={money.toggle}
+          aria-label={money.hidden ? "Mostrar montos" : "Ocultar montos"}
+          title={money.hidden ? "Mostrar montos" : "Ocultar montos"}
+          className={cn(
+            "relative inline-flex items-center justify-center h-9 w-9 rounded-md transition-colors",
+            money.hidden
+              ? "bg-brick-100 text-brick-500 hover:bg-brick-200 dark:bg-brick-500/20 dark:text-brick-300"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          )}
+        >
+          {money.hidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          {money.hidden && (
+            <span
+              aria-hidden="true"
+              className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-brick-500"
+            />
+          )}
+        </button>
 
         {/* Sync indicator (compact) */}
         <SyncIndicator />
@@ -237,6 +305,51 @@ export function TopBar() {
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <QuickPayModal open={payOpen} onOpenChange={setPayOpen} />
     </header>
+  );
+}
+
+// QuickActionButton — botón cuadrado icon-only para la toolbar global del
+// TopBar. La kbd se publicita con un mini-badge en la esquina inferior
+// derecha (no duplica el ancho del botón) y se mantiene en title +
+// aria-label como fallback para screen readers. El "tone='brand'" se
+// usa para la acción primaria de cobrar — la más frecuente y la que el
+// operador quiere encontrar primero.
+function QuickActionButton({
+  onClick,
+  icon: Icon,
+  label,
+  kbd,
+  tone = "neutral",
+}: {
+  onClick: () => void;
+  icon: typeof DollarSign;
+  label: string;
+  kbd: string;
+  tone?: "neutral" | "brand";
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={`${label} (${kbd})`}
+      className={cn(
+        "relative inline-flex items-center justify-center h-9 w-9 rounded-md transition-colors",
+        tone === "brand"
+          ? "bg-brick-100 text-brick-500 hover:bg-brick-200 dark:bg-brick-500/20 dark:text-brick-300"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+      )}
+    >
+      <Icon className="h-4 w-4" strokeWidth={2.25} />
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute bottom-0.5 right-1 font-mono text-[9px] font-semibold leading-none tracking-tight opacity-60"
+      >
+        {kbd}
+      </span>
+    </button>
   );
 }

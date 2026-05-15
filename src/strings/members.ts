@@ -79,9 +79,28 @@ export const members = {
       notes: "Notas",
       paymentsEmpty: "Aún no hay pagos registrados.",
       attendanceEmpty: "Aún no hay asistencias registradas.",
+      attendanceLoading: "Cargando asistencias…",
+      attendanceError: "No pudimos cargar las asistencias.",
+      attendanceOverride: "Permitido por operador",
+      attendanceOperator: (name: string) => `Operador: ${name}`,
+      attendanceMethod: {
+        fingerprint: "Huella",
+        pin: "PIN",
+        manual: "Manual",
+      },
+      attendanceResult: {
+        allowed_active: "Acceso permitido",
+        allowed_expiring_soon: "Acceso permitido — por vencer",
+        allowed_override: "Acceso permitido por operador",
+        denied_expired: "Acceso denegado — membresía vencida",
+        denied_inactive: "Acceso denegado — socio inactivo",
+        denied_no_membership: "Acceso denegado — sin membresía",
+        denied_unpaid_enrollment: "Acceso denegado — inscripción pendiente",
+      } as Record<string, string>,
       notesEmpty: "Sin notas.",
     },
     actions: {
+      checkin: "Check-in",
       edit: "Editar",
       markInactive: "Marcar inactivo",
       markActive: "Reactivar",
@@ -139,21 +158,6 @@ export const members = {
     chooseFile: "Subir archivo",
     takePhoto: "Tomar foto",
     removePhoto: "Quitar foto",
-    camera: {
-      title: "Capturar foto del socio",
-      hint: "Cuando estés listo, presiona Capturar.",
-      capture: "Capturar",
-      retake: "Volver a tomar",
-      use: "Usar esta foto",
-      cancel: "Cancelar",
-      starting: "Iniciando cámara…",
-      errors: {
-        notFound: "No se detectó cámara conectada.",
-        denied:
-          "Tinta no tiene permiso para usar la cámara. Abre Ajustes del Sistema → Privacidad → Cámara.",
-        generic: "No pudimos abrir la cámara. Vuelve a intentar.",
-      },
-    },
     // Inverso al botón "+ Agregar X" — esconde la sección y limpia el
     // valor. Misma copia para email/birthdate/notes para mantener
     // consistencia.

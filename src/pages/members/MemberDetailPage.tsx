@@ -1,9 +1,12 @@
-import { useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { format, parseISO } from "date-fns";
+import { es } from "date-fns/locale";
 import {
   ArrowLeft,
   Loader2,
+  LogIn,
   Mail,
   Phone,
   Pencil,
@@ -15,6 +18,10 @@ import {
   Wallet,
   Fingerprint,
   Copy,
+  CheckCircle2,
+  XCircle,
+  ShieldCheck,
+  Search as SearchIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +33,14 @@ import { useHotkeys } from "@/hooks/useHotkeys";
 import { useBiometricStatus } from "@/hooks/useBiometric";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { usePaymentHistory, fmtMoney } from "@/hooks/useBilling";
+import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
+import {
+  checkinErrorMessage,
+  useCheckinManual,
+  useMemberCheckins,
+  type CheckinEvent,
+} from "@/hooks/useCheckin";
+import { eventToFeedback, feedbackTone } from "@/components/checkin/CheckinFeedback";
 import { fmtDate, daysFromToday } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { members as t } from "@/strings/members";
@@ -52,7 +67,9 @@ import { PaymentHistory } from "@/components/billing/PaymentHistory";
 export default function MemberDetailPage() {
   const navigate = useNavigate();
   const { id: memberId = null } = useParams<{ id: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const detail = useMember(memberId);
+  const money = useMoneyVisibility();
   const role = useAuthStore((s) => s.user?.role);
   const history = usePaymentHistory(memberId, {});
 
@@ -77,8 +94,62 @@ export default function MemberDetailPage() {
   }, [history.data]);
   const totalPending = history.data?.total_pending ?? 0;
 
+  const checkinManual = useCheckinManual();
+
+  // Soporte ?action=pay para que las CTAs de "Atención requerida" (vencer,
+  // saldos pendientes) lancen directo al modal de cobro al aterrizar en
+  // el detalle. Cuando se abre, consumimos el param para que un refresh
+  // no re-dispare el modal y para que el URL quede limpio.
+  useEffect(() => {
+    if (searchParams.get("action") === "pay" && detail.data && !payOpen) {
+      setPayOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("action");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, detail.data, payOpen, setSearchParams]);
+
+  // Dispara un check-in manual del socio actual y muestra un toast con el
+  // resultado. La feedback usa el mismo mapping que la pantalla de Check-in
+  // para que el copy se mantenga uniforme entre superficies.
+  const handleCheckin = useCallback(async () => {
+    if (!member || checkinManual.isPending) return;
+    try {
+      const ev = await checkinManual.mutateAsync({ member_id: member.id });
+      const fb = eventToFeedback(ev);
+      const detail = (() => {
+        const days = ev.days_until_expiry ?? 0;
+        switch (fb.kind) {
+          case "success_active":
+            return ct.feedback.successActive(days);
+          case "success_expiring_soon":
+            return ct.feedback.successExpiringSoon(Math.max(0, days));
+          case "denied_expired":
+            return ct.feedback.deniedExpired(Math.abs(days));
+          case "denied_inactive":
+            return ct.feedback.deniedInactive;
+          case "denied_no_membership":
+            return ct.feedback.deniedNoMembership;
+          default:
+            return ct.feedback.deniedNotFound;
+        }
+      })();
+      const tone = feedbackTone(fb.kind);
+      const title = `${member.full_name}`;
+      if (tone === "success") toast.success(title, { description: detail });
+      else if (tone === "warning") toast.warning(title, { description: detail });
+      else toast.error(title, { description: detail });
+    } catch (err) {
+      const msg = checkinErrorMessage(err, ct.feedback.deniedNotFound);
+      toast.error(member.full_name, { description: msg });
+    }
+  }, [member, checkinManual]);
+
   // Hotkeys: las desactivamos mientras algún sub-modal está abierto
   // para no interceptar teclas dentro de los inputs del modal.
+  const anyModalOpen =
+    editOpen || statusOpen || lockOpen || pinOpen || payOpen || settleOpen || fpOpen;
+
   const hotkeyHandlers = useMemo(
     () => ({
       e: () => {
@@ -87,18 +158,16 @@ export default function MemberDetailPage() {
       p: () => {
         if (member) setPayOpen(true);
       },
+      c: () => {
+        handleCheckin();
+      },
       Escape: () => {
-        if (!editOpen && !statusOpen && !lockOpen && !pinOpen && !payOpen && !settleOpen && !fpOpen) {
-          navigate("/members");
-        }
+        navigate("/members");
       },
     }),
-    [member, editOpen, statusOpen, lockOpen, pinOpen, payOpen, settleOpen, fpOpen, navigate]
+    [member, navigate, handleCheckin]
   );
-  useHotkeys(
-    hotkeyHandlers,
-    !editOpen && !statusOpen && !lockOpen && !pinOpen && !payOpen && !settleOpen && !fpOpen
-  );
+  useHotkeys(hotkeyHandlers, !anyModalOpen);
 
   const expiryDays =
     membership && membership.expiry_date ? daysFromToday(membership.expiry_date) : null;
@@ -177,6 +246,18 @@ export default function MemberDetailPage() {
             </div>
           </div>
           <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="default"
+              onClick={handleCheckin}
+              disabled={checkinManual.isPending}
+            >
+              {checkinManual.isPending ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <LogIn className="h-4 w-4 mr-2" />
+              )}
+              {t.detail.actions.checkin}
+            </Button>
             <Button variant="outline" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4 mr-2" />
               {t.detail.actions.edit}
@@ -291,7 +372,7 @@ export default function MemberDetailPage() {
           >
             <span className="flex items-center gap-2">
               <Wallet className="h-4 w-4" />
-              {bt.detailFlag.pending(fmtMoney(totalPending))}
+              {bt.detailFlag.pending(money.fmt(totalPending))}
             </span>
             <span className="text-xs underline">{bt.detailFlag.pendingTitle}</span>
           </button>
@@ -307,11 +388,8 @@ export default function MemberDetailPage() {
           <TabsContent value="payments" className="py-3">
             <PaymentHistory memberId={member.id} memberName={member.full_name} />
           </TabsContent>
-          <TabsContent
-            value="attendance"
-            className="text-sm text-muted-foreground py-6 text-center"
-          >
-            {t.detail.tabs.attendanceEmpty}
+          <TabsContent value="attendance" className="py-3">
+            <AttendanceHistory memberId={member.id} />
           </TabsContent>
           <TabsContent value="notes" className="text-sm py-3">
             {member.notes ? (
@@ -450,5 +528,98 @@ function PinInline({ pin, onChange }: { pin?: string; onChange(): void }) {
         {t.pin.triggerChange}
       </button>
     </span>
+  );
+}
+
+function AttendanceHistory({ memberId }: { memberId: string }) {
+  const q = useMemberCheckins(memberId);
+
+  if (q.isLoading) {
+    return (
+      <div className="flex items-center justify-center py-6 text-sm text-muted-foreground gap-2">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span>{t.detail.tabs.attendanceLoading}</span>
+      </div>
+    );
+  }
+  if (q.error) {
+    return (
+      <p className="py-6 text-center text-sm text-destructive">
+        {t.detail.tabs.attendanceError}
+      </p>
+    );
+  }
+  const items = q.data?.items ?? [];
+  if (items.length === 0) {
+    return (
+      <p className="py-6 text-center text-sm text-muted-foreground">
+        {t.detail.tabs.attendanceEmpty}
+      </p>
+    );
+  }
+  return (
+    <ul className="divide-y divide-border">
+      {items.map((ev) => (
+        <AttendanceRow key={ev.id} ev={ev} />
+      ))}
+    </ul>
+  );
+}
+
+function AttendanceRow({ ev }: { ev: CheckinEvent }) {
+  const allowed =
+    ev.result === "allowed_active" ||
+    ev.result === "allowed_expiring_soon" ||
+    ev.manual_override;
+  // Override mantiene la prioridad visual ("entró por decisión del
+  // operador") aunque el evaluador original haya denegado.
+  const Icon = ev.manual_override ? ShieldCheck : allowed ? CheckCircle2 : XCircle;
+  const iconClass = ev.manual_override
+    ? "text-warning"
+    : allowed
+    ? "text-success"
+    : "text-destructive";
+  const methodLabel =
+    ev.method === "fingerprint"
+      ? t.detail.tabs.attendanceMethod.fingerprint
+      : ev.method === "pin"
+      ? t.detail.tabs.attendanceMethod.pin
+      : t.detail.tabs.attendanceMethod.manual;
+  const MethodIcon =
+    ev.method === "fingerprint" ? Fingerprint : ev.method === "pin" ? KeyRound : SearchIcon;
+  const when = parseISO(ev.created_at);
+  return (
+    <li className="flex items-center gap-3 py-3">
+      <Icon className={cn("h-5 w-5 shrink-0", iconClass)} strokeWidth={2.25} />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-foreground">
+          {t.detail.tabs.attendanceResult[ev.result] ?? ev.result}
+          {ev.manual_override && (
+            <span className="ml-2 text-xs font-medium text-warning">
+              {t.detail.tabs.attendanceOverride}
+            </span>
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+          <MethodIcon className="h-3 w-3" />
+          <span>{methodLabel}</span>
+          {ev.operator_name && (
+            <>
+              <span className="opacity-50">·</span>
+              <span>{t.detail.tabs.attendanceOperator(ev.operator_name)}</span>
+            </>
+          )}
+        </div>
+        {ev.override_reason && (
+          <div className="text-xs text-muted-foreground mt-0.5 italic">
+            “{ev.override_reason}”
+          </div>
+        )}
+      </div>
+      <div className="text-right text-xs text-muted-foreground shrink-0 tabular-nums">
+        <div>{format(when, "d MMM", { locale: es })}</div>
+        <div className="font-medium text-foreground">{format(when, "HH:mm")}</div>
+      </div>
+    </li>
   );
 }

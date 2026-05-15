@@ -24,6 +24,8 @@ export const dashboard = {
   kpis: {
     activeMembers: "Socios activos",
     incomeMonth: "Ingresos del mes",
+    expensesMonth: "Egresos del mes",
+    expensesHint: "Mercancía + otros",
     expiringWeek: "Vencen esta semana",
     recoverable: "Por recuperar",
     vsLastPeriod: "vs período anterior",
@@ -64,5 +66,26 @@ export const dashboard = {
     title: "Caja del día",
     seeFullClose: "Ver caja del día",
     seeExpiring: "Ver socios por vencer",
+  },
+  quickActions: {
+    sectionLabel: "Acciones rápidas",
+    pay: "Cobrar",
+    checkin: "Check-in",
+    sale: "Venta rápida",
+    newMember: "Nuevo socio",
+  },
+  privacy: {
+    showAmounts: "Mostrar montos",
+    hideAmounts: "Ocultar montos",
+    masked: "$•••",
+  },
+  kioskCard: {
+    title: "¿Listo para abrir?",
+    body:
+      "Pon el modo kiosko en la pantalla de entrada para que tus socios hagan check-in solos. Tú sigues cobrando en esta ventana.",
+    cta: "Abrir modo kiosko",
+    shortcutHint: "También desde cualquier pantalla:",
+    shortcut: "Ctrl + Alt + K",
+    dismiss: "Ocultar",
   },
 };

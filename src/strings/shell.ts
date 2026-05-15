@@ -6,6 +6,7 @@ export const shell = {
     billing: "Cobros",
     sales: "Venta rápida",
     products: "Productos",
+    expenses: "Gastos",
     membershipTypes: "Tipos de membresía",
     checkin: "Check-in",
     challenges: "Retos",
@@ -34,6 +35,9 @@ export const shell = {
     syncing: "Sincronizando…",
     offline: "Sin internet, todo guardado en esta laptop.",
     error: "Hay un problema sincronizando.",
+    authInvalid: "Vuelve a iniciar sesión para sincronizar.",
+    authInvalidHint:
+      "La credencial de esta laptop expiró. Tus cambios siguen guardados; vuelve a iniciar sesión para reanudar el sync.",
     detailsTitle: "Estado de sincronización",
     lastSync: "Último sync exitoso",
     pending: "Cambios pendientes",
@@ -41,5 +45,6 @@ export const shell = {
     never: "Nunca",
     none: "Ninguno",
     triggerNow: "Sincronizar ahora",
+    relogin: "Iniciar sesión",
   },
 };

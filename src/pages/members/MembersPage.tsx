@@ -32,6 +32,7 @@ import {
   type SortDir,
 } from "@/hooks/useMembers";
 import { useMembershipTypes } from "@/hooks/useMembershipTypes";
+import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useDebounce } from "@/hooks/useDebounce";
 import { daysFromToday } from "@/lib/dates";
 import { members as t } from "@/strings/members";
@@ -432,6 +433,7 @@ function MemberRow({ item, onClick }: MemberRowProps) {
   const m = item.member;
   const ms = item.current_membership;
   const status = statusInfo(item);
+  const money = useMoneyVisibility();
   const showPay =
     item.access_status === "denied_expired" ||
     item.access_status === "denied_unpaid_enrollment" ||
@@ -477,7 +479,7 @@ function MemberRow({ item, onClick }: MemberRowProps) {
         )}
         {ms && (
           <div className="text-xs text-muted-foreground mt-0.5 tabular">
-            {fmtMoney(ms.price)}
+            {money.mask(fmtMoney(ms.price))}
           </div>
         )}
       </DataTableCell>

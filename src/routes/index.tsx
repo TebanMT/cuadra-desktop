@@ -24,6 +24,7 @@ import WhatsAppSetupPage from "@/pages/settings/WhatsAppSetupPage";
 import TemplatesPage from "@/pages/settings/TemplatesPage";
 import AlertsPage from "@/pages/settings/AlertsPage";
 import ProductsPage from "@/pages/products/ProductsPage";
+import ExpensesPage from "@/pages/expenses/ExpensesPage";
 import QuickSalePage from "@/pages/sales/QuickSalePage";
 import CashClosePage from "@/pages/reports/CashClosePage";
 import ReportsPage from "@/pages/reports/ReportsPage";
@@ -78,6 +79,7 @@ export const router = createBrowserRouter([
           { path: "profile", element: <ProfilePage /> },
           { path: "billing", element: <CobrosPage /> },
           { path: "products", element: <ProductsPage /> },
+          { path: "expenses", element: <ExpensesPage /> },
           { path: "sales", element: <QuickSalePage /> },
           { path: "checkin", element: <CheckinPage /> },
           { path: "reports", element: <ReportsPage /> },

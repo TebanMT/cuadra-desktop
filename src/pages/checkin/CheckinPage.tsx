@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Loader2, Maximize2, Fingerprint, KeyRound, Search as SearchIcon } from "lucide-react";
+import { Maximize2, Fingerprint, KeyRound, Search as SearchIcon } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,8 @@ import {
 import { useBiometricStatus } from "@/hooks/useBiometric";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
+import { openKioskWindow } from "@/lib/kioskWindow";
+import { useKioskWindowOpen } from "@/hooks/useKioskWindow";
 import { checkin as t } from "@/strings/checkin";
 
 type Method = "fingerprint" | "pin" | "manual";
@@ -28,8 +29,8 @@ type Method = "fingerprint" | "pin" | "manual";
 const AUTOFADE_MS = 5000;
 
 export default function CheckinPage() {
-  const navigate = useNavigate();
   const operator = useAuthStore((s) => s.user);
+  const kioskOpen = useKioskWindowOpen();
   const bio = useBiometricStatus();
   const methods = useCheckinMethods();
   const recents = useRecentCheckins();
@@ -171,9 +172,9 @@ export default function CheckinPage() {
             {format(now, "EEEE d MMM · HH:mm", { locale: es })}
           </span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => navigate("/kiosk")} className="rounded-md">
+        <Button variant="outline" size="sm" onClick={() => openKioskWindow()} className="rounded-md">
           <Maximize2 className="h-4 w-4" />
-          {t.page.openKiosk}
+          {kioskOpen ? t.page.goToKiosk : t.page.openKiosk}
         </Button>
       </header>
 

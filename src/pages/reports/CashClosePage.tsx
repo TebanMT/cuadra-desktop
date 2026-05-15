@@ -14,6 +14,7 @@ import {
   type CashCloseReport,
 } from "@/hooks/useCashClose";
 import { fmtMoney, type PaymentConcept, type PaymentMethod } from "@/hooks/useBilling";
+import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { ApiError } from "@/lib/api";
 import { fmtDate, fmtIso, parseDate, todayIso } from "@/lib/dates";
 import { cashClose as t } from "@/strings/cashClose";
@@ -107,8 +108,23 @@ function ReportView({
   canClose: boolean;
 }) {
   const [closeOpen, setCloseOpen] = useState(false);
+  const money = useMoneyVisibility();
 
-  const empty = report.total === 0 && (report.refunds_total ?? 0) === 0;
+  const totalGross = report.total ?? 0;
+  const refundsTotal = report.refunds_total ?? 0;
+  const expensesTotal = report.expenses_total ?? 0;
+  const netTotal = report.net_total ?? totalGross - refundsTotal - expensesTotal;
+  const empty =
+    totalGross === 0 && refundsTotal === 0 && expensesTotal === 0;
+
+  // Efectivo que debería quedar en el cajón al cerrar: cash entrante del
+  // día menos gastos pagados en efectivo. Refunds en cash ya están fuera
+  // del by_method (el BE las excluye), pero los gastos sí salen físicamente
+  // del cajón, así que los restamos acá también para que la "calculated
+  // cash" del modal coincida con lo que el BE persistirá.
+  const cashIncome = report.by_method?.cash ?? 0;
+  const cashExpenses = report.expenses_by_method?.cash ?? 0;
+  const calculatedCash = cashIncome - cashExpenses;
 
   return (
     <div className="space-y-6">
@@ -120,12 +136,12 @@ function ReportView({
           {METHOD_KEYS.map((m) => (
             <div key={m} className="flex items-baseline justify-between text-base">
               <span>{t.page.methods[m]}</span>
-              <span className="tabular-nums font-medium">{fmtMoney(report.by_method?.[m] ?? 0)}</span>
+              <span className="tabular-nums font-medium">{money.fmt(report.by_method?.[m] ?? 0)}</span>
             </div>
           ))}
           <div className="flex items-baseline justify-between border-t pt-2 text-lg">
             <span className="font-semibold">{t.page.total}</span>
-            <span className="tabular-nums font-bold">{fmtMoney(report.total)}</span>
+            <span className="tabular-nums font-bold">{money.fmt(totalGross)}</span>
           </div>
         </div>
       </section>
@@ -148,17 +164,62 @@ function ReportView({
                       : t.page.counts.payments(entry.count)})
                   </span>
                 </span>
-                <span className="tabular-nums font-medium">{fmtMoney(entry.total)}</span>
+                <span className="tabular-nums font-medium">{money.fmt(entry.total)}</span>
               </div>
             );
           })}
-          {(report.refunds_total ?? 0) > 0 && (
+          {refundsTotal > 0 && (
             <div className="flex items-baseline justify-between border-t pt-2 text-base text-destructive">
               <span>{t.page.sections.refunds}</span>
-              <span className="tabular-nums">−{fmtMoney(report.refunds_total)}</span>
+              <span className="tabular-nums">−{money.fmt(refundsTotal)}</span>
             </div>
           )}
         </div>
+      </section>
+
+      {/* Gastos del día — la fila que faltaba. Ingresos + devoluciones
+          no le decían nada al dueño si no veía qué salió. */}
+      <section className="rounded-lg border bg-background p-6 space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {t.page.sections.expenses}
+        </h2>
+        {(report.expenses ?? []).length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {t.page.sections.expensesEmpty}
+          </p>
+        ) : (
+          <>
+            <ul className="space-y-2">
+              {report.expenses.map((e) => (
+                <li key={e.id} className="flex items-baseline justify-between text-sm">
+                  <div className="min-w-0">
+                    <span className="font-medium text-foreground">
+                      {t.page.expenseCategories[e.category] ?? e.category}
+                    </span>
+                    {e.description && (
+                      <span className="text-muted-foreground ml-2 truncate">
+                        — {e.description}
+                      </span>
+                    )}
+                    <span className="text-xs text-muted-foreground ml-2">
+                      ({t.page.methods[e.payment_method as PaymentMethod] ??
+                        e.payment_method})
+                    </span>
+                  </div>
+                  <span className="tabular-nums font-medium text-destructive">
+                    −{money.fmt(e.amount)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-baseline justify-between border-t pt-2 text-base">
+              <span className="font-semibold">{t.page.total}</span>
+              <span className="tabular-nums font-bold text-destructive">
+                −{money.fmt(expensesTotal)}
+              </span>
+            </div>
+          </>
+        )}
       </section>
 
       {(report.operators ?? []).length > 0 && (
@@ -170,17 +231,54 @@ function ReportView({
             {report.operators.map((op) => (
               <li key={op.operator_id} className="flex items-baseline justify-between text-sm">
                 <div>
-                  <span className="font-medium">{op.operator_name}</span>
+                  <span className="font-medium">{op.operator_name || "—"}</span>
                   <span className="text-muted-foreground ml-2">
                     ({t.page.counts.mix(op.payments_count, op.sales_count)})
                   </span>
                 </div>
-                <span className="tabular-nums font-medium">{fmtMoney(op.total)}</span>
+                <span className="tabular-nums font-medium">{money.fmt(op.total)}</span>
               </li>
             ))}
           </ul>
         </section>
       )}
+
+      {/* Resumen del día — la línea que el dueño realmente quiere ver:
+          "qué entró − qué salió = lo que se ganó hoy". */}
+      <section className="rounded-lg border bg-muted/40 p-6 space-y-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          {t.page.sections.summary}
+        </h2>
+        <div className="space-y-1.5 text-sm">
+          <div className="flex items-baseline justify-between">
+            <span>{t.page.summary.income}</span>
+            <span className="tabular-nums">{money.fmt(totalGross)}</span>
+          </div>
+          {refundsTotal > 0 && (
+            <div className="flex items-baseline justify-between text-destructive">
+              <span>− {t.page.summary.refunds}</span>
+              <span className="tabular-nums">−{money.fmt(refundsTotal)}</span>
+            </div>
+          )}
+          {expensesTotal > 0 && (
+            <div className="flex items-baseline justify-between text-destructive">
+              <span>− {t.page.summary.expenses}</span>
+              <span className="tabular-nums">−{money.fmt(expensesTotal)}</span>
+            </div>
+          )}
+          <div className="flex items-baseline justify-between border-t pt-2 text-lg">
+            <span className="font-semibold">{t.page.summary.net}</span>
+            <span
+              className={
+                "tabular-nums font-bold " +
+                (netTotal >= 0 ? "text-foreground" : "text-destructive")
+              }
+            >
+              {money.fmt(netTotal)}
+            </span>
+          </div>
+        </div>
+      </section>
 
       {empty && (
         <p className="text-center text-muted-foreground py-6">{t.page.empty}</p>
@@ -193,7 +291,7 @@ function ReportView({
             {Math.abs(report.closed.diff) > 0 && (
               <span className="ml-2">
                 {t.page.diffLabel(
-                  fmtMoney(Math.abs(report.closed.diff)),
+                  money.fmt(Math.abs(report.closed.diff)),
                   report.closed.diff >= 0 ? "+" : "−"
                 )}
               </span>
@@ -223,7 +321,7 @@ function ReportView({
         open={closeOpen}
         onOpenChange={setCloseOpen}
         date={date}
-        calculatedCash={report.by_method?.cash ?? 0}
+        calculatedCash={calculatedCash}
       />
     </div>
   );

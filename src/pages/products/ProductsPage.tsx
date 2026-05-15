@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
   Loader2,
   Plus,
   Search,
-  Pencil,
   BadgeMinus,
   BadgePlus,
   Package,
   PackageOpen,
   PackagePlus,
   PackageX,
+  X as XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -51,13 +55,16 @@ import {
   useUpdateProduct,
   type ListProductsInput,
   type Product,
+  type ProductSortColumn,
   type ProductStatusFilter,
-  type UpsertProductInput,
+  type SortDirection,
 } from "@/hooks/useProducts";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { ApiError } from "@/lib/api";
 import { cn, formatMoney } from "@/lib/utils";
 import { ProductForm, type ProductFormSubmitPayload } from "@/components/products/ProductForm";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
 import { AdjustStockModal } from "@/components/products/AdjustStockModal";
 import { products as t } from "@/strings/products";
 import { common } from "@/strings/common";
@@ -82,28 +89,122 @@ function stockColorClass(p: Product) {
   return "text-muted-foreground";
 }
 
+// SortableHeader — column header clickeable que dispara toggleSort.
+// Renderea un indicador visual (↑/↓ cuando es la columna activa, ↕
+// neutro para las inactivas) y queda accesible por teclado (es un
+// <button> nativo, soporta Tab + Enter).
+function SortableHeader({
+  label,
+  column,
+  sortBy,
+  sortDir,
+  onClick,
+  align = "left",
+}: {
+  label: string;
+  column: ProductSortColumn;
+  sortBy: ProductSortColumn;
+  sortDir: SortDirection;
+  onClick: (col: ProductSortColumn) => void;
+  align?: "left" | "right";
+}) {
+  const active = sortBy === column;
+  const Icon = active ? (sortDir === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+  return (
+    <DataTableTh className={cn(align === "right" && "text-right")}>
+      <button
+        type="button"
+        onClick={() => onClick(column)}
+        className={cn(
+          "inline-flex items-center gap-1 hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 rounded",
+          align === "right" && "ml-auto",
+          active ? "text-foreground" : "text-muted-foreground"
+        )}
+        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+        aria-label={`Ordenar por ${label}${
+          active ? `, actualmente ${sortDir === "asc" ? "ascendente" : "descendente"}` : ""
+        }`}
+      >
+        <span>{label}</span>
+        <Icon className={cn("h-3.5 w-3.5", active ? "opacity-100" : "opacity-50")} />
+      </button>
+    </DataTableTh>
+  );
+}
+
 export default function ProductsPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [category, setCategory] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>("active");
-  const [lowStockOnly, setLowStockOnly] = useState(false);
+  // Hidrata el filtro inicial desde el query param (?low_stock=1) — el KPI
+  // "Stock crítico" del reporte navega aquí con ese flag, y queremos que el
+  // filtro arranque ya aplicado.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [lowStockOnly, setLowStockOnly] = useState(
+    () => searchParams.get("low_stock") === "1",
+  );
   const [page, setPage] = useState(1);
+  // Sort: persist en estado local. Default name asc — coincide con el
+  // default del backend si lo omitimos, pero lo mando explícito para
+  // que el header de la tabla pueda reflejar la dirección activa.
+  const [sortBy, setSortBy] = useState<ProductSortColumn>("name");
+  const [sortDir, setSortDir] = useState<SortDirection>("asc");
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
   const [adjusting, setAdjusting] = useState<Product | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<Product | null>(null);
+  const money = useMoneyVisibility();
 
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, category, statusFilter, lowStockOnly]);
+  }, [debouncedSearch, category, statusFilter, lowStockOnly, sortBy, sortDir]);
+
+  // Mantén el URL sincronizado con el toggle — si el operador apaga el
+  // filtro al llegar desde el drill-down, removemos el query param para
+  // que un refresh no vuelva a forzarlo.
+  useEffect(() => {
+    const next = new URLSearchParams(searchParams);
+    if (lowStockOnly) {
+      next.set("low_stock", "1");
+    } else {
+      next.delete("low_stock");
+    }
+    const cur = searchParams.toString();
+    const after = next.toString();
+    if (cur !== after) {
+      setSearchParams(next, { replace: true });
+    }
+  }, [lowStockOnly, searchParams, setSearchParams]);
+
+  // toggleSort: click en column header. Si la columna ya es la activa,
+  // invierte dirección; si no, la convierte en activa y arranca asc.
+  // Convención típica de data tables.
+  const toggleSort = (col: ProductSortColumn) => {
+    if (sortBy === col) {
+      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(col);
+      setSortDir("asc");
+    }
+  };
+
+  const hasActiveFilters = !!(debouncedSearch || category || lowStockOnly || statusFilter !== "active");
+  const clearAllFilters = () => {
+    setSearch("");
+    setCategory("");
+    setStatusFilter("active");
+    setLowStockOnly(false);
+  };
 
   const filters: ListProductsInput = {
     q: debouncedSearch || undefined,
     category: category || undefined,
     status: statusFilter,
     low_stock: lowStockOnly || undefined,
+    sort: sortBy,
+    dir: sortDir,
     page,
     page_size: PAGE_SIZE,
   };
@@ -119,11 +220,10 @@ export default function ProductsPage() {
     return Array.from(set);
   }, [items]);
 
-  const lowCount = items.filter((p) => p.active && stockLevel(p) === "low").length;
-  const outCount = items.filter((p) => p.active && stockLevel(p) === "out").length;
-  const totalValue = items
-    .filter((p) => p.active)
-    .reduce((acc, p) => acc + p.price * p.stock, 0);
+  // Stats globales del backend (filtro completo, no la página). El BE
+  // calcula low/out/total_value con SUM(CASE WHEN ...) sobre el set
+  // filtrado — antes los counters reflejaban solo la página visible.
+  const totals = list.data?.totals ?? { total_value: 0, low_count: 0, out_count: 0 };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -142,32 +242,33 @@ export default function ProductsPage() {
         }
       />
 
-      {/* Stats */}
+      {/* Stats — calculadas en backend sobre el filtro completo, no la
+          página visible. Los hints aclaran que cuentan todo el filtro. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Productos"
-          value={total || items.length}
+          value={total}
           icon={Package}
           tone="neutral"
-          hint="catálogo activo"
+          hint={hasActiveFilters ? "en el filtro" : "en el catálogo"}
         />
         <StatCard
           title="Stock bajo"
-          value={lowCount}
+          value={totals.low_count}
           icon={PackageOpen}
-          tone={lowCount > 0 ? "warning" : "neutral"}
+          tone={totals.low_count > 0 ? "warning" : "neutral"}
           hint="por debajo del mínimo"
         />
         <StatCard
           title="Agotados"
-          value={outCount}
+          value={totals.out_count}
           icon={PackageX}
-          tone={outCount > 0 ? "danger" : "neutral"}
+          tone={totals.out_count > 0 ? "danger" : "neutral"}
           hint="sin existencias"
         />
         <StatCard
           title="Valor de stock"
-          value={formatMoney(totalValue)}
+          value={money.fmt(totals.total_value)}
           icon={PackagePlus}
           tone="success"
           hint="precio venta × existencias"
@@ -177,14 +278,28 @@ export default function ProductsPage() {
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
         <div className="flex-1 min-w-[280px] max-w-md relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.page.searchPlaceholder}
-            className="pl-9 h-10"
+            className="pl-9 pr-9 h-10"
             aria-label={t.page.searchPlaceholder}
           />
+          {/* Botón limpiar búsqueda — aparece solo cuando hay texto.
+              Patrón estándar de search inputs (Gmail, GitHub, etc); evita
+              al operador tener que seleccionar todo + borrar. */}
+          {search && (
+            <button
+              type="button"
+              onClick={() => setSearch("")}
+              className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              aria-label="Limpiar búsqueda"
+              title="Limpiar búsqueda"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          )}
         </div>
 
         <Select value={category || "_all"} onValueChange={(v) => setCategory(v === "_all" ? "" : v)}>
@@ -232,53 +347,148 @@ export default function ProductsPage() {
         ) : items.length === 0 ? (
           <EmptyState
             icon={<Package className="h-5 w-5" />}
-            title={debouncedSearch || category || lowStockOnly ? t.page.noResults : t.page.empty}
+            title={hasActiveFilters ? t.page.noResults : t.page.empty}
             hint={
-              !debouncedSearch && !category && !lowStockOnly
-                ? "Empieza agregando tu primer producto."
-                : undefined
+              hasActiveFilters
+                ? "Prueba con otros filtros o limpia la búsqueda."
+                : "Empieza agregando tu primer producto."
+            }
+            action={
+              hasActiveFilters ? (
+                <Button variant="outline" size="sm" onClick={clearAllFilters}>
+                  <XIcon className="h-4 w-4 mr-1" />
+                  Limpiar filtros
+                </Button>
+              ) : undefined
             }
           />
         ) : (
           <DataTable>
             <DataTableHead>
               <DataTableTh className="w-12 pl-5" />
-              <DataTableTh>Producto</DataTableTh>
-              <DataTableTh>Categoría</DataTableTh>
-              <DataTableTh className="text-right">Precio</DataTableTh>
-              <DataTableTh className="text-right">Stock</DataTableTh>
+              <SortableHeader
+                label="Producto"
+                column="name"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onClick={toggleSort}
+              />
+              <SortableHeader
+                label="Categoría"
+                column="category"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onClick={toggleSort}
+              />
+              <SortableHeader
+                label="Precio"
+                column="price"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onClick={toggleSort}
+                align="right"
+              />
+              <SortableHeader
+                label="Stock"
+                column="stock"
+                sortBy={sortBy}
+                sortDir={sortDir}
+                onClick={toggleSort}
+                align="right"
+              />
               <DataTableTh>Estado</DataTableTh>
-              <DataTableTh className="w-32 text-right pr-5">Acciones</DataTableTh>
+              <DataTableTh className="w-24 text-right pr-5">Acciones</DataTableTh>
             </DataTableHead>
             <DataTableBody>
               {items.map((p) => (
                 <DataTableRow
                   key={p.id}
                   onClick={() => setEditing(p)}
-                  className={cn("group", !p.active && "opacity-60")}
+                  // Keyboard a11y: la fila completa funciona como botón.
+                  // Tab la enfoca; Enter / Space disparan "Editar". Sin
+                  // esto, los operadores con teclado solo (o screen
+                  // readers) no podían interactuar con la tabla.
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setEditing(p);
+                    }
+                  }}
+                  aria-label={`Editar ${p.name}`}
+                  className={cn(
+                    "group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
+                    !p.active && "opacity-60"
+                  )}
                 >
                   <DataTableCell className="w-12 pl-5">
-                    <div className="h-10 w-10 rounded-md border border-border bg-muted flex items-center justify-center overflow-hidden">
-                      {p.photo_url ? (
-                        <img src={p.photo_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <span className="text-xs font-semibold text-muted-foreground">
-                          {p.name.slice(0, 2).toUpperCase()}
-                        </span>
-                      )}
+                    <div className="h-10 w-10 rounded-md border border-border bg-muted flex items-center justify-center overflow-hidden relative">
+                      <span className="text-xs font-semibold text-muted-foreground">
+                        {p.name.slice(0, 2).toUpperCase()}
+                      </span>
+                      <ProductPhoto
+                        productId={p.id}
+                        imageUrl={p.image_url}
+                        className="absolute inset-0 h-full w-full object-cover"
+                      />
                     </div>
                   </DataTableCell>
+                  {/* Nombre — affordance visible para "click para editar":
+                      hover muestra underline + cursor pointer. La fila
+                      entera también dispara editar al click, esto solo
+                      le da pista visual al operador. */}
                   <DataTableCell>
-                    <span className="font-semibold text-foreground">{p.name}</span>
+                    <span className="font-semibold text-foreground group-hover:underline underline-offset-4 decoration-muted-foreground/40">
+                      {p.name}
+                    </span>
                   </DataTableCell>
                   <DataTableCell className="text-muted-foreground">{p.category}</DataTableCell>
                   <DataTableCell className="text-right tabular font-medium text-foreground">
                     {formatMoney(p.price)}
                   </DataTableCell>
-                  <DataTableCell className={cn("text-right tabular", stockColorClass(p))}>
-                    <span className="font-semibold">{p.stock}</span>
-                    {p.min_stock > 0 && (
-                      <span className="ml-1 text-xs text-muted-foreground">/ {p.min_stock}</span>
+                  {/* Stock cell — clickeable cuando el producto está activo:
+                      tocar el número abre el modal de ajuste directo. Es la
+                      affordance natural ("para cambiar este número, tócalo")
+                      y evita exigir que el operador encuentre el botón en
+                      hover. stopPropagation evita disparar el row-click de
+                      Editar. Keyboard: focusable + Enter/Space dispara ajuste. */}
+                  <DataTableCell
+                    className={cn("text-right tabular", stockColorClass(p))}
+                    onClick={
+                      p.active
+                        ? (e) => {
+                            e.stopPropagation();
+                            setAdjusting(p);
+                          }
+                        : undefined
+                    }
+                    title={p.active ? t.page.rowAdjust : undefined}
+                  >
+                    {p.active ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAdjusting(p);
+                        }}
+                        onKeyDown={(e) => {
+                          // Prevenimos que Enter/Space en este botón
+                          // burbujeen al row (que dispararía editar).
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.stopPropagation();
+                          }
+                        }}
+                        className="font-semibold rounded px-1.5 py-0.5 -mx-1.5 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 transition-colors"
+                        aria-label={`Ajustar stock de ${p.name}`}
+                      >
+                        {p.stock}
+                      </button>
+                    ) : (
+                      <span className="font-semibold">{p.stock}</span>
+                    )}
+                    {p.stock_minimum > 0 && (
+                      <span className="ml-1 text-xs text-muted-foreground">/ {p.stock_minimum}</span>
                     )}
                   </DataTableCell>
                   <DataTableCell>
@@ -288,33 +498,34 @@ export default function ProductsPage() {
                       <Badge variant="outline">{t.page.badges.inactive}</Badge>
                     )}
                   </DataTableCell>
+                  {/* Acciones — solo "Ajustar stock" como botón explícito.
+                      Editar se accede via row-click / Enter / click en el
+                      nombre (underline en hover). Quitamos el botón
+                      Editar que vivía aquí en hover porque competía con
+                      Ajustar y era invisible para touch/teclado. */}
                   <DataTableCell
                     className="text-right pr-3"
                     children={
                       <div
-                        className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="inline-flex items-center gap-1"
                         onClick={(e) => e.stopPropagation()}
                       >
                         {p.active && (
                           <button
                             type="button"
                             onClick={() => setAdjusting(p)}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.stopPropagation();
+                              }
+                            }}
+                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 transition-colors"
                             title={t.page.rowAdjust}
-                            aria-label={t.page.rowAdjust}
+                            aria-label={`${t.page.rowAdjust} de ${p.name}`}
                           >
                             <PackagePlus className="h-4 w-4" />
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={() => setEditing(p)}
-                          className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                          title={t.page.rowEdit}
-                          aria-label={t.page.rowEdit}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
                       </div>
                     }
                   />
@@ -400,8 +611,15 @@ function CreateDialog({
   async function submit(payload: ProductFormSubmitPayload) {
     setServerError(null);
     try {
-      const input: UpsertProductInput = payload.values;
-      const created = await create.mutateAsync(input);
+      const created = await create.mutateAsync({
+        name: payload.values.name,
+        category: payload.values.category,
+        price: payload.values.price,
+        initial_stock: payload.values.initial_stock,
+        stock_minimum: payload.values.stock_minimum,
+        initial_cost: payload.values.initial_cost,
+        image_url: payload.values.image_url,
+      });
       toast.success(t.form.success.created(created.name));
       if (payload.addAnother) {
         setResetKey((n) => n + 1);
@@ -459,7 +677,13 @@ function EditDialog({
     if (!product) return;
     setServerError(null);
     try {
-      await update.mutateAsync(payload.values);
+      await update.mutateAsync({
+        name: payload.values.name,
+        category: payload.values.category,
+        price: payload.values.price,
+        stock_minimum: payload.values.stock_minimum,
+        image_url: payload.values.image_url,
+      });
       toast.success(t.form.success.updated);
       onClose();
     } catch (e) {
@@ -501,13 +725,14 @@ function EditDialog({
           <>
             <ProductForm
               mode="edit"
+              productId={product.id}
               initial={{
                 name: product.name,
                 category: product.category,
                 price: String(product.price),
                 stock: String(product.stock),
-                min_stock: String(product.min_stock),
-                photo_url: product.photo_url ?? "",
+                stock_minimum: String(product.stock_minimum),
+                image_url: product.image_url ?? "",
               }}
               knownCategories={knownCategories}
               submitting={update.isPending}

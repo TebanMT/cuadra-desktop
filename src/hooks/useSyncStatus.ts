@@ -2,7 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 
-export type SyncLevel = "ok" | "syncing" | "warn" | "error";
+export type SyncLevel = "ok" | "syncing" | "warn" | "error" | "auth";
 
 export interface SyncStatus {
   state:
@@ -11,7 +11,11 @@ export interface SyncStatus {
     | "offline_medium"
     | "offline_long"
     | "offline_critical"
-    | "initial_syncing";
+    | "initial_syncing"
+    // auth_invalid: el cloud rechazó la credencial sk_live_* del sidecar
+    // (típicamente por revocación tras 30+ días de idle). La UI muestra
+    // CTA de re-login en lugar de "Sin internet".
+    | "auth_invalid";
   // Field names mirror the backend wire shape
   // (cuadra-core/src/shared/sync/types.go::StatusResponse). Earlier they were
   // mistyped as last_sync_at / pending_count, which made the UI permanently
@@ -19,6 +23,10 @@ export interface SyncStatus {
   last_synced_at: string | null;
   queue_pending_count: number;
   last_error: string | null;
+  // auth_invalid surface también cuando el sidecar nunca recibió token
+  // (waiting for auth). Desde el operador es el mismo problema:
+  // hace falta autenticar.
+  auth_invalid?: boolean;
 }
 
 export function useSyncStatus(enabled = true) {
@@ -58,6 +66,10 @@ export function levelOf(status?: SyncStatus | null): SyncLevel {
       return "warn";
     case "offline_critical":
       return "error";
+    case "auth_invalid":
+      // Tono propio: la credencial del sidecar está muerta y hace falta
+      // re-login. Distinto de error genérico — la acción es clara.
+      return "auth";
     default:
       return "ok";
   }

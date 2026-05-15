@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import type { PaymentMethod, Payment } from "./useBilling";
+import type { PaymentMethod } from "./useBilling";
 
 export interface SaleLineItemInput {
   product_id: string;
@@ -12,33 +12,34 @@ export interface RegisterSaleInput {
   payment_method: PaymentMethod;
   member_id?: string;
   notes?: string;
+  // paid (opcional): cuando es menor al total, el faltante se persiste
+  // como balance_pending en el Payment ("fiado"). El backend rechaza
+  // fiado sin member_id — la UI debe gatear el flujo en consecuencia.
+  paid?: number;
 }
 
-export interface SaleLineItem {
+export interface SaleItemResponse {
   product_id: string;
   product_name: string;
   unit_price: number;
   quantity: number;
   line_total: number;
+  stock_after: number;
 }
 
-export interface Sale {
-  id: string;
-  gym_id: string;
-  payment_id: string;
-  member_id?: string | null;
-  member_name?: string | null;
-  total: number;
-  payment_method: PaymentMethod;
-  line_items: SaleLineItem[];
-  operator_id?: string | null;
-  operator_name?: string | null;
-  created_at: string;
-}
-
+// RegisterSaleResponse — shape del response de POST /api/v1/sales.
+// Matchea registerSaleResp en payment_controller.go (campos planos, sin
+// envelope sale/payment).
 export interface RegisterSaleResponse {
-  sale: Sale;
-  payment: Payment;
+  sale_id: string;
+  payment_id: string;
+  folio: string;
+  subtotal: number;
+  discount: number;
+  total: number;
+  paid: number;
+  balance_pending: number;
+  items: SaleItemResponse[];
   pending_offline_sync?: boolean;
 }
 
@@ -65,10 +66,19 @@ export function useMemberSearch(query: string) {
   return useQuery<MemberSearchResult[]>({
     queryKey: ["members", "search", query],
     queryFn: async () => {
-      const res = await api.get<{ items: MemberSearchResult[] }>("/api/v1/members/search", {
-        query: { q: query, limit: 10 },
+      // El sidecar/backend solo expone GET /api/v1/members (con `q` como
+      // filtro). Aplanamos el list-item ({ member, current_membership,
+      // access_status }) al shape mínimo que necesita el dropdown.
+      const res = await api.get<{
+        items: Array<{ member: { id: string; full_name: string; phone: string } }>;
+      }>("/api/v1/members", {
+        query: { q: query, page: 1, page_size: 10 },
       });
-      return res.items ?? [];
+      return (res.items ?? []).map((it) => ({
+        member_id: it.member.id,
+        full_name: it.member.full_name,
+        phone: it.member.phone,
+      }));
     },
     enabled: query.trim().length >= 2,
     staleTime: 10_000,

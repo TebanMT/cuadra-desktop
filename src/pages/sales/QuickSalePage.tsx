@@ -1,20 +1,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Minus, Plus, Search, Trash2, UserCheck, UserPlus, X } from "lucide-react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  AlertTriangle,
+  Loader2,
+  Minus,
+  PackagePlus,
+  Plus,
+  Search,
+  Trash2,
+  UserCheck,
+  UserPlus,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   stockLevel,
   useActiveProducts,
   type Product,
   type StockLevel,
 } from "@/hooks/useProducts";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
 import {
   useMemberSearch,
   useRegisterSale,
@@ -24,7 +38,7 @@ import {
 import { fmtMoney, type PaymentMethod } from "@/hooks/useBilling";
 import { levelOf, useSyncStatus } from "@/hooks/useSyncStatus";
 import { useDebounce } from "@/hooks/useDebounce";
-import { ApiError } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { sales as t } from "@/strings/sales";
 
@@ -33,14 +47,34 @@ interface CartLine {
   qty: number;
 }
 
+// normalize — quita acentos y baja a lowercase. Sin esto "mineral" no
+// pegaba con "Agua mineral" y "ciel" no pegaba con "Ciél". Usamos
+// NFD + strip de combining marks (Unicode plane Diacritic) que cubre
+// todas las vocales acentuadas en español.
+function normalize(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .trim();
+}
+
+// Cash quick-amount chips. Cubre los billetes típicos del operador
+// mexicano + "Exacto" (= total). Si el total ya rebasa el chip lo
+// escondemos automáticamente para no inducir error.
+const CASH_QUICK_AMOUNTS = [50, 100, 200, 500, 1000] as const;
+
 function badgeForStock(level: StockLevel, stock: number) {
-  if (level === "out") return { text: t.page.badges.out, className: "bg-destructive text-destructive-foreground" };
-  if (level === "low") return { text: t.page.badges.low(stock), className: "bg-warning text-warning-foreground" };
+  if (level === "out")
+    return { text: t.page.badges.out, className: "bg-destructive text-destructive-foreground" };
+  if (level === "low")
+    return { text: t.page.badges.low(stock), className: "bg-warning text-warning-foreground" };
   return { text: t.page.badges.stock(stock), className: "bg-muted text-muted-foreground" };
 }
 
 export default function QuickSalePage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const products = useActiveProducts();
   const sync = useSyncStatus();
   const register = useRegisterSale();
@@ -51,8 +85,25 @@ export default function QuickSalePage() {
   const [error, setError] = useState<string | null>(null);
   const [qtyModal, setQtyModal] = useState<Product | null>(null);
   const [qtyValue, setQtyValue] = useState("1");
-  const [keyBuffer, setKeyBuffer] = useState("");
-  const bufferTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [search, setSearch] = useState("");
+  // Por default escondemos los productos con stock=0 — el operador
+  // tiene foco en lo que SÍ se puede vender ahora. El toggle expone los
+  // agotados (caso típico: el operador sabe que sí tiene físico pero el
+  // sistema no lo refleja). Al tocar uno agotado se abre el modal de
+  // restock rápido que registra el inventario y agrega al carrito en un
+  // solo gesto — protege contra olvidos del día a día.
+  const [showOutOfStock, setShowOutOfStock] = useState(false);
+  const [restockModal, setRestockModal] = useState<Product | null>(null);
+  // Cash change calculator state. Vacío = sin cálculo. parseFloat lo
+  // convierte a número al usarlo; no usamos number en state porque
+  // intermedios como "1" vs "1." tienen UX distinta en input numérico.
+  const [givenCash, setGivenCash] = useState("");
+  // Fiado: el toggle decide si el operador quiere dejar saldo. Si está
+  // ON, paidValue es lo que cobra ahora (default = total). Si OFF, se
+  // ignora — el BE recibe paid omitido y cobra todo. Requiere socio.
+  const [creditMode, setCreditMode] = useState(false);
+  const [paidValue, setPaidValue] = useState("");
+  const searchRef = useRef<HTMLInputElement | null>(null);
 
   const items = useMemo(() => products.data ?? [], [products.data]);
   const offline = levelOf(sync.data) !== "ok";
@@ -72,9 +123,32 @@ export default function QuickSalePage() {
     [cartLines]
   );
 
+  // Filtra los productos por (a) la búsqueda visible — substring +
+  // accent-tolerant (normalize ambos lados) — y (b) la regla
+  // "esconder agotados por default". El toggle showOutOfStock los
+  // reintroduce cuando el operador necesita registrar mercancía no
+  // capturada.
+  const filtered = useMemo(() => {
+    const q = normalize(search);
+    return items.filter((p) => {
+      if (!showOutOfStock && p.stock <= 0) return false;
+      if (q && !normalize(p.name).includes(q)) return false;
+      return true;
+    });
+  }, [items, search, showOutOfStock]);
+
+  // outOfStockCount — count de agotados que el toggle expondría. Si es
+  // 0 escondemos el toggle entero (no aporta señal). Conteo se hace
+  // sobre `items` (no filtered) para que respete sólo el dataset, no la
+  // búsqueda.
+  const outOfStockCount = useMemo(
+    () => items.filter((p) => p.stock <= 0).length,
+    [items]
+  );
+
   const grouped = useMemo(() => {
     const map = new Map<string, Product[]>();
-    for (const p of items) {
+    for (const p of filtered) {
       const arr = map.get(p.category) ?? [];
       arr.push(p);
       map.set(p.category, arr);
@@ -85,7 +159,7 @@ export default function QuickSalePage() {
         category,
         list: list.slice().sort((a, b) => a.name.localeCompare(b.name, "es")),
       }));
-  }, [items]);
+  }, [filtered]);
 
   function addToCart(product: Product, qty = 1) {
     if (product.stock <= 0) return;
@@ -124,58 +198,102 @@ export default function QuickSalePage() {
     setCart({});
     setMember(null);
     setError(null);
+    setGivenCash("");
+    setCreditMode(false);
+    setPaidValue("");
   }
 
   function close() {
     navigate("/");
   }
 
-  // Keyboard: type letters to filter, Enter to add 1.
+  // Atajos globales:
+  //   E / T / C  → método de pago (cash / transfer / card). No se
+  //                disparan si el operador está escribiendo en un input.
+  //   Esc        → limpia el carrito (si tiene algo). Si está vacío y el
+  //                foco está en el search, blurea el search.
+  //   Enter      → agrega el primer match al carrito cuando hay query
+  //                visible. (Reemplaza el viejo keyBuffer invisible.)
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
-      if (target) {
-        const tag = target.tagName.toLowerCase();
-        if (tag === "input" || tag === "textarea" || target.isContentEditable) return;
-      }
-      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      const isInput =
+        target &&
+        (target.tagName.toLowerCase() === "input" ||
+          target.tagName.toLowerCase() === "textarea" ||
+          target.isContentEditable);
 
+      // Esc siempre disponible — incluso desde el search input — para
+      // dar al operador una salida rápida del estado actual.
       if (e.key === "Escape") {
-        if (keyBuffer) {
-          setKeyBuffer("");
-          return;
+        if (cartLines.length > 0 || search) {
+          e.preventDefault();
+          clearCart();
+          setSearch("");
         }
-      }
-
-      if (e.key === "Enter" && keyBuffer) {
-        e.preventDefault();
-        const term = keyBuffer.toLowerCase();
-        const match = items.find(
-          (p) => p.active && p.stock > 0 && p.name.toLowerCase().startsWith(term)
-        );
-        if (match) addToCart(match, 1);
-        setKeyBuffer("");
         return;
       }
 
-      if (e.key === "Backspace" && keyBuffer) {
-        e.preventDefault();
-        setKeyBuffer((b) => b.slice(0, -1));
+      // Enter desde el search agrega el primer producto filtrado con
+      // stock disponible. Asegura el flujo "tecleo + Enter" sin mouse.
+      if (e.key === "Enter" && isInput && target === searchRef.current) {
+        const first = filtered.find((p) => p.active && p.stock > 0);
+        if (first) {
+          e.preventDefault();
+          addToCart(first, 1);
+        }
         return;
       }
 
-      if (e.key.length === 1 && /[a-zA-Z0-9áéíóúüñ]/i.test(e.key)) {
-        setKeyBuffer((b) => b + e.key);
-        if (bufferTimeout.current) clearTimeout(bufferTimeout.current);
-        bufferTimeout.current = setTimeout(() => setKeyBuffer(""), 1500);
+      // Atajos de método: sólo cuando NO hay un input enfocado, sin
+      // modificadores. Una sola letra E/T/C. Mayúsculas y minúsculas.
+      if (!isInput && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const k = e.key.toLowerCase();
+        if (k === "e") {
+          e.preventDefault();
+          setMethod("cash");
+        } else if (k === "t") {
+          e.preventDefault();
+          setMethod("transfer");
+        } else if (k === "c") {
+          e.preventDefault();
+          setMethod("card");
+        }
       }
     }
     window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      if (bufferTimeout.current) clearTimeout(bufferTimeout.current);
-    };
-  }, [items, keyBuffer]);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [cartLines.length, filtered, search]);
+
+  // Autofocus en el search al cargar la página — habilita escribir
+  // inmediatamente sin tocar el mouse.
+  useEffect(() => {
+    searchRef.current?.focus();
+  }, []);
+
+  // Reset del cambio cuando se sale del método cash (no tiene sentido).
+  useEffect(() => {
+    if (method !== "cash") setGivenCash("");
+  }, [method]);
+
+  // Si se quita el socio mientras el toggle de fiado estaba ON, hay que
+  // desactivarlo: fiado-sin-socio es estado inválido.
+  useEffect(() => {
+    if (!member && creditMode) {
+      setCreditMode(false);
+      setPaidValue("");
+    }
+  }, [member, creditMode]);
+
+  // Reset paidValue al total cuando entra a credit mode (default es
+  // "cobrar todo"; el operador baja el valor para crear el saldo).
+  useEffect(() => {
+    if (creditMode) {
+      setPaidValue((v) => (v === "" ? String(total) : v));
+    } else {
+      setPaidValue("");
+    }
+  }, [creditMode, total]);
 
   function openQtyModal(p: Product) {
     if (p.stock <= 0) return;
@@ -195,6 +313,26 @@ export default function QuickSalePage() {
     setQtyModal(null);
   }
 
+  // Cobrado efectivo: lo que de verdad va al payment. En credit mode es
+  // el input; en modo normal es el total completo.
+  const paidNow = useMemo(() => {
+    if (!creditMode) return total;
+    const v = parseFloat(paidValue);
+    if (!Number.isFinite(v)) return 0;
+    return v;
+  }, [creditMode, paidValue, total]);
+
+  const balanceLeft = creditMode ? Math.max(0, total - paidNow) : 0;
+
+  // Cambio en efectivo: positivo = devuelves; negativo = falta. Se
+  // muestra solo cuando method = cash y hay total > 0.
+  const cashGiven = useMemo(() => {
+    const v = parseFloat(givenCash);
+    return Number.isFinite(v) ? v : 0;
+  }, [givenCash]);
+  const cashToCover = creditMode ? paidNow : total;
+  const change = cashGiven - cashToCover;
+
   async function submit() {
     setError(null);
     if (cartLines.length === 0) {
@@ -204,6 +342,20 @@ export default function QuickSalePage() {
     if (!method) {
       setError(t.page.errors.methodRequired);
       return;
+    }
+    if (creditMode) {
+      if (!member) {
+        setError(t.page.credit.requiresMember);
+        return;
+      }
+      if (paidNow <= 0) {
+        setError(t.page.credit.paidMustBePositive);
+        return;
+      }
+      if (paidNow > total) {
+        setError(t.page.credit.paidExceedsTotal);
+        return;
+      }
     }
     for (const line of cartLines) {
       if (line.qty > line.product.stock) {
@@ -216,17 +368,22 @@ export default function QuickSalePage() {
       line_items: cartLines.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
       payment_method: method,
       ...(member ? { member_id: member.member_id } : {}),
+      ...(creditMode && paidNow < total ? { paid: paidNow } : {}),
     };
 
     try {
       const res = await register.mutateAsync(payload);
-      const amount = fmtMoney(res.sale.total);
       if (res.pending_offline_sync || offline) {
         toast.success(t.page.success.offline);
+      } else if (res.balance_pending > 0) {
+        toast.success(
+          `${fmtMoney(res.paid)} cobrados · queda ${fmtMoney(res.balance_pending)} a deber.`
+        );
       } else {
-        toast.success(t.page.success.online(amount));
+        toast.success(t.page.success.online(fmtMoney(res.total)));
       }
       clearCart();
+      searchRef.current?.focus();
     } catch (err) {
       if (err instanceof ApiError) {
         const data = err.details as Record<string, unknown> | null;
@@ -240,20 +397,12 @@ export default function QuickSalePage() {
   return (
     <div className="flex flex-col h-full">
       <header className="flex items-center justify-between border-b border-foreground/10 px-6 py-5 bg-background">
-        <div className="flex items-center gap-3">
-          <h1
-            className="text-3xl font-semibold text-foreground"
-            style={{ letterSpacing: "-0.025em" }}
-          >
-            {t.page.title}
-          </h1>
-          {keyBuffer && (
-            <span className="inline-flex items-center gap-1.5 rounded-md border border-border bg-muted px-2 py-1 text-xs">
-              <Search className="h-3 w-3" />
-              <span className="font-mono">{keyBuffer}</span>
-            </span>
-          )}
-        </div>
+        <h1
+          className="text-3xl font-semibold text-foreground"
+          style={{ letterSpacing: "-0.025em" }}
+        >
+          {t.page.title}
+        </h1>
         <div className="flex items-center gap-2">
           <MemberAssociator member={member} onChange={setMember} />
           <Button variant="ghost" size="icon" onClick={close} aria-label={t.page.close}>
@@ -269,7 +418,56 @@ export default function QuickSalePage() {
       )}
 
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_360px] overflow-hidden">
-        <div className="overflow-y-auto p-6">
+        <div className="overflow-y-auto p-6 space-y-6">
+          {/* Search sticky — siempre visible, autofocus al cargar. El
+              operador puede escribir sin tocar el mouse, ver matches en
+              vivo, y Enter agrega el primer match al carrito. */}
+          <div className="sticky top-0 -mt-6 -mx-6 px-6 pt-6 pb-3 bg-background z-10 border-b border-border">
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="relative flex-1 min-w-[240px] max-w-lg">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                <Input
+                  ref={searchRef}
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder={t.page.searchPlaceholder}
+                  className="pl-9 pr-9 h-11 text-base"
+                  aria-label={t.page.searchPlaceholder}
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      searchRef.current?.focus();
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                    aria-label="Limpiar búsqueda"
+                    title="Limpiar búsqueda"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {/* Toggle "Ver agotados". Sólo aparece si hay al menos un
+                  producto en 0 — sin nada que esconder no aporta. */}
+              {outOfStockCount > 0 && (
+                <label className="flex items-center gap-2 cursor-pointer h-11 px-3 rounded-md border border-input hover:bg-muted">
+                  <Switch
+                    checked={showOutOfStock}
+                    onCheckedChange={setShowOutOfStock}
+                  />
+                  <span className="text-sm whitespace-nowrap">
+                    {t.page.showOutOfStock}
+                    <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">
+                      ({outOfStockCount})
+                    </span>
+                  </span>
+                </label>
+              )}
+            </div>
+          </div>
+
           {products.isLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -278,6 +476,10 @@ export default function QuickSalePage() {
             <div className="text-center py-20 text-muted-foreground">
               <p>{t.page.empty}</p>
               <p className="text-sm mt-1">{t.page.emptyHint}</p>
+            </div>
+          ) : grouped.length === 0 ? (
+            <div className="text-center py-20 text-muted-foreground">
+              <p>{t.page.noSearchResults}</p>
             </div>
           ) : (
             <div className="space-y-8">
@@ -294,6 +496,7 @@ export default function QuickSalePage() {
                         cartQty={cart[p.id] ?? 0}
                         onAdd={() => addToCart(p, 1)}
                         onCustomQty={() => openQtyModal(p)}
+                        onRestock={() => setRestockModal(p)}
                       />
                     ))}
                   </div>
@@ -343,28 +546,142 @@ export default function QuickSalePage() {
               <span className="text-2xl font-semibold tabular-nums">{fmtMoney(total)}</span>
             </div>
 
+            {/* Método de pago como segmented control con hint de tecla
+                (E/T/C). Hace descubrible el shortcut sin meter un
+                cheat-sheet aparte. */}
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                 {t.page.cart.methodLabel}
               </Label>
-              <RadioGroup
-                value={method}
-                onValueChange={(v) => setMethod(v as PaymentMethod)}
-                className="flex flex-wrap gap-3"
-              >
-                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                  <RadioGroupItem value="cash" id="qs-m-cash" />
-                  {t.page.cart.methods.cash}
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                  <RadioGroupItem value="transfer" id="qs-m-tr" />
-                  {t.page.cart.methods.transfer}
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer text-sm">
-                  <RadioGroupItem value="card" id="qs-m-card" />
-                  {t.page.cart.methods.card}
-                </label>
-              </RadioGroup>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(["cash", "transfer", "card"] as PaymentMethod[]).map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    onClick={() => setMethod(m)}
+                    className={cn(
+                      "h-10 rounded-md border text-sm font-medium transition-colors",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      method === m
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-background hover:bg-muted border-border text-foreground"
+                    )}
+                    aria-pressed={method === m}
+                  >
+                    <span>{t.page.cart.methods[m]}</span>
+                    <kbd
+                      className={cn(
+                        "ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded px-1 text-[10px] font-mono",
+                        method === m
+                          ? "bg-primary-foreground/20 text-primary-foreground"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      {t.page.cart.methodHints[m]}
+                    </kbd>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Calculadora de cambio (solo cash, total > 0). Chips
+                rápidos con denominaciones MX típicas + "Exacto". El
+                cambio se renderiza en verde si positivo, en rojo si
+                falta para cubrir. */}
+            {method === "cash" && cashToCover > 0 && (
+              <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
+                <Label
+                  htmlFor="qs-given"
+                  className="text-xs uppercase tracking-wide text-muted-foreground"
+                >
+                  {t.page.change.label}
+                </Label>
+                <Input
+                  id="qs-given"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  step="0.01"
+                  value={givenCash}
+                  onChange={(e) => setGivenCash(e.target.value)}
+                  placeholder={t.page.change.placeholder}
+                  className="h-10 text-base"
+                />
+                <div className="flex flex-wrap gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => setGivenCash(String(cashToCover))}
+                    className="px-2 py-1 text-xs rounded border border-border bg-background hover:bg-muted transition-colors"
+                  >
+                    {t.page.change.exact}
+                  </button>
+                  {CASH_QUICK_AMOUNTS.filter((v) => v >= cashToCover).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setGivenCash(String(v))}
+                      className="px-2 py-1 text-xs rounded border border-border bg-background hover:bg-muted transition-colors tabular-nums"
+                    >
+                      ${v}
+                    </button>
+                  ))}
+                </div>
+                {givenCash !== "" && (
+                  <div
+                    className={cn(
+                      "text-sm font-semibold tabular-nums",
+                      change >= 0 ? "text-success" : "text-destructive"
+                    )}
+                  >
+                    {change >= 0
+                      ? t.page.change.result(fmtMoney(change))
+                      : t.page.change.shortfall(fmtMoney(-change))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Fiado: toggle sólo aparece cuando hay socio asociado.
+                Cuando está activo, input para "cobrado ahora" + display
+                de "queda a deber". El submit cambia label.
+
+                Nota: usamos <div> + onClick en lugar de <label> porque
+                Radix Switch es un <button>. Un <label> sin htmlFor
+                envolviendo un button hace double-fire del click (HTML
+                spec: el label forwarda al primer "labelable element"
+                interno; button califica). El stopPropagation en el
+                Switch evita el bubbling al div padre. */}
+            <div className="space-y-2">
+              <CreditToggleRow
+                disabled={!member}
+                checked={creditMode}
+                onToggle={(v) => setCreditMode(v)}
+              />
+              {creditMode && (
+                <div className="space-y-2 rounded-md border border-warning/40 bg-warning/5 p-3">
+                  <Label
+                    htmlFor="qs-paid"
+                    className="text-xs uppercase tracking-wide text-muted-foreground"
+                  >
+                    {t.page.credit.paidLabel}
+                  </Label>
+                  <Input
+                    id="qs-paid"
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    max={total}
+                    step="0.01"
+                    value={paidValue}
+                    onChange={(e) => setPaidValue(e.target.value)}
+                    className="h-10 text-base"
+                  />
+                  <div className="flex items-center gap-2 text-sm font-semibold text-warning tabular-nums">
+                    <AlertTriangle className="h-4 w-4 shrink-0" />
+                    <span>{t.page.credit.balanceLabel(fmtMoney(balanceLeft))}</span>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Button
@@ -374,7 +691,9 @@ export default function QuickSalePage() {
               disabled={register.isPending || cartLines.length === 0}
             >
               {register.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t.page.cart.submit(fmtMoney(total))}
+              {balanceLeft > 0
+                ? t.page.cart.submitWithDebt(fmtMoney(paidNow), fmtMoney(balanceLeft))
+                : t.page.cart.submit(fmtMoney(total))}
             </Button>
           </div>
         </aside>
@@ -419,6 +738,26 @@ export default function QuickSalePage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <QuickRestockModal
+        product={restockModal}
+        onClose={() => setRestockModal(null)}
+        onDone={(productId, newStock) => {
+          // Parche optimista al cache de useActiveProducts. Si no lo
+          // hacemos, addToCart leería el item con stock=0 del closure
+          // viejo y el +1 se descartaría. setQueryData dispara un
+          // re-render de QuickSalePage con el item refrescado.
+          queryClient.setQueryData<Product[]>(["products", "active"], (old) =>
+            (old ?? []).map((p) => (p.id === productId ? { ...p, stock: newStock } : p))
+          );
+          // Y aún así no podemos depender del closure para addToCart —
+          // metemos directo al carrito con qty=1. La fila lee el item
+          // del array refrescado, así que el precio se mostrará bien.
+          setCart((c) => ({ ...c, [productId]: 1 }));
+          setRestockModal(null);
+          searchRef.current?.focus();
+        }}
+      />
     </div>
   );
 }
@@ -428,15 +767,49 @@ interface ProductCardProps {
   cartQty: number;
   onAdd(): void;
   onCustomQty(): void;
+  onRestock(): void;
 }
 
-function ProductCard({ product, cartQty, onAdd, onCustomQty }: ProductCardProps) {
+function ProductCard({ product, cartQty, onAdd, onCustomQty, onRestock }: ProductCardProps) {
   const level = stockLevel(product);
   const out = level === "out";
   const badge = badgeForStock(level, product.stock);
+  // Long-press para abrir el modal de cantidad. El right-click sigue
+  // funcionando en desktop pero no es descubrible en touch. 500ms es
+  // el umbral típico (Material/iOS). Si la posición cambia mucho
+  // (scroll/drag) cancelamos para no disparar accidentalmente.
+  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressFired = useRef(false);
+
+  function startLongPress() {
+    if (out) return;
+    longPressFired.current = false;
+    longPressTimer.current = setTimeout(() => {
+      longPressFired.current = true;
+      onCustomQty();
+    }, 500);
+  }
+  function cancelLongPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  }
 
   function handleClick() {
-    if (out) return;
+    if (out) {
+      // Out-of-stock ya no bloquea: el tap abre el modal de restock
+      // rápido. Caso típico: te llegó mercancía y no la registraste,
+      // ahora un socio te la pide. Un solo gesto registra el inventario
+      // y mete 1 al carrito.
+      onRestock();
+      return;
+    }
+    if (longPressFired.current) {
+      // El long-press ya abrió el modal — evitamos sumar 1 además.
+      longPressFired.current = false;
+      return;
+    }
     onAdd();
   }
 
@@ -451,22 +824,34 @@ function ProductCard({ product, cartQty, onAdd, onCustomQty }: ProductCardProps)
       type="button"
       onClick={handleClick}
       onContextMenu={handleContextMenu}
-      disabled={out}
-      title={out ? t.page.tooltips.out : t.page.tooltips.rightClick}
+      onPointerDown={startLongPress}
+      onPointerUp={cancelLongPress}
+      onPointerLeave={cancelLongPress}
+      onPointerCancel={cancelLongPress}
+      title={out ? t.page.outOfStockTap : t.page.tooltips.rightClick}
       className={cn(
-        "relative flex flex-col items-stretch text-left rounded-lg border bg-background overflow-hidden transition-all",
+        "relative flex flex-col items-stretch text-left rounded-lg border-2 bg-background overflow-hidden transition-all",
         "focus:outline-none focus:ring-2 focus:ring-ring",
-        out ? "opacity-50 cursor-not-allowed" : "hover:border-primary hover:shadow-sm active:scale-[0.98]"
+        out
+          // Out-of-stock: dashed border + muted bg para diferenciar
+          // visualmente del estado "vendible", sin esconderlo (toggle
+          // del padre ya hace eso). Hover ofrece el affordance de
+          // restock — borde primary tenue.
+          ? "border-dashed border-muted-foreground/40 bg-muted/30 hover:border-primary/60 hover:bg-primary/5"
+          : cartQty > 0
+          ? "border-primary shadow-sm bg-primary/5"
+          : "border-border hover:border-primary/60 hover:shadow-sm active:scale-[0.98]"
       )}
     >
-      <div className="aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
-        {product.photo_url ? (
-          <img src={product.photo_url} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <span className="text-2xl font-semibold text-muted-foreground">
-            {product.name.slice(0, 2).toUpperCase()}
-          </span>
-        )}
+      <div className="relative aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
+        <span className="text-2xl font-semibold text-muted-foreground">
+          {product.name.slice(0, 2).toUpperCase()}
+        </span>
+        <ProductPhoto
+          productId={product.id}
+          imageUrl={product.image_url}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
       </div>
       <div className="px-3 py-2 space-y-1">
         <div className="font-medium text-sm leading-tight line-clamp-2 min-h-[2.5rem]">
@@ -487,6 +872,15 @@ function ProductCard({ product, cartQty, onAdd, onCustomQty }: ProductCardProps)
       {cartQty > 0 && (
         <span className="absolute top-2 right-2 inline-flex items-center justify-center h-7 min-w-[1.75rem] rounded-full bg-primary text-primary-foreground text-xs font-semibold px-2 shadow">
           ×{cartQty}
+        </span>
+      )}
+      {out && (
+        // Hint visible: el card está accesible y el tap registra
+        // mercancía. Lo ponemos sobre la foto en lugar de bajo el
+        // nombre para no romper el alineamiento del grid.
+        <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-background/95 border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+          <PackagePlus className="h-3 w-3" />
+          {t.page.outOfStockTap}
         </span>
       )}
     </button>
@@ -527,7 +921,13 @@ function CartRow({ line, onInc, onDec, onRemove }: CartRowProps) {
       <div className="w-20 text-right tabular-nums font-semibold">
         {fmtMoney(line.product.price * line.qty)}
       </div>
-      <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground" onClick={onRemove} aria-label={t.page.cart.remove}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-7 w-7 text-muted-foreground"
+        onClick={onRemove}
+        aria-label={t.page.cart.remove}
+      >
         <X className="h-3.5 w-3.5" />
       </Button>
     </div>
@@ -611,5 +1011,206 @@ function MemberAssociator({
         </div>
       </PopoverContent>
     </Popover>
+  );
+}
+
+// CreditToggleRow — fila del switch de fiado. Aislada en componente
+// propio porque mezcla 3 cosas no-triviales: (1) la fila completa es
+// clickeable (no sólo el switch), (2) cuando está deshabilitada
+// envuelve todo en un Tooltip de Radix para explicar el porqué en
+// hover (el `title` nativo del browser tiene latencia ~700ms y no
+// aparece en touch — el Tooltip es ~150ms y consistente), (3) el
+// stopPropagation del Switch evita el double-toggle vs el onClick del
+// contenedor.
+function CreditToggleRow({
+  disabled,
+  checked,
+  onToggle,
+}: {
+  disabled: boolean;
+  checked: boolean;
+  onToggle(next: boolean): void;
+}) {
+  const row = (
+    <div
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled}
+      aria-pressed={checked}
+      onClick={() => {
+        if (disabled) return;
+        onToggle(!checked);
+      }}
+      onKeyDown={(e) => {
+        if (disabled) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle(!checked);
+        }
+      }}
+      className={cn(
+        "flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 select-none transition-colors",
+        disabled
+          ? "opacity-60 cursor-not-allowed"
+          : "cursor-pointer hover:bg-muted/50",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      )}
+    >
+      <span className="text-sm font-medium">{t.page.credit.toggle}</span>
+      <Switch
+        checked={checked}
+        onCheckedChange={(v) => {
+          if (disabled) return;
+          onToggle(!!v);
+        }}
+        onClick={(e) => e.stopPropagation()}
+        disabled={disabled}
+      />
+    </div>
+  );
+
+  // Cuando está deshabilitado, el row queda envuelto en un Tooltip.
+  // delayDuration 150ms — más rápido que el nativo, menos brusco que 0.
+  // Sin asChild Radix pone su propio botón wrapper que rompe el ancho
+  // del contenedor padre (el row ya es full-width); asChild deja al row
+  // como el trigger directo.
+  if (!disabled) return row;
+  return (
+    <Tooltip delayDuration={150}>
+      <TooltipTrigger asChild>{row}</TooltipTrigger>
+      <TooltipContent side="top" className="max-w-[220px] text-center">
+        {t.page.credit.requiresMember}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+// adjustStockResp — shape devuelta por POST /products/:id/adjust-stock
+// según payment_controller.go. La definimos aquí porque el hook
+// existente useAdjustStock devuelve `Product` (incorrecto — pre-existing
+// FE/BE mismatch). Para no expandir el blast radius, este modal hace
+// el POST directo con `api.post` y el tipo correcto.
+interface AdjustStockResp {
+  new_stock: number;
+  delta: number;
+  movement_id: string;
+}
+
+function QuickRestockModal({
+  product,
+  onClose,
+  onDone,
+}: {
+  product: Product | null;
+  onClose(): void;
+  onDone(productId: string, newStock: number): void;
+}) {
+  const [qty, setQty] = useState("1");
+  const [cost, setCost] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (product) {
+      setQty("1");
+      setCost("");
+      setError(null);
+      setSubmitting(false);
+    }
+  }, [product]);
+
+  if (!product) return null;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const q = parseInt(qty, 10);
+    if (!Number.isFinite(q) || q <= 0) {
+      setError(t.page.restock.errors.qtyInvalid);
+      return;
+    }
+    const costNum = cost ? parseFloat(cost) : undefined;
+    // reason fija porque la triggereó la venta. Sin razón, el reporte
+    // de "Compras de inventario" mostraría "—" y el dueño no sabría
+    // por qué se registró el restock. La etiqueta lo deja claro.
+    const payload: Record<string, unknown> = {
+      movement_type: "restock",
+      quantity: q,
+      reason: t.page.restock.reasonDefault,
+    };
+    if (costNum !== undefined && Number.isFinite(costNum) && costNum > 0) {
+      payload.cost = costNum;
+    }
+    setSubmitting(true);
+    try {
+      const res = await api.post<AdjustStockResp>(
+        `/api/v1/products/${product!.id}/adjust-stock`,
+        payload
+      );
+      toast.success(t.page.restock.success(q, product!.name));
+      onDone(product!.id, res.new_stock);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        const data = err.details as Record<string, unknown> | null;
+        setError((data?.exception as string | undefined) || t.page.restock.errors.generic);
+      } else {
+        setError(t.page.restock.errors.generic);
+      }
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={!!product} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>{t.page.restock.title(product.name)}</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4" noValidate>
+          <p className="text-sm text-muted-foreground">{t.page.restock.description}</p>
+          {error && (
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          <div className="space-y-2">
+            <Label htmlFor="restock-qty">{t.page.restock.qtyLabel}</Label>
+            <Input
+              id="restock-qty"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={qty}
+              onChange={(e) => setQty(e.target.value)}
+              autoFocus
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="restock-cost">{t.page.restock.costLabel}</Label>
+            <Input
+              id="restock-cost"
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              placeholder="0.00"
+              value={cost}
+              onChange={(e) => setCost(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">{t.page.restock.costHint}</p>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
+              {t.page.restock.cancel}
+            </Button>
+            <Button type="submit" disabled={submitting}>
+              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+              {t.page.restock.submit}
+            </Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   );
 }

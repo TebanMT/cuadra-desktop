@@ -35,9 +35,18 @@ pub fn run() {
         })
         .on_window_event(move |window, event| {
             // Window-X click → graceful shutdown of the sidecar so it
-            // releases port 9090 before the next launch. This path is
-            // the "happy" close on every platform.
+            // releases port 9090 before the next launch. Only la main
+            // dispara este shutdown: la kiosk vive en su propia
+            // WebviewWindow y cerrarla NO debe matar al sidecar (la
+            // recepción sigue cobrando). Al cerrar la main, además,
+            // arrastramos a la kiosk para no dejar proceso huérfano.
             if let tauri::WindowEvent::CloseRequested { .. } = event {
+                if window.label() != "main" {
+                    return;
+                }
+                if let Some(kiosk) = window.app_handle().get_webview_window("kiosk") {
+                    let _ = kiosk.close();
+                }
                 let state: tauri::State<AppState> = window.state();
                 let sm = state.sidecar.clone();
                 tauri::async_runtime::block_on(async move {

@@ -56,6 +56,7 @@ import {
   type PaymentConcept,
   type PaymentMethod,
 } from "@/hooks/useBilling";
+import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useMember } from "@/hooks/useMembers";
 import { todayIso } from "@/lib/dates";
 import { billing as t } from "@/strings/billing";
@@ -149,6 +150,7 @@ function rowAccent(p: Payment): string | null {
 
 export default function CobrosPage() {
   const navigate = useNavigate();
+  const money = useMoneyVisibility();
   const [period, setPeriod] = useState<Period>("today");
   const [customFrom, setCustomFrom] = useState<string>(todayIso());
   const [customTo, setCustomTo] = useState<string>(todayIso());
@@ -231,7 +233,7 @@ export default function CobrosPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <StatCard
           title={t.cobranza.stats.total}
-          value={fmtMoney(query.data?.total_paid ?? 0)}
+          value={money.fmt(query.data?.total_paid ?? 0)}
           icon={CircleDollarSign}
           tone="neutral"
           hint={t.cobranza.stats.totalHint}
@@ -245,19 +247,19 @@ export default function CobrosPage() {
         />
         <StatCard
           title={t.cobranza.stats.cash}
-          value={fmtMoney(query.data?.cash_total ?? 0)}
+          value={money.fmt(query.data?.cash_total ?? 0)}
           icon={Banknote}
           tone="success"
         />
         <StatCard
           title={t.cobranza.stats.transfer}
-          value={fmtMoney(query.data?.transfer_total ?? 0)}
+          value={money.fmt(query.data?.transfer_total ?? 0)}
           icon={ArrowLeftRight}
           tone="neutral"
         />
         <StatCard
           title={t.cobranza.stats.card}
-          value={fmtMoney(query.data?.card_total ?? 0)}
+          value={money.fmt(query.data?.card_total ?? 0)}
           icon={Wallet}
           tone="neutral"
         />
@@ -416,7 +418,7 @@ export default function CobrosPage() {
                       <span>{conceptLabel(p.concept)}</span>
                       {p.balance_pending > 0 && (
                         <span className="ml-1.5 text-xs text-warning">
-                          • {t.cobranza.pendingTag(fmtMoney(p.balance_pending))}
+                          • {t.cobranza.pendingTag(money.fmt(p.balance_pending))}
                         </span>
                       )}
                       {p.concept === "refund" && (
@@ -431,7 +433,7 @@ export default function CobrosPage() {
                         accent
                       )}
                     >
-                      {fmtMoney(p.amount)}
+                      {money.fmt(p.amount)}
                     </DataTableCell>
                     <DataTableCell>
                       <MethodBadge method={p.payment_method} />

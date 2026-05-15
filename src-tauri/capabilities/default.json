@@ -1,15 +1,22 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capabilities for the main Tinta window",
+  "description": "Capabilities for the main Tinta window and the kiosk window. Both load the same SPA and share the same API surface (auth, checkin, sidecar IPC).",
   "windows": [
-    "main"
+    "main",
+    "kiosk"
   ],
   "permissions": [
     "core:default",
     "core:window:default",
+    "core:window:allow-close",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-set-focus",
     "core:event:default",
     "core:path:default",
+    "core:webview:default",
+    "core:webview:allow-create-webview-window",
     "shell:default",
     "shell:allow-execute",
     "dialog:default",

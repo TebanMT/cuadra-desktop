@@ -18,8 +18,11 @@ export interface Product {
   category: string;
   price: number;
   stock: number;
-  min_stock: number;
-  photo_url?: string | null;
+  // Backend returns `stock_minimum` (productResp en
+  // product_controller.go). Mantener este nombre, no `min_stock` —
+  // sino el campo queda undefined y la UI pinta 0.
+  stock_minimum: number;
+  image_url?: string | null;
   active: boolean;
   created_at: string;
   updated_at?: string;
@@ -27,11 +30,18 @@ export interface Product {
 
 export type ProductStatusFilter = "active" | "inactive" | "all";
 
+// Columnas ordenables — coincide con product/domain/repository.go
+// (whitelist en backend). Default: name asc.
+export type ProductSortColumn = "name" | "price" | "stock" | "category";
+export type SortDirection = "asc" | "desc";
+
 export interface ListProductsInput {
   q?: string;
   category?: string;
   status?: ProductStatusFilter;
   low_stock?: boolean;
+  sort?: ProductSortColumn;
+  dir?: SortDirection;
   page?: number;
   page_size?: number;
 }
@@ -41,15 +51,43 @@ export interface ProductListResponse {
   total: number;
   page: number;
   page_size: number;
+  // totals — stats globales sobre el filtro completo (no la página
+  // visible). Reemplaza el cálculo client-side de items.filter(...)
+  // que mentía cuando había paginación.
+  totals: {
+    total_value: number;
+    low_count: number;
+    out_count: number;
+  };
 }
 
-export interface UpsertProductInput {
+// CreateProductInput — shape JSON que el backend espera en POST
+// /api/v1/products (createProductReq en product_controller.go). Ojo:
+// el stock inicial viaja como `initial_stock`, NO `stock`; y el mínimo
+// como `stock_minimum`, NO `min_stock`. Mandar nombres viejos hacía
+// que el backend los ignorara y todo quedara en 0.
+// `initial_cost` es opcional — se persiste en el stock_movement
+// inicial (type='restock') para que el dueño pueda ver cuánto gastó
+// llenando el inventario de arranque en el reporte de egresos.
+export interface CreateProductInput {
   name: string;
-  category: string;
+  category?: string;
   price: number;
-  stock: number;
-  min_stock: number;
-  photo_url?: string;
+  initial_stock: number;
+  stock_minimum: number;
+  initial_cost?: number;
+  image_url?: string;
+}
+
+// UpdateProductInput — PATCH /api/v1/products/:id no acepta stock
+// (solo se cambia via /adjust-stock). Mismo rename de stock_minimum
+// que en create.
+export interface UpdateProductInput {
+  name: string;
+  category?: string;
+  price: number;
+  stock_minimum: number;
+  image_url?: string;
 }
 
 export type StockMovementType = "restock" | "damage" | "count";
@@ -72,8 +110,13 @@ function buildQuery(filters: ListProductsInput): Record<string, string | number 
   return {
     q: filters.q || undefined,
     category: filters.category || undefined,
-    status: filters.status === "all" ? undefined : filters.status,
+    // BE ya acepta "all" explícitamente desde que migramos a ActiveFilter
+    // (3 estados). Pero "all" sigue mapeando al default si el FE lo
+    // omite, así que lo pasamos solo cuando importa (inactive/all).
+    status: filters.status,
     low_stock: filters.low_stock || undefined,
+    sort: filters.sort,
+    dir: filters.dir,
     page: filters.page,
     page_size: filters.page_size,
   };
@@ -103,7 +146,7 @@ export function useActiveProducts() {
 export function useCreateProduct() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpsertProductInput) => api.post<Product>("/api/v1/products", input),
+    mutationFn: (input: CreateProductInput) => api.post<Product>("/api/v1/products", input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
   });
 }
@@ -111,7 +154,7 @@ export function useCreateProduct() {
 export function useUpdateProduct(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: UpsertProductInput) =>
+    mutationFn: (input: UpdateProductInput) =>
       api.patch<Product>(`/api/v1/products/${id}`, input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
   });
@@ -144,8 +187,8 @@ export function useAdjustStock(productId: string) {
 
 export type StockLevel = "ok" | "low" | "out";
 
-export function stockLevel(product: Pick<Product, "stock" | "min_stock">): StockLevel {
+export function stockLevel(product: Pick<Product, "stock" | "stock_minimum">): StockLevel {
   if (product.stock <= 0) return "out";
-  if (product.stock <= product.min_stock) return "low";
+  if (product.stock <= product.stock_minimum) return "low";
   return "ok";
 }

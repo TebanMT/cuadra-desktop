@@ -8,7 +8,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { members as t } from "@/strings/members";
 
 type Stage = "starting" | "live" | "preview" | "error";
 type ErrorKind = "notFound" | "denied" | "generic";
@@ -17,6 +16,11 @@ interface Props {
   open: boolean;
   onOpenChange(open: boolean): void;
   onCapture(dataUrl: string): void;
+  // title cambia por contexto ("Capturar foto del socio" /
+  // "Capturar foto del producto") — el resto de copy es genérico
+  // y vive hardcoded acá para no inflar /strings con un namespace
+  // que solo se duplica entre callers.
+  title: string;
 }
 
 // CameraCaptureModal — captura una foto con la webcam del operador.
@@ -25,7 +29,7 @@ interface Props {
 // volver-a-tomar). Si no apagamos los tracks, la luz indicadora de la
 // cámara queda encendida y el operador asume que Tinta sigue mirando —
 // mal mensaje en un equipo compartido del gimnasio.
-export function CameraCaptureModal({ open, onOpenChange, onCapture }: Props) {
+export function CameraCaptureModal({ open, onOpenChange, onCapture, title }: Props) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [stage, setStage] = useState<Stage>("starting");
@@ -118,7 +122,7 @@ export function CameraCaptureModal({ open, onOpenChange, onCapture }: Props) {
     >
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{t.form.camera.title}</DialogTitle>
+          <DialogTitle>{title}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -126,7 +130,7 @@ export function CameraCaptureModal({ open, onOpenChange, onCapture }: Props) {
             {stage === "starting" && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/80">
                 <Loader2 className="h-8 w-8 animate-spin" />
-                <p className="text-sm">{t.form.camera.starting}</p>
+                <p className="text-sm">Iniciando cámara…</p>
               </div>
             )}
             {stage === "error" && (
@@ -134,7 +138,11 @@ export function CameraCaptureModal({ open, onOpenChange, onCapture }: Props) {
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
                   <AlertDescription>
-                    {t.form.camera.errors[errorKind]}
+                    {errorKind === "notFound"
+                      ? "No se detectó cámara conectada."
+                      : errorKind === "denied"
+                        ? "Tinta no tiene permiso para usar la cámara. Abre Ajustes del Sistema → Privacidad → Cámara."
+                        : "No pudimos abrir la cámara. Vuelve a intentar."}
                   </AlertDescription>
                 </Alert>
               </div>
@@ -154,42 +162,42 @@ export function CameraCaptureModal({ open, onOpenChange, onCapture }: Props) {
               // El video live va espejado (CSS) porque es lo natural para
               // una selfie cam — el operador se ve "como en un espejo".
               // El snapshot NO va espejado: es la captura cruda del canvas,
-              // y así es como queda guardado y se verá en el perfil del
-              // socio. Mantener consistencia preview→stored evita el "la
-              // foto que aprobé no es la que se guardó".
+              // y así es como queda guardado. Mantener consistencia
+              // preview→stored evita el "la foto que aprobé no es la que
+              // se guardó".
               <img src={snapshot} alt="" className="h-full w-full object-cover" />
             )}
           </div>
 
           {stage === "live" && (
             <p className="text-sm text-muted-foreground text-center">
-              {t.form.camera.hint}
+              Cuando estés listo, presiona Capturar.
             </p>
           )}
 
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
             <Button type="button" variant="outline" onClick={close}>
-              {t.form.camera.cancel}
+              Cancelar
             </Button>
             {stage === "live" && (
               <Button type="button" onClick={capture}>
                 <Camera className="h-4 w-4 mr-2" />
-                {t.form.camera.capture}
+                Capturar
               </Button>
             )}
             {stage === "preview" && (
               <>
                 <Button type="button" variant="outline" onClick={retake}>
-                  {t.form.camera.retake}
+                  Volver a tomar
                 </Button>
                 <Button type="button" onClick={use}>
-                  {t.form.camera.use}
+                  Usar esta foto
                 </Button>
               </>
             )}
             {stage === "error" && errorKind !== "notFound" && (
               <Button type="button" onClick={startStream}>
-                {t.form.camera.capture}
+                Capturar
               </Button>
             )}
           </div>

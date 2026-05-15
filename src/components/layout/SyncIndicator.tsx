@@ -1,14 +1,23 @@
 import { useState } from "react";
-import { CheckCircle2, AlertTriangle, AlertCircle, RefreshCw } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import {
+  CheckCircle2,
+  AlertTriangle,
+  AlertCircle,
+  KeyRound,
+  RefreshCw,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { useSyncStatus, useTriggerSync, levelOf, type SyncStatus } from "@/hooks/useSyncStatus";
 import { cn } from "@/lib/utils";
 import { shell } from "@/strings/shell";
@@ -17,6 +26,7 @@ export function SyncIndicator() {
   const [open, setOpen] = useState(false);
   const { data } = useSyncStatus();
   const trigger = useTriggerSync();
+  const navigate = useNavigate();
   const level = levelOf(data);
 
   const Icon =
@@ -24,6 +34,8 @@ export function SyncIndicator() {
       ? CheckCircle2
       : level === "syncing"
       ? RefreshCw
+      : level === "auth"
+      ? KeyRound
       : level === "warn"
       ? AlertTriangle
       : AlertCircle;
@@ -32,6 +44,8 @@ export function SyncIndicator() {
       ? "text-success"
       : level === "syncing"
       ? "text-muted-foreground"
+      : level === "auth"
+      ? "text-warning"
       : level === "warn"
       ? "text-warning"
       : "text-destructive";
@@ -41,6 +55,8 @@ export function SyncIndicator() {
       ? shell.sync.online
       : level === "syncing"
       ? shell.sync.syncing
+      : level === "auth"
+      ? shell.sync.authInvalid
       : level === "warn"
       ? shell.sync.offline
       : shell.sync.error;
@@ -75,9 +91,24 @@ export function SyncIndicator() {
               <Icon className={cn("h-5 w-5", colorClass)} />
               {shell.sync.detailsTitle}
             </DialogTitle>
-            <DialogDescription>{label}</DialogDescription>
+            <DialogDescription>
+              {level === "auth" ? shell.sync.authInvalidHint : label}
+            </DialogDescription>
           </DialogHeader>
           <SyncDetail status={data} />
+          {level === "auth" && (
+            <DialogFooter>
+              <Button
+                onClick={() => {
+                  setOpen(false);
+                  navigate("/auth/login");
+                }}
+              >
+                <KeyRound className="h-4 w-4" />
+                {shell.sync.relogin}
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </div>
