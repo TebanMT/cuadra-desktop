@@ -35,12 +35,17 @@
 # Flags de build (validados manualmente 2026-05-16, ver memoria
 # project_biometric_strategy.md):
 #
-#     ./setup.sh "$INSTALL_DIR" --MSYS --64
+#     ./setup.sh "$INSTALL_DIR" --MSYS --STDLIBS --64
 #
-#   --MSYS implica --STDLIBS (sin libpng/openjp2 — usamos JPEG vía libjpegb,
-#   el sidecar Go re-encodea el PNG entrante como JPEG antes de invocar
-#   mindtct) y --without-X11 (NBIS sólo lo usa para utilidades gráficas
-#   irrelevantes para nosotros).
+#   --MSYS activa el path rules_msys.mak.src (sed-pipeline + paths MSYS) y
+#   apaga X11. **Pero NO implica --STDLIBS** a pesar de que setea el flag
+#   STDLIBS_FLAG=1 (es un bug del setup.sh): para apagar libpng + openjp2
+#   hay que pasar --STDLIBS explícito, que es lo que apaga
+#   NBIS_PNG_FLAG/NBIS_OPENJP2_FLAG. Sin esto el build intenta compilar
+#   libpng-1.2.23 (que no tiene `configure` moderno) y openjp2 (que pide
+#   CMake < 3.5, removido en CMake 3.x).
+#   --64 fuerza -m64. El bundle final sólo necesita el matcher JPEG-based
+#   (el sidecar Go re-encodea el PNG entrante como JPEG antes de mindtct).
 #
 # Output:
 #   Cada release tag `nbis-vX.Y` queda con dos assets en
@@ -110,23 +115,23 @@ jobs:
           cd nbis
           echo "NBIS_DIR=$(pwd -W)" >> "$GITHUB_ENV"
 
-      - name: Configure NBIS (setup.sh --MSYS --64)
-        # `--MSYS` activa el path rules_msys.mak.src + implica --STDLIBS +
-        # --without-X11. `--64` fuerza -m64. El install dir tiene que ser
-        # absoluto y en formato `C:/...` (con forward slashes) según
-        # INSTALL_WINDOWS.txt; pwd -W ya lo entrega así en MSYS2.
+      - name: Configure NBIS (setup.sh --MSYS --STDLIBS --64)
+        # `--MSYS` activa el path rules_msys.mak.src + apaga X11. `--STDLIBS`
+        # apaga libpng + openjp2 (sino el build intenta compilar libpng-1.2.23
+        # sin `configure` moderno, y openjp2 con CMake < 3.5 removido). `--64`
+        # fuerza -m64. El install dir tiene que ser absoluto y en formato
+        # `C:/...` (con forward slashes) según INSTALL_WINDOWS.txt; pwd -W
+        # ya lo entrega así en MSYS2.
         #
-        # setup.sh no lee stdin (sólo procesa args + corre gcc/sed). Originalmente
-        # le metí `yes |` defensivo, pero como termina rápido el `yes` recibe
-        # SIGPIPE y bajo `set -o pipefail` el step entero muere con exit 141.
-        # Redirigimos stdin de /dev/null para hacer explícito que no hay
-        # prompt que responder.
+        # setup.sh no lee stdin (sólo procesa args + corre gcc/sed). Redirigimos
+        # de /dev/null para hacer explícito que no hay prompt — un `yes |`
+        # defensivo recibiría SIGPIPE y bajo pipefail mataría el step.
         working-directory: nbis
         run: |
           set -euo pipefail
           INSTALL_DIR="$(pwd -W)/install"
           mkdir -p "$INSTALL_DIR"
-          ./setup.sh "$INSTALL_DIR" --MSYS --64 < /dev/null
+          ./setup.sh "$INSTALL_DIR" --MSYS --STDLIBS --64 < /dev/null
           echo "INSTALL_DIR=$INSTALL_DIR" >> "$GITHUB_ENV"
 
       - name: Build NBIS (make config && make it)
