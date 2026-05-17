@@ -115,14 +115,18 @@ jobs:
         # --without-X11. `--64` fuerza -m64. El install dir tiene que ser
         # absoluto y en formato `C:/...` (con forward slashes) según
         # INSTALL_WINDOWS.txt; pwd -W ya lo entrega así en MSYS2.
+        #
+        # setup.sh no lee stdin (sólo procesa args + corre gcc/sed). Originalmente
+        # le metí `yes |` defensivo, pero como termina rápido el `yes` recibe
+        # SIGPIPE y bajo `set -o pipefail` el step entero muere con exit 141.
+        # Redirigimos stdin de /dev/null para hacer explícito que no hay
+        # prompt que responder.
         working-directory: nbis
         run: |
           set -euo pipefail
           INSTALL_DIR="$(pwd -W)/install"
           mkdir -p "$INSTALL_DIR"
-          # Aceptamos automáticamente el prompt de licencia (NBIS pide
-          # confirmación al primer setup.sh; echo y es lo más portable).
-          yes | ./setup.sh "$INSTALL_DIR" --MSYS --64
+          ./setup.sh "$INSTALL_DIR" --MSYS --64 < /dev/null
           echo "INSTALL_DIR=$INSTALL_DIR" >> "$GITHUB_ENV"
 
       - name: Build NBIS (make config && make it)
