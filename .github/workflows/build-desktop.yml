@@ -253,14 +253,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download NBIS binaries (mindtct.exe + bozorth3.exe)
-        # Los baja del release `${NBIS_VERSION}` de cuadra-core a
+        # Los baja del release `${NBIS_VERSION}` de este mismo repo a
         # src-tauri/binaries/nbis/. tauri.windows.conf.json los bundlea
         # como resources al lado del .exe principal, donde el sidecar
         # los resuelve via filepath.Dir(os.Executable()).
+        # GITHUB_TOKEN (auto-inyectado por Actions) alcanza porque el
+        # release vive en el mismo repo — sin necesidad de PAT extra.
         env:
-          GH_TOKEN: ${{ secrets.TINTA_CORE_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NBIS_VERSION: ${{ env.NBIS_VERSION }}
-          TINTA_CORE_REPO: ${{ env.TINTA_CORE_REPO }}
         shell: bash
         run: bash scripts/prepare-nbis-windows.sh
 

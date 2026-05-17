@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
 # prepare-nbis-windows.sh — descarga los binarios NBIS Windows (mindtct.exe +
-# bozorth3.exe) desde un release de cuadra-core y los deja donde Tauri los
-# espera para el bundle Windows.
+# bozorth3.exe) desde un release de este mismo repo (cuadra-desktop) y los
+# deja donde Tauri los espera para el bundle Windows.
 #
 # Pipeline:
-#   1. cuadra-core/.github/workflows/build-nbis-windows.yml compila los dos
+#   1. cuadra-desktop/.github/workflows/build-nbis-windows.yml compila los dos
 #      .exe con MSYS2/MinGW y publica un release `nbis-vX.Y` con los binarios
-#      como assets.
+#      como assets (en este mismo repo).
 #   2. cuadra-desktop/.github/workflows/build-desktop.yml (job Windows) llama
-#      a este script ANTES de `pnpm tauri build`.
+#      a este script ANTES de `pnpm tauri build` — usa el GITHUB_TOKEN del
+#      runner para autenticarse contra los releases del propio repo, sin PAT
+#      cross-repo.
 #   3. Tauri los empaqueta como resources al instalador (configuración en
 #      src-tauri/tauri.windows.conf.json, sólo aplica al target Windows).
 #   4. El sidecar Go (digitalpersona.go resolveBinaries) los encuentra al
@@ -17,8 +19,8 @@
 #
 # Uso (CI):
 #
-#   NBIS_VERSION=nbis-v1 TINTA_CORE_REPO=TebanMT/cuadra-core \
-#     GH_TOKEN=$TINTA_CORE_TOKEN bash scripts/prepare-nbis-windows.sh
+#   NBIS_VERSION=nbis-v1 GH_TOKEN=$GITHUB_TOKEN \
+#     bash scripts/prepare-nbis-windows.sh
 #
 # Uso (local — sólo si querés probar el bundle Windows desde tu máquina, que
 # en general no funciona desde macOS por el toolchain MSVC):
@@ -27,22 +29,22 @@
 #   NBIS_VERSION=nbis-v1 bash scripts/prepare-nbis-windows.sh
 #
 # Variables:
-#   NBIS_VERSION     (required) tag del release en cuadra-core, ej. "nbis-v1".
-#   TINTA_CORE_REPO  default "TebanMT/cuadra-core"
-#   GH_TOKEN         PAT con acceso de lectura a releases de cuadra-core
-#                    (privado). En CI usar el mismo secret TINTA_CORE_TOKEN
-#                    del checkout. Si está vacío, asumimos `gh auth` ya
-#                    está configurado.
-#   DEST_DIR         default "src-tauri/binaries/nbis"
+#   NBIS_VERSION   (required) tag del release de este repo, ej. "nbis-v1".
+#   NBIS_REPO      default "TebanMT/cuadra-desktop" (override sólo si moviste
+#                  los releases a otro repo).
+#   GH_TOKEN       Token con scope `contents: read` sobre NBIS_REPO. En CI
+#                  el GITHUB_TOKEN default del runner alcanza (mismo repo).
+#                  Si está vacío, asumimos `gh auth` ya está configurado.
+#   DEST_DIR       default "src-tauri/binaries/nbis"
 #
 # Idempotente: si los .exe ya existen y matchean el tag esperado (vía un
 # .nbis-version stamp), no re-descarga.
 
 set -euo pipefail
 
-: "${NBIS_VERSION:?Falta NBIS_VERSION (ej: nbis-v1) — debe coincidir con un tag de release en cuadra-core}"
+: "${NBIS_VERSION:?Falta NBIS_VERSION (ej: nbis-v1) — debe coincidir con un tag de release en NBIS_REPO}"
 
-TINTA_CORE_REPO="${TINTA_CORE_REPO:-TebanMT/cuadra-core}"
+NBIS_REPO="${NBIS_REPO:-TebanMT/cuadra-desktop}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEST_DIR="${DEST_DIR:-$REPO_ROOT/src-tauri/binaries/nbis}"
@@ -70,7 +72,7 @@ download_with_gh() {
   local out="$2"
   echo "  ↓ $asset (via gh release)"
   gh release download "$NBIS_VERSION" \
-    --repo "$TINTA_CORE_REPO" \
+    --repo "$NBIS_REPO" \
     --pattern "$asset" \
     --output "$out" \
     --clobber
@@ -80,7 +82,7 @@ download_with_curl() {
   local asset="$1"
   local out="$2"
   if [ -z "${GH_TOKEN:-}" ]; then
-    echo "::error:: GH_TOKEN vacío y gh CLI no disponible — no hay forma de autenticar contra el release privado" >&2
+    echo "::error:: GH_TOKEN vacío y gh CLI no disponible — no hay forma de autenticar contra el release" >&2
     exit 1
   fi
   # La API REST de GitHub permite resolver el asset por nombre dentro del tag,
@@ -88,7 +90,7 @@ download_with_curl() {
   # el endpoint /releases/tags/{tag} y filtrar con jq. Si no hay jq tampoco,
   # caemos al endpoint legacy de assets que sí da redirección directa.
   echo "  ↓ $asset (via curl REST)"
-  local api="https://api.github.com/repos/$TINTA_CORE_REPO/releases/tags/$NBIS_VERSION"
+  local api="https://api.github.com/repos/$NBIS_REPO/releases/tags/$NBIS_VERSION"
   local asset_url
   asset_url=$(curl -fsSL \
     -H "Authorization: Bearer $GH_TOKEN" \
@@ -110,7 +112,7 @@ download_with_curl() {
         fi
       done)
   if [ -z "$asset_url" ]; then
-    echo "::error:: No encontré el asset '$asset' en $TINTA_CORE_REPO@$NBIS_VERSION" >&2
+    echo "::error:: No encontré el asset '$asset' en $NBIS_REPO@$NBIS_VERSION" >&2
     exit 1
   fi
   curl -fsSL \
@@ -130,7 +132,7 @@ download_asset() {
   fi
 }
 
-echo "→ Descargando NBIS $NBIS_VERSION desde $TINTA_CORE_REPO"
+echo "→ Descargando NBIS $NBIS_VERSION desde $NBIS_REPO"
 download_asset "mindtct.exe" "$DEST_DIR/mindtct.exe"
 download_asset "bozorth3.exe" "$DEST_DIR/bozorth3.exe"
 
