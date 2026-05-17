@@ -11,8 +11,13 @@
 #      a este script ANTES de `pnpm tauri build` — usa el GITHUB_TOKEN del
 #      runner para autenticarse contra los releases del propio repo, sin PAT
 #      cross-repo.
-#   3. Tauri los empaqueta como resources al instalador (configuración en
+#   3. Tauri los empaqueta vía `bundle.externalBin` (configuración en
 #      src-tauri/tauri.windows.conf.json, sólo aplica al target Windows).
+#      externalBin exige que cada binario tenga el sufijo del target triple
+#      (igual que el sidecar `tinta-sidecar-<triple>.exe`); Tauri lo strippea
+#      al bundlear y deja `mindtct.exe` / `bozorth3.exe` al lado del exe
+#      principal. Por eso este script guarda los .exe CON el sufijo
+#      `-x86_64-pc-windows-msvc`.
 #   4. El sidecar Go (digitalpersona.go resolveBinaries) los encuentra al
 #      lado de su propio .exe dentro del install dir y los ejecuta como
 #      subprocess (ADR-004-bis).
@@ -29,13 +34,16 @@
 #   NBIS_VERSION=nbis-v1 bash scripts/prepare-nbis-windows.sh
 #
 # Variables:
-#   NBIS_VERSION   (required) tag del release de este repo, ej. "nbis-v1".
-#   NBIS_REPO      default "TebanMT/cuadra-desktop" (override sólo si moviste
-#                  los releases a otro repo).
-#   GH_TOKEN       Token con scope `contents: read` sobre NBIS_REPO. En CI
-#                  el GITHUB_TOKEN default del runner alcanza (mismo repo).
-#                  Si está vacío, asumimos `gh auth` ya está configurado.
-#   DEST_DIR       default "src-tauri/binaries/nbis"
+#   NBIS_VERSION    (required) tag del release de este repo, ej. "nbis-v1".
+#   NBIS_REPO       default "TebanMT/cuadra-desktop" (override sólo si moviste
+#                   los releases a otro repo).
+#   GH_TOKEN        Token con scope `contents: read` sobre NBIS_REPO. En CI
+#                   el GITHUB_TOKEN default del runner alcanza (mismo repo).
+#                   Si está vacío, asumimos `gh auth` ya está configurado.
+#   TARGET_TRIPLE   default "x86_64-pc-windows-msvc" — el sufijo que Tauri
+#                   externalBin espera. Sólo cambialo si agregás un target
+#                   Windows distinto (arm64, etc).
+#   DEST_DIR        default "src-tauri/binaries/nbis"
 #
 # Idempotente: si los .exe ya existen y matchean el tag esperado (vía un
 # .nbis-version stamp), no re-descarga.
@@ -45,17 +53,23 @@ set -euo pipefail
 : "${NBIS_VERSION:?Falta NBIS_VERSION (ej: nbis-v1) — debe coincidir con un tag de release en NBIS_REPO}"
 
 NBIS_REPO="${NBIS_REPO:-TebanMT/cuadra-desktop}"
+TARGET_TRIPLE="${TARGET_TRIPLE:-x86_64-pc-windows-msvc}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DEST_DIR="${DEST_DIR:-$REPO_ROOT/src-tauri/binaries/nbis}"
 STAMP_FILE="$DEST_DIR/.nbis-version"
+
+# Nombres de salida con el sufijo del triple que externalBin exige. El asset
+# en el release se llama `mindtct.exe` a secas — el sufijo lo agregamos acá.
+MINDTCT_OUT="$DEST_DIR/mindtct-$TARGET_TRIPLE.exe"
+BOZORTH3_OUT="$DEST_DIR/bozorth3-$TARGET_TRIPLE.exe"
 
 mkdir -p "$DEST_DIR"
 
 # Skip-cache si los assets esperados ya están y matchean la versión pedida.
 # Útil en local cuando el dev itera sobre `pnpm tauri build` sin querer pegarle
 # a la red en cada vuelta.
-if [ -f "$STAMP_FILE" ] && [ -f "$DEST_DIR/mindtct.exe" ] && [ -f "$DEST_DIR/bozorth3.exe" ]; then
+if [ -f "$STAMP_FILE" ] && [ -f "$MINDTCT_OUT" ] && [ -f "$BOZORTH3_OUT" ]; then
   current=$(cat "$STAMP_FILE")
   if [ "$current" = "$NBIS_VERSION" ]; then
     echo "✓ NBIS $NBIS_VERSION ya está en $DEST_DIR (skip download)"
@@ -133,12 +147,12 @@ download_asset() {
 }
 
 echo "→ Descargando NBIS $NBIS_VERSION desde $NBIS_REPO"
-download_asset "mindtct.exe" "$DEST_DIR/mindtct.exe"
-download_asset "bozorth3.exe" "$DEST_DIR/bozorth3.exe"
+download_asset "mindtct.exe" "$MINDTCT_OUT"
+download_asset "bozorth3.exe" "$BOZORTH3_OUT"
 
 # Defensa: que tengan tamaño razonable (>50KB) — un .exe NBIS stripped pesa
 # ~100KB, cualquier asset corrupto sería detectable acá.
-for f in "$DEST_DIR/mindtct.exe" "$DEST_DIR/bozorth3.exe"; do
+for f in "$MINDTCT_OUT" "$BOZORTH3_OUT"; do
   size=$(wc -c < "$f")
   if [ "$size" -lt 50000 ]; then
     echo "::error:: $f parece corrupto (tamaño=$size bytes, esperado >50KB)" >&2

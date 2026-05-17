@@ -254,9 +254,10 @@ jobs:
 
       - name: Download NBIS binaries (mindtct.exe + bozorth3.exe)
         # Los baja del release `${NBIS_VERSION}` de este mismo repo a
-        # src-tauri/binaries/nbis/. tauri.windows.conf.json los bundlea
-        # como resources al lado del .exe principal, donde el sidecar
-        # los resuelve via filepath.Dir(os.Executable()).
+        # src-tauri/binaries/nbis/ con el sufijo del target triple que
+        # externalBin exige (mindtct-x86_64-pc-windows-msvc.exe). Tauri los
+        # bundlea via externalBin al lado del .exe principal, donde el
+        # sidecar los resuelve via filepath.Dir(os.Executable()).
         # GITHUB_TOKEN (auto-inyectado por Actions) alcanza porque el
         # release vive en el mismo repo — sin necesidad de PAT extra.
         env:
@@ -267,9 +268,10 @@ jobs:
 
       - name: Build Tauri
         # `--config src-tauri/tauri.windows.conf.json` merge un overlay
-        # Windows-only sobre el config base — añade los binarios NBIS como
-        # resources sin contaminar el bundle macOS (que no tiene ni necesita
-        # esos .exe). Tauri 2 aplica el overlay después del config principal.
+        # Windows-only sobre el config base — extiende `bundle.externalBin`
+        # con los binarios NBIS sin contaminar el bundle macOS (que no tiene
+        # ni necesita esos .exe). El merge de Tauri 2 (JSON Merge Patch)
+        # reemplaza arrays enteros, por eso el overlay re-lista tinta-sidecar.
         run: pnpm tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
 
       - name: Upload Windows installer (NSIS .exe)
