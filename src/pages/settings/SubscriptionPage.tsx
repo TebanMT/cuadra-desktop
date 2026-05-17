@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { open as openExternal } from "@tauri-apps/plugin-shell";
 import { toast } from "sonner";
 import {
@@ -13,16 +12,6 @@ import {
 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { StatCard } from "@/components/shared/StatCard";
 import {
   DataTable,
@@ -36,9 +25,7 @@ import {
   SectionCard,
 } from "@/components/shared/PagePrimitives";
 import {
-  useStartCheckout,
   useSubscription,
-  type CheckoutProvider,
   type SubscriptionEvent,
 } from "@/hooks/useSubscription";
 import { fmtMoney } from "@/hooks/useBilling";
@@ -47,15 +34,48 @@ import { fmtDate } from "@/lib/dates";
 
 const SUPPORT_WHATSAPP_URL = "https://wa.me/525555555555";
 
-type PlanLabel = "Trial" | "Standard" | "Plus" | "—";
+// El flujo de activación / cambio de plan vive end-to-end en el dashboard
+// cloud (entinta.app). Razones:
+//   - Stripe / Mercado Pago corren en browser por construcción (los webviews
+//     embebidos los bloquean), así que el desktop ya tendría que sacar al
+//     dueño al browser para terminar el cobro.
+//   - Centralizar billing en el dashboard significa que tarjeta + dirección
+//     fiscal + recibos viven en un solo lugar — menos contextos para que el
+//     dueño se confunda.
+//   - El sidecar no necesita proxy de checkout, refresh de tokens cloud,
+//     manejo de errores de red para una acción que SIEMPRE requiere internet.
+const DASHBOARD_BILLING_URL = "https://entinta.app/settings/subscription";
+const DASHBOARD_HISTORY_URL = "https://entinta.app/settings/subscription#history";
 
+type PlanLabel = "Standard" | "Plus" | "—";
+
+// planLabel devuelve el TIER al que el dueño tiene acceso hoy. Trial =
+// Standard (la prueba habilita features Standard). El flag isTrial separado
+// se usa para colorear y mostrar el sub-texto "en prueba".
 function planLabel(plan: string | undefined): PlanLabel {
   if (!plan) return "—";
-  if (plan === "trial") return "Trial";
-  if (plan === "pro_annual") return "Plus";
-  if (plan === "pro_monthly") return "Standard";
-  // Fallback for unknown future plan strings — capitalise first letter.
-  return (plan.charAt(0).toUpperCase() + plan.slice(1)) as PlanLabel;
+  if (plan === "plus_monthly" || plan === "plus_annual") return "Plus";
+  // trial + standard_monthly/annual + cualquier valor desconocido caen a
+  // Standard: hoy es el único tier vendible, y el trial habilita Standard.
+  return "Standard";
+}
+
+// daysUntil cuenta días enteros (truncados hacia arriba) hasta la fecha
+// ISO dada. Devuelve null si no hay fecha. Negativo si ya pasó.
+function daysUntil(iso: string | null | undefined): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.ceil((t - Date.now()) / (24 * 60 * 60 * 1000));
+}
+
+// trialHint compone "En prueba — X días restantes" / "Tu prueba terminó hoy"
+// con concordancia singular/plural y caso límite negativos.
+function trialHint(daysLeft: number | null): string {
+  if (daysLeft == null) return "En prueba de 30 días";
+  if (daysLeft <= 0) return "Tu prueba terminó";
+  if (daysLeft === 1) return "En prueba — queda 1 día";
+  return `En prueba — quedan ${daysLeft} días`;
 }
 
 function eventTypeLabel(type: SubscriptionEvent["type"]): string {
@@ -94,58 +114,54 @@ function statusLabel(status: string | undefined): string {
   return "Activo";
 }
 
-type CheckoutPlan = "pro_monthly" | "pro_annual";
+// openInBrowser abre la URL en el navegador del sistema vía Tauri shell.
+// Si falla (capability mal configurada, Tauri no bootstrapped en tests),
+// loguea + intenta copiar la URL al portapapeles + muestra toast con la
+// URL para que el dueño la abra a mano. Históricamente esto fallaba en
+// silencio porque el catch comía el error y el botón parecía no responder.
+async function openInBrowser(url: string) {
+  try {
+    await openExternal(url);
+  } catch (err) {
+    console.error("[subscription] openExternal failed:", err);
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.error("No pudimos abrir el navegador. Copiamos el link, pégalo en tu navegador.", {
+        description: url,
+        duration: 8000,
+      });
+    } catch {
+      toast.error("Abre este link en tu navegador:", {
+        description: url,
+        duration: 12000,
+      });
+    }
+  }
+}
 
-const PLAN_PRICE_MXN: Record<CheckoutPlan, number> = {
-  pro_monthly: 799,
-  pro_annual: 1599,
-};
-
-const PLAN_DISPLAY: Record<CheckoutPlan, { name: string; tagline: string }> = {
-  pro_monthly: { name: "Standard", tagline: "Lo esencial para operar tu gym" },
-  pro_annual: { name: "Plus", tagline: "Multi-sucursal y reportes avanzados" },
-};
+async function openDashboardBilling() {
+  await openInBrowser(DASHBOARD_BILLING_URL);
+}
 
 export default function SubscriptionPage() {
   const gym = useAuthStore((s) => s.gym);
   const sub = useSubscription();
-  const startCheckout = useStartCheckout();
-  const [activateOpen, setActivateOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<CheckoutPlan>("pro_monthly");
-  const [selectedProvider, setSelectedProvider] =
-    useState<CheckoutProvider>("stripe");
 
-  const plan = gym?.subscription_plan;
-  const status = gym?.subscription_status;
+  // Plan / status efectivos: priorizamos la respuesta fresca de /subscriptions/me
+  // sobre el snapshot del auth store (que puede quedarse atrás si el cloud
+  // acabó de procesar un webhook).
+  const plan = sub.data?.plan ?? gym?.subscription_plan;
+  const status = sub.data?.status ?? gym?.subscription_status;
   const isTrial = plan === "trial";
   const isPastDue = status === "past_due";
 
-  async function handleActivate() {
-    try {
-      const result = await startCheckout.mutateAsync({
-        provider: selectedProvider,
-        plan: selectedPlan,
-      });
-      // Tauri's shell.open routes to the user's default browser. We do *not*
-      // navigate inside the desktop app — Stripe / MP block embedded webviews
-      // and the browser keeps password-manager autofill working.
-      await openExternal(result.url);
-      setActivateOpen(false);
-      toast.success("Abrimos el pago en tu navegador.", {
-        description:
-          "Cuando termines, regresa aquí; tu plan se actualiza automáticamente.",
-      });
-    } catch (err: unknown) {
-      const msg =
-        err instanceof Error
-          ? err.message
-          : "No pudimos iniciar el pago. Intenta de nuevo.";
-      toast.error(msg);
-    }
-  }
-
-  const nextChargeIso =
-    sub.data?.period_ends_at ?? gym?.subscription_ends_at ?? gym?.trial_ends_at ?? null;
+  // Trial: usamos trial_ends_at del API (autoritativo). Standard pagado:
+  // period_ends_at = próxima renovación. Fallback al gym snapshot por si
+  // /subscriptions/me viene null en el primer render.
+  const trialEndsIso = sub.data?.trial_ends_at ?? gym?.trial_ends_at ?? null;
+  const periodEndsIso = sub.data?.period_ends_at ?? gym?.subscription_ends_at ?? null;
+  const nextChargeIso = isTrial ? trialEndsIso : periodEndsIso;
+  const trialDaysLeft = isTrial ? daysUntil(trialEndsIso) : null;
 
   const history: SubscriptionEvent[] = sub.data?.history ?? [];
 
@@ -176,7 +192,7 @@ export default function SubscriptionPage() {
           value={planLabel(plan)}
           tone={isTrial ? "warning" : "primary"}
           icon={Sparkles}
-          hint={isTrial ? "Prueba de 14 días" : undefined}
+          hint={isTrial ? trialHint(trialDaysLeft) : undefined}
         />
         <StatCard
           title="Estado"
@@ -185,11 +201,11 @@ export default function SubscriptionPage() {
           icon={ShieldCheck}
         />
         <StatCard
-          title="Próximo cobro"
+          title={isTrial ? "Fin de la prueba" : "Próximo cobro"}
           value={fmtDate(nextChargeIso)}
           tone="neutral"
           icon={CalendarDays}
-          hint={isTrial && nextChargeIso ? "Fin del periodo de prueba" : undefined}
+          hint={isTrial && nextChargeIso ? "Activa antes para no perder cobros" : undefined}
         />
       </div>
 
@@ -204,10 +220,11 @@ export default function SubscriptionPage() {
             <Button
               size="sm"
               variant="default"
-              onClick={() => setActivateOpen(true)}
+              onClick={openDashboardBilling}
               className="shrink-0"
             >
-              Activar plan ahora
+              <ExternalLink className="mr-1.5 h-4 w-4" />
+              Activar en el dashboard
             </Button>
           </AlertDescription>
         </Alert>
@@ -219,11 +236,14 @@ export default function SubscriptionPage() {
           <AlertTitle>No pudimos cobrar el último intento</AlertTitle>
           <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span>Actualiza tu método de pago para no perder acceso.</span>
-            <Button asChild size="sm" variant="default" className="shrink-0">
-              <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-                <MessageCircle className="mr-1.5 h-4 w-4" />
-                Hablar por WhatsApp
-              </a>
+            <Button
+              size="sm"
+              variant="default"
+              onClick={openDashboardBilling}
+              className="shrink-0"
+            >
+              <ExternalLink className="mr-1.5 h-4 w-4" />
+              Actualizar pago
             </Button>
           </AlertDescription>
         </Alert>
@@ -237,8 +257,8 @@ export default function SubscriptionPage() {
         {history.length === 0 ? (
           <EmptyState
             icon={<CreditCard className="h-5 w-5" />}
-            title="Aún no hay movimientos."
-            hint="Cuando actives tu plan aparecerán aquí."
+            title="Sin movimientos todavía."
+            hint="Cuando actives tu plan los cobros aparecerán aquí. Para detalle completo (recibos, métodos guardados) abre tu dashboard."
           />
         ) : (
           <DataTable>
@@ -264,14 +284,31 @@ export default function SubscriptionPage() {
             </DataTableBody>
           </DataTable>
         )}
+        {history.length > 0 && (
+          <div className="flex justify-end pt-3 px-4 pb-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => openInBrowser(DASHBOARD_HISTORY_URL)}
+            >
+              <ExternalLink className="mr-1.5 h-3.5 w-3.5" />
+              Ver recibos en el dashboard
+            </Button>
+          </div>
+        )}
       </SectionCard>
 
       <SectionCard title="Facturación">
         <p className="text-sm text-muted-foreground">
-          Procesamos los cobros con Stripe / Mercado Pago. Si tienes preguntas
-          sobre un cargo, escríbenos por WhatsApp.
+          Procesamos los cobros con Stripe / Mercado Pago. Para cambiar tu plan,
+          actualizar tarjeta o descargar recibos abre tu dashboard. Si tienes
+          dudas sobre un cargo escríbenos por WhatsApp.
         </p>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button onClick={openDashboardBilling}>
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Abrir dashboard de facturación
+          </Button>
           <Button asChild variant="outline">
             <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer">
               <MessageCircle className="mr-2 h-4 w-4" />
@@ -280,107 +317,6 @@ export default function SubscriptionPage() {
           </Button>
         </div>
       </SectionCard>
-
-      <Dialog open={activateOpen} onOpenChange={setActivateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Activar plan</DialogTitle>
-            <DialogDescription>
-              Elige tu plan y método de pago. Te llevamos al sitio seguro
-              del procesador para terminar el cobro.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-5 py-2">
-            <div>
-              <Label className="mb-2 block text-sm font-medium">Plan</Label>
-              <RadioGroup
-                value={selectedPlan}
-                onValueChange={(v) => setSelectedPlan(v as CheckoutPlan)}
-                className="gap-2"
-              >
-                {(Object.keys(PLAN_DISPLAY) as CheckoutPlan[]).map((key) => {
-                  const display = PLAN_DISPLAY[key];
-                  return (
-                    <label
-                      key={key}
-                      htmlFor={`plan-${key}`}
-                      className="flex cursor-pointer items-center justify-between gap-3 rounded-md border bg-card p-3 hover:border-primary"
-                    >
-                      <div className="flex items-center gap-3">
-                        <RadioGroupItem id={`plan-${key}`} value={key} />
-                        <div>
-                          <div className="font-medium">{display.name}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {display.tagline}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-medium">
-                          {fmtMoney(PLAN_PRICE_MXN[key])}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          / mes
-                        </div>
-                      </div>
-                    </label>
-                  );
-                })}
-              </RadioGroup>
-            </div>
-
-            <div>
-              <Label className="mb-2 block text-sm font-medium">
-                Método de pago
-              </Label>
-              <RadioGroup
-                value={selectedProvider}
-                onValueChange={(v) =>
-                  setSelectedProvider(v as CheckoutProvider)
-                }
-                className="grid grid-cols-2 gap-2"
-              >
-                <label
-                  htmlFor="prov-stripe"
-                  className="flex cursor-pointer items-center gap-2 rounded-md border bg-card p-3 hover:border-primary"
-                >
-                  <RadioGroupItem id="prov-stripe" value="stripe" />
-                  <span className="text-sm">Tarjeta (Stripe)</span>
-                </label>
-                <label
-                  htmlFor="prov-mp"
-                  className="flex cursor-pointer items-center gap-2 rounded-md border bg-card p-3 hover:border-primary"
-                >
-                  <RadioGroupItem id="prov-mp" value="mercadopago" />
-                  <span className="text-sm">Mercado Pago</span>
-                </label>
-              </RadioGroup>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="ghost"
-              onClick={() => setActivateOpen(false)}
-              disabled={startCheckout.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleActivate}
-              disabled={startCheckout.isPending}
-            >
-              {startCheckout.isPending ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <ExternalLink className="mr-2 h-4 w-4" />
-              )}
-              Continuar al pago
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -53,7 +53,10 @@ export default function MemberCreatePage() {
     const v = p.values;
     return {
       full_name: v.full_name.trim(),
-      phone: v.phone.replace(/\D/g, "").slice(-10),
+      // v.phone ya viene en E.164 desde MemberForm. El slice(-10) viejo
+      // descartaba el código de país de socios internacionales que el
+      // selector ya admite (PhoneInput soporta LATAM + US + España).
+      phone: v.phone,
       email: v.email.trim() || undefined,
       birthdate: v.birthdate || undefined,
       photo_url: v.photo_url || undefined,

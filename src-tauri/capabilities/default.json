@@ -19,6 +19,7 @@
     "core:webview:allow-create-webview-window",
     "shell:default",
     "shell:allow-execute",
+    "shell:allow-open",
     "dialog:default",
     "os:default",
     "process:default",

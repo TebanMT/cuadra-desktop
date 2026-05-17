@@ -355,4 +355,93 @@ export const members = {
     loadDetail: "No pudimos cargar este socio.",
     loadTypes: "No pudimos cargar las membresías.",
   },
+  import: {
+    title: "Importar socios desde Excel",
+    subtitle:
+      "Sube tu libreta exportada como CSV y damos de alta a todos en un click.",
+    backToList: "Volver a socios",
+    steps: {
+      one: "1. Sube tu archivo",
+      two: "2. Revisa la vista previa",
+      three: "3. Listo",
+    },
+    step1: {
+      dropZone: "Arrastra tu archivo aquí o haz clic para elegirlo",
+      hint: "Acepta archivos .csv exportados de Excel o Google Sheets (hasta 5 MB).",
+      changeFile: "Cambiar archivo",
+      downloadTemplate: "Descargar plantilla",
+      templateHint:
+        "La plantilla ya trae los nombres de las columnas y un par de filas de ejemplo.",
+      structure: {
+        title: "Cómo debe verse tu archivo",
+        intro:
+          "La primera fila son los nombres de las columnas. Estas son las 5 obligatorias para los socios y 3 opcionales para asignarles membresía:",
+        required: "Obligatorias:",
+        optional: "Opcionales (membresía actual):",
+        rules: {
+          phone: "Teléfono: 10 dígitos sin espacios ni guiones.",
+          dates: "Fechas: en formato AAAA-MM-DD (por ejemplo 1990-03-15).",
+          membership:
+            "Si llenas las 3 columnas de membresía, te traes al socio con su plan ya al día. Si las dejas vacías, lo cobras después.",
+          plan:
+            "El nombre del plan tiene que existir en Configuración antes de importar.",
+        },
+      },
+      continue: "Continuar",
+    },
+    step2: {
+      heading: (n: number) =>
+        n === 1 ? "1 socio para importar" : `${n} socios para importar`,
+      previewTitle: "Vista previa (primeras 20 filas)",
+      noPreview: "Tu archivo no trae filas de datos.",
+      duplicatesTitle: (n: number) =>
+        n === 1
+          ? "1 teléfono ya está en tu base"
+          : `${n} teléfonos ya están en tu base`,
+      duplicatesHint:
+        "Por defecto los saltamos para no duplicar a tus socios. Si quieres importarlos igual, prende el toggle.",
+      allowDuplicates: "Importarlos igual (permitir teléfonos repetidos)",
+      back: "Atrás",
+      cta: (n: number) =>
+        n === 1 ? "Importar 1 socio" : `Importar ${n} socios`,
+      ctaLoading: "Importando…",
+      cols: {
+        row: "Fila",
+        name: "Nombre",
+        phone: "Teléfono",
+        plan: "Plan",
+        flag: "Aviso",
+      },
+      flags: {
+        duplicateInBase: "Ya existe",
+        duplicateInFile: "Repetido en archivo",
+      },
+    },
+    step3: {
+      headingOk: "Listo, importamos a tus socios.",
+      headingPartial: "Importación terminada con algunos avisos.",
+      headingFail: "No pudimos importar nada.",
+      summaryImported: (n: number) =>
+        n === 1 ? "1 socio agregado" : `${n} socios agregados`,
+      summarySkipped: (n: number) =>
+        n === 1 ? "1 fila saltada" : `${n} filas saltadas`,
+      summaryErrors: (n: number) =>
+        n === 1 ? "1 fila con error" : `${n} filas con error`,
+      skippedTitle: "Filas que saltamos",
+      errorsTitle: "Filas que no pudimos procesar",
+      errorsHint:
+        "Corrige tu Excel, vuelve a guardarlo como CSV y súbelo otra vez — los que ya entraron no se duplican porque los detectamos por teléfono.",
+      importMore: "Importar otro archivo",
+      goToList: "Ir a la lista de socios",
+    },
+    errors: {
+      fileTooLarge: "El archivo pesa más de 5 MB. Achícalo o pide ayuda.",
+      notCSV: "Sube un archivo .csv exportado de Excel.",
+      generic: "No pudimos procesar el archivo. Revisa el formato y vuelve a intentar.",
+      networkRetry: "Falló la subida. Vuelve a intentar.",
+    },
+    cta: {
+      importFromExcel: "Importar desde Excel",
+    },
+  },
 };

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import {
   BarChart3,
   Bell,
@@ -73,6 +73,7 @@ export function Sidebar() {
   const user = useAuthStore((s) => s.user);
   const gym = useAuthStore((s) => s.gym);
   const logout = useLogout();
+  const navigate = useNavigate();
 
   const initials = getInitials(user?.full_name);
   const palette = getAvatarPalette(user?.full_name);
@@ -166,28 +167,40 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* User profile */}
+        {/* User profile — el avatar + nombre son CTA hacia /profile. Antes
+            eran sólo display y la única forma de llegar a "Mi perfil" era
+            el dropdown del top-bar, que un dueño no-técnico no descubre
+            (síntoma: "no puedo asignar mi PIN"). El botón de logout queda
+            como ícono aparte para no robar clicks accidentales. */}
         <div className="border-t border-sidebar-border p-2">
           <div className="flex items-center gap-3 rounded-md p-2">
-            <div
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-              style={{ backgroundColor: palette.bg, color: palette.text }}
+            <button
+              type="button"
+              onClick={() => navigate("/profile")}
+              title={shell.user.profile}
+              aria-label={shell.user.profile}
+              className="flex flex-1 min-w-0 items-center gap-3 rounded-md text-left hover:bg-[hsl(var(--sidebar-hover))] transition-colors"
             >
-              {initials}
-            </div>
-            <div
-              className={cn(
-                "flex-1 overflow-hidden min-w-0 transition-opacity duration-200",
-                hovered ? "opacity-100" : "opacity-0 w-0"
-              )}
-            >
-              <p className="text-sm font-medium text-sidebar-foreground leading-tight truncate">
-                {user?.full_name ?? "—"}
-              </p>
-              <p className="text-[11px] text-sidebar-muted capitalize leading-tight mt-0.5">
-                {user?.role ?? ""}
-              </p>
-            </div>
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                style={{ backgroundColor: palette.bg, color: palette.text }}
+              >
+                {initials}
+              </div>
+              <div
+                className={cn(
+                  "flex-1 overflow-hidden min-w-0 transition-opacity duration-200",
+                  hovered ? "opacity-100" : "opacity-0 w-0"
+                )}
+              >
+                <p className="text-sm font-medium text-sidebar-foreground leading-tight truncate">
+                  {user?.full_name ?? "—"}
+                </p>
+                <p className="text-[11px] text-sidebar-muted capitalize leading-tight mt-0.5">
+                  {user?.role ?? ""}
+                </p>
+              </div>
+            </button>
             <button
               onClick={() => logout.mutate()}
               title={shell.user.logout}

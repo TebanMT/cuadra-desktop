@@ -1,5 +1,13 @@
 import { useState } from "react";
-import { Loader2, Plus, KeyRound, MoreHorizontal, Pencil, Power } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  KeyRound,
+  MoreHorizontal,
+  Pencil,
+  Power,
+  RefreshCcw,
+} from "lucide-react";
 import { toast } from "sonner";
 import {
   Table,
@@ -32,6 +40,7 @@ import {
 import { OperatorCreateModal } from "@/components/settings/OperatorCreateModal";
 import { OperatorEditModal } from "@/components/settings/OperatorEditModal";
 import { OperatorResetPasswordModal } from "@/components/settings/OperatorResetPasswordModal";
+import { OperatorRotatePinModal } from "@/components/settings/OperatorRotatePinModal";
 import {
   useOperators,
   useToggleOperatorActive,
@@ -51,6 +60,7 @@ export default function OperatorsPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Operator | null>(null);
   const [resetting, setResetting] = useState<Operator | null>(null);
+  const [rotatingPIN, setRotatingPIN] = useState<Operator | null>(null);
   const [confirmToggle, setConfirmToggle] = useState<Operator | null>(null);
 
   const items = list.data?.items ?? [];
@@ -134,15 +144,23 @@ export default function OperatorsPage() {
                         {t.operators.role[op.role]}
                       </TableCell>
                       <TableCell>
-                        {op.active ? (
-                          op.must_change_password ? (
-                            <Badge variant="warning">{t.operators.status.pendingPassword}</Badge>
+                        <div className="flex flex-wrap items-center gap-1">
+                          {op.active ? (
+                            op.must_change_password ? (
+                              <Badge variant="warning">{t.operators.status.pendingPassword}</Badge>
+                            ) : (
+                              <Badge variant="success">{t.operators.status.active}</Badge>
+                            )
                           ) : (
-                            <Badge variant="success">{t.operators.status.active}</Badge>
-                          )
-                        ) : (
-                          <Badge variant="secondary">{t.operators.status.inactive}</Badge>
-                        )}
+                            <Badge variant="secondary">{t.operators.status.inactive}</Badge>
+                          )}
+                          {op.role === "operator" && op.has_pin && (
+                            <Badge variant="outline">{t.operators.status.pin}</Badge>
+                          )}
+                          {op.role === "operator" && !op.has_pin && !op.phone && (
+                            <Badge variant="warning">{t.operators.status.legacyPending}</Badge>
+                          )}
+                        </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell text-xs text-muted-foreground">
                         {op.last_login_at ? fmtDate(op.last_login_at) : "—"}
@@ -160,10 +178,16 @@ export default function OperatorsPage() {
                                 <Pencil className="h-4 w-4 mr-2" />
                                 {t.operators.actions.edit}
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setResetting(op)}>
-                                <KeyRound className="h-4 w-4 mr-2" />
-                                {t.operators.actions.resetPassword}
+                              <DropdownMenuItem onClick={() => setRotatingPIN(op)}>
+                                <RefreshCcw className="h-4 w-4 mr-2" />
+                                {t.operators.actions.rotatePin}
                               </DropdownMenuItem>
+                              {op.email && (
+                                <DropdownMenuItem onClick={() => setResetting(op)}>
+                                  <KeyRound className="h-4 w-4 mr-2" />
+                                  {t.operators.actions.resetPasswordLegacy}
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={() => {
@@ -205,6 +229,11 @@ export default function OperatorsPage() {
         operator={resetting}
         open={!!resetting}
         onOpenChange={(o) => !o && setResetting(null)}
+      />
+      <OperatorRotatePinModal
+        operator={rotatingPIN}
+        open={!!rotatingPIN}
+        onOpenChange={(o) => !o && setRotatingPIN(null)}
       />
       <ToggleConfirm
         operator={confirmToggle}

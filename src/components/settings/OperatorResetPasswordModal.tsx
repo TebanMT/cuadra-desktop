@@ -36,7 +36,7 @@ export function OperatorResetPasswordModal({ operator, open, onOpenChange }: Pro
   async function doReset() {
     try {
       const res = await reset.mutateAsync();
-      setGenerated({ password: res.new_password });
+      setGenerated({ password: res.password });
       toast.success(t.operators.resetPwd.success);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : t.operators.errors.generic);
@@ -103,7 +103,7 @@ export function OperatorResetPasswordModal({ operator, open, onOpenChange }: Pro
           <div className="flex justify-between pt-2">
             <Button variant="outline" onClick={copyPwd}>
               <Copy className="h-4 w-4" />
-              {t.operators.createForm.copyPassword}
+              {t.operators.createForm.copyPin}
             </Button>
             <Button onClick={() => close(false)}>{t.operators.createForm.done}</Button>
           </div>

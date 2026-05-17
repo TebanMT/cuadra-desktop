@@ -5,6 +5,11 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  PhoneInput,
+  formatE164,
+  splitE164,
+} from "@/components/shared/PhoneInput";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useAssignSelfPIN, useClearSelfPIN, useUpdateMe } from "@/hooks/useAuth";
 import { ApiError } from "@/lib/api";
@@ -32,7 +37,9 @@ export default function ProfilePage() {
   const qc = useQueryClient();
 
   const [fullName, setFullName] = useState(user?.full_name ?? "");
-  const [phone, setPhone] = useState(user?.phone ?? "");
+  const initialSplit = splitE164(user?.phone ?? "");
+  const [phoneDialCode, setPhoneDialCode] = useState<string>(initialSplit.dialCode);
+  const [phoneNumber, setPhoneNumber] = useState(initialSplit.number);
   const [error, setError] = useState<string | null>(null);
   // PIN dialog state. Two passes (enter → confirm) so a typo on the new
   // PIN doesn't lock the operator out of the kiosk for the rest of the day.
@@ -99,8 +106,13 @@ export default function ProfilePage() {
   useEffect(() => {
     if (user?.full_name) setFullName(user.full_name);
   }, [user?.full_name]);
+  // Cuando el row del user se hidrata después del primer paint, re-splitea
+  // el phone almacenado (E.164) para mantener sincronizados el selector de
+  // país y el input numérico.
   useEffect(() => {
-    setPhone(user?.phone ?? "");
+    const split = splitE164(user?.phone ?? "");
+    setPhoneDialCode(split.dialCode);
+    setPhoneNumber(split.number);
   }, [user?.phone]);
 
   const looksWrong =
@@ -126,7 +138,7 @@ export default function ProfilePage() {
     try {
       await update.mutateAsync({
         full_name: fullName.trim(),
-        phone: phone.trim() || null,
+        phone: formatE164(phoneDialCode, phoneNumber) || null,
       });
       toast.success("Perfil actualizado.");
     } catch (e) {
@@ -195,12 +207,12 @@ export default function ProfilePage() {
 
           <div className="space-y-2">
             <Label htmlFor="phone">Teléfono (opcional)</Label>
-            <Input
+            <PhoneInput
               id="phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="10 dígitos"
-              inputMode="tel"
+              dialCode={phoneDialCode}
+              number={phoneNumber}
+              onDialCodeChange={setPhoneDialCode}
+              onNumberChange={setPhoneNumber}
             />
           </div>
 

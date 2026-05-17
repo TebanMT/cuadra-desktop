@@ -7,6 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  DEFAULT_DIAL_CODE,
+  PhoneInput,
+  formatE164,
+  phoneNumberValid,
+} from "@/components/shared/PhoneInput";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -26,7 +32,6 @@ import { ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/dates";
 import { settings as t } from "@/strings/settings";
 
-const PHONE_REGEX = /^\+?[0-9\s-]{10,}$/;
 
 export default function WhatsAppSetupPage() {
   const state = useWhatsappState();
@@ -205,7 +210,8 @@ function ConnectFlow() {
   const start = useStartWhatsappConnect();
   const confirm = useConfirmWhatsappConnect();
   const [step, setStep] = useState<"intro" | "phone" | "code">("intro");
-  const [phone, setPhone] = useState("");
+  const [phoneDialCode, setPhoneDialCode] = useState<string>(DEFAULT_DIAL_CODE);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -215,14 +221,16 @@ function ConnectFlow() {
     }
   }, [step]);
 
+  const phoneE164 = formatE164(phoneDialCode, phoneNumber);
+
   async function sendCode() {
     setError(null);
-    if (!PHONE_REGEX.test(phone.trim())) {
+    if (!phoneNumberValid(phoneDialCode, phoneNumber)) {
       setError(t.whatsapp.errors.phoneInvalid);
       return;
     }
     try {
-      await start.mutateAsync({ phone_number: phone.trim() });
+      await start.mutateAsync({ phone_number: phoneE164 });
       setStep("code");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t.whatsapp.errors.generic);
@@ -236,7 +244,7 @@ function ConnectFlow() {
       return;
     }
     try {
-      await confirm.mutateAsync({ phone_number: phone.trim(), code: code.trim() });
+      await confirm.mutateAsync({ phone_number: phoneE164, code: code.trim() });
       toast.success(t.whatsapp.successConnected);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 400 || err.code === "invalid_code")) {
@@ -260,15 +268,6 @@ function ConnectFlow() {
 
         {step === "intro" && (
           <div className="space-y-4">
-            <div className="aspect-video rounded-md overflow-hidden border bg-muted">
-              <iframe
-                title="Cómo conectar WhatsApp"
-                src="https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ"
-                className="w-full h-full"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-              />
-            </div>
             <Step
               icon={MessageCircle}
               title={t.whatsapp.notConnected.step1Title}
@@ -306,12 +305,12 @@ function ConnectFlow() {
             )}
             <div className="space-y-1">
               <Label htmlFor="wa-phone">{t.whatsapp.notConnected.phoneLabel}</Label>
-              <Input
+              <PhoneInput
                 id="wa-phone"
-                placeholder={t.whatsapp.notConnected.phonePlaceholder}
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                autoFocus
+                dialCode={phoneDialCode}
+                number={phoneNumber}
+                onDialCodeChange={setPhoneDialCode}
+                onNumberChange={setPhoneNumber}
               />
             </div>
             <div className="flex justify-between">
@@ -335,7 +334,7 @@ function ConnectFlow() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <p className="text-sm">{t.whatsapp.notConnected.sentTo(phone)}</p>
+            <p className="text-sm">{t.whatsapp.notConnected.sentTo(phoneE164)}</p>
             <div className="space-y-1">
               <Label htmlFor="wa-code">{t.whatsapp.notConnected.codeLabel}</Label>
               <Input

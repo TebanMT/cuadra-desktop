@@ -2,7 +2,46 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
 export type SubscriptionStatus = "active" | "past_due" | "cancelled";
-export type SubscriptionPlan = "trial" | "pro_monthly" | "pro_annual";
+export type SubscriptionPlan =
+  | "trial"
+  | "standard_monthly"
+  | "standard_annual"
+  | "plus_monthly"
+  | "plus_annual";
+
+/** Tier-only SKU (sin cadence). Útil para gating de features Plus. */
+export type CheckoutPlan =
+  | "standard_monthly"
+  | "standard_annual"
+  | "plus_monthly"
+  | "plus_annual";
+
+/** Devuelve true si el plan pertenece al tier Plus (cualquier cadencia). */
+export function isPlusPlan(plan: string | undefined | null): boolean {
+  return plan === "plus_monthly" || plan === "plus_annual";
+}
+
+/**
+ * Devuelve true si el gym debe poder acceder a features Plus.
+ * Incluye trial: el dueño en trial gratuito de 30 días debe poder probar
+ * todo lo que vende Plus para evaluar el upgrade. Si excluyéramos trial,
+ * el trial se quedaría con Standard-only y no convertiría.
+ *
+ * Espeja `gymDomain.CanAccessPlusFeatures` del backend.
+ */
+export function canAccessPlusFeatures(plan: string | undefined | null): boolean {
+  return plan === "trial" || plan === "plus_monthly" || plan === "plus_annual";
+}
+
+/** Devuelve true si el gym está en cualquier SKU pagado (no trial). */
+export function isPaidPlan(plan: string | undefined | null): boolean {
+  return (
+    plan === "standard_monthly" ||
+    plan === "standard_annual" ||
+    plan === "plus_monthly" ||
+    plan === "plus_annual"
+  );
+}
 
 export interface SubscriptionEvent {
   id: string;
@@ -57,30 +96,13 @@ export function useExtendTrial() {
   });
 }
 
-export type CheckoutProvider = "stripe" | "mercadopago";
-
-export interface StartCheckoutInput {
-  provider: CheckoutProvider;
-  plan: "pro_monthly" | "pro_annual";
-}
-
-export interface StartCheckoutResult {
-  url: string;
-  session_id?: string;
-}
-
-/**
- * Owner-only — asks cloud to create a Stripe Checkout Session (mode=subscription)
- * or a Mercado Pago preapproval and returns the hosted URL. The caller is
- * responsible for opening the URL in the system browser; subscription state
- * only flips to "active" once the corresponding webhook lands.
- */
-export function useStartCheckout() {
-  return useMutation({
-    mutationFn: (input: StartCheckoutInput) =>
-      api.post<StartCheckoutResult>("/api/v1/subscriptions/checkout-session", input),
-  });
-}
+// El flow de checkout vive end-to-end en el dashboard cloud (entinta.app).
+// El desktop sólo abre la URL del dashboard via tauri shell.open en lugar
+// de hablar con un endpoint local de checkout. Si en algún futuro queremos
+// originar checkouts desde el desktop, el hook iría aquí — pero implica
+// proxy del sidecar al cloud con refresh de tokens, lo cual no aporta UX
+// real (Stripe/MP siempre abren browser, así que el dueño YA está saliendo
+// del desktop).
 
 /**
  * Effective access banner level — the FE uses this to decide whether to show

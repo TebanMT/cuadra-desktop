@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  DEFAULT_DIAL_CODE,
+  PhoneInput,
+  formatE164,
+  phoneNumberValid,
+  splitE164,
+} from "@/components/shared/PhoneInput";
 import { useUpdateOperator, type Operator } from "@/hooks/useOperators";
 import { ApiError } from "@/lib/api";
 import { settings as t } from "@/strings/settings";
@@ -26,17 +33,24 @@ export function OperatorEditModal({ operator, open, onOpenChange }: Props) {
   const update = useUpdateOperator(operator?.id ?? "");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
+  const [phoneDialCode, setPhoneDialCode] = useState<string>(DEFAULT_DIAL_CODE);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && operator) {
       setFullName(operator.full_name);
       setEmail(operator.email);
-      setPhone(operator.phone ?? "");
+      const split = splitE164(operator.phone ?? "");
+      setPhoneDialCode(split.dialCode);
+      setPhoneNumber(split.number);
       setError(null);
     }
   }, [open, operator]);
+
+  // Un operador es "legacy pendiente migrar" cuando no tiene PIN y
+  // tampoco tiene teléfono. Forzar phone+PIN lo migra al modelo nuevo.
+  const isLegacyPending = !!operator && !operator.has_pin && !operator.phone;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -47,7 +61,13 @@ export function OperatorEditModal({ operator, open, onOpenChange }: Props) {
       setError(t.operators.errors.nameShort);
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+    if (!phoneNumberValid(phoneDialCode, phoneNumber)) {
+      setError(t.operators.errors.phoneRequired);
+      return;
+    }
+    // Email opcional — solo validamos cuando viene no-vacío.
+    const emailClean = email.trim();
+    if (emailClean && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
       setError(t.operators.errors.emailInvalid);
       return;
     }
@@ -55,16 +75,23 @@ export function OperatorEditModal({ operator, open, onOpenChange }: Props) {
     try {
       await update.mutateAsync({
         full_name: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim() || null,
+        // "" significa "limpiar el correo" — el BE lo permite para operators.
+        email: emailClean.toLowerCase(),
+        phone: formatE164(phoneDialCode, phoneNumber),
       });
       toast.success(t.operators.editForm.success);
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof ApiError && err.code === "email_already_in_use") {
-        setError(t.operators.errors.emailDuplicated);
+      if (err instanceof ApiError) {
+        if (err.code === "email_already_in_use") {
+          setError(t.operators.errors.emailDuplicated);
+        } else if (err.code === "phone_taken_in_gym") {
+          setError(t.operators.errors.phoneDuplicated);
+        } else {
+          setError(err.message);
+        }
       } else {
-        setError(err instanceof ApiError ? err.message : t.operators.errors.generic);
+        setError(t.operators.errors.generic);
       }
     }
   }
@@ -77,6 +104,11 @@ export function OperatorEditModal({ operator, open, onOpenChange }: Props) {
           <DialogDescription className="sr-only">Editar operador.</DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4" noValidate>
+          {isLegacyPending && (
+            <Alert variant="warning">
+              <AlertDescription>{t.operators.editForm.legacyMigrate}</AlertDescription>
+            </Alert>
+          )}
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -92,21 +124,23 @@ export function OperatorEditModal({ operator, open, onOpenChange }: Props) {
             />
           </div>
           <div className="space-y-1">
-            <Label htmlFor="op-edit-email">{t.operators.fields.email}</Label>
+            <Label htmlFor="op-edit-phone">{t.operators.fields.phone}</Label>
+            <PhoneInput
+              id="op-edit-phone"
+              dialCode={phoneDialCode}
+              number={phoneNumber}
+              onDialCodeChange={setPhoneDialCode}
+              onNumberChange={setPhoneNumber}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="op-edit-email">{t.operators.fields.emailOptional}</Label>
             <Input
               id="op-edit-email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="op-edit-phone">{t.operators.fields.phone}</Label>
-            <Input
-              id="op-edit-phone"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+52 ..."
+              placeholder="opcional@correo.com"
             />
           </div>
           <div className="flex justify-end gap-2 pt-2">

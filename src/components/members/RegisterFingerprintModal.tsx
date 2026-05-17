@@ -220,7 +220,7 @@ function CaptureStep({
       <div className="text-center space-y-1">
         <p className="font-medium">
           {status === "capturing"
-            ? t.fingerprint.capturing(done + 1)
+            ? t.fingerprint.processing
             : status === "waiting"
             ? t.fingerprint.waitingPlace
             : status === "success"
@@ -229,7 +229,12 @@ function CaptureStep({
             ? ""
             : t.fingerprint.instruction}
         </p>
-        <p className="text-2xl font-bold tabular-nums">{t.fingerprint.capturesLabel(done, total)}</p>
+        {/* Counter is meaningful only when the flow does multi-sample
+            averaging (>1 placement). The current single-shot enroll
+            hides it to avoid the awkward "Capturas: 1 de 1" line. */}
+        {total > 1 && (
+          <p className="text-2xl font-bold tabular-nums">{t.fingerprint.capturesLabel(done, total)}</p>
+        )}
       </div>
 
       <div className="flex justify-end gap-2 pt-2">

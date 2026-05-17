@@ -11,6 +11,7 @@ dist-ssr
 # Tauri
 src-tauri/target
 src-tauri/binaries/tinta-sidecar*
+src-tauri/binaries/nbis/
 src-tauri/Cargo.lock
 
 # Logs

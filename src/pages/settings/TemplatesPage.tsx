@@ -55,12 +55,33 @@ function renderPreview(body: string): string {
   return body.replace(/\{[a-z_]+\}/g, (match) => SAMPLE_DATA[match] ?? match);
 }
 
+// Llaves que NO se muestran en Plantillas:
+//   - owner_alert_*  → ahora se editan desde Alertas (con su toggle).
+//   - whatsapp_connect_otp / operator_temp_password → mensajes del sistema
+//     no editables por el dueño en términos prácticos (reglas estrictas de
+//     Twilio + auth). Esconderlas evita prometer una edición que rompería
+//     el flujo.
+// Filtramos en FE; en BE siguen existiendo en notification_templates para
+// no romper renders, overrides ya creados ni el listado interno.
+const TEMPLATES_HIDDEN_KEYS = new Set<string>([
+  "owner_alert_low_stock",
+  "owner_alert_expired_batch",
+  "owner_alert_cash_close_diff",
+  "owner_alert_vip_no_visit",
+  "owner_alert_no_payments_today",
+  "whatsapp_connect_otp",
+  "operator_temp_password",
+]);
+
 export default function TemplatesPage() {
   const list = useTemplates();
   const gymName = useAuthStore((s) => s.gym?.name) ?? "Gym Bros";
   const [editing, setEditing] = useState<NotificationTemplate | null>(null);
 
   const sample = { ...SAMPLE_DATA, "{gym_name}": gymName };
+  const visibleItems = list.data?.items.filter(
+    (tpl) => !TEMPLATES_HIDDEN_KEYS.has(tpl.key),
+  );
 
   return (
     <div className="p-6 space-y-6 max-w-5xl mx-auto">
@@ -86,9 +107,9 @@ export default function TemplatesPage() {
         </Alert>
       )}
 
-      {list.data && (
+      {visibleItems && (
         <div className="space-y-3">
-          {list.data.items.map((tpl) => (
+          {visibleItems.map((tpl) => (
             <TemplateRow key={tpl.key} tpl={tpl} onEdit={() => setEditing(tpl)} sample={sample} />
           ))}
         </div>
@@ -106,6 +127,18 @@ export default function TemplatesPage() {
   );
 }
 
+// humanizeTemplateKey convierte una key snake_case en algo legible para el
+// fallback cuando el BE introduce una llave nueva todavía no traducida en
+// settings.ts. No queremos crashear (el bug original de TemplatesPage), pero
+// tampoco esconderlo con `?.title` — el badge "key cruda" hace obvio que
+// falta traducción y no compromete el render.
+function humanizeTemplateKey(key: string): string {
+  return key
+    .split("_")
+    .map((w) => (w.length > 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w))
+    .join(" ");
+}
+
 function TemplateRow({
   tpl,
   onEdit,
@@ -115,15 +148,21 @@ function TemplateRow({
   onEdit(): void;
   sample: Record<string, string>;
 }) {
-  const meta = t.templates.keys[tpl.key];
+  const meta = t.templates.keys[tpl.key as keyof typeof t.templates.keys];
+  const title = meta?.title ?? humanizeTemplateKey(tpl.key);
+  const description = meta?.description ?? `Plantilla del sistema (clave: ${tpl.key}).`;
+  // Decidimos "Personalizada" comparando body vs default_body en vez de
+  // confiar en is_default — así, después de Restaurar (que hace PATCH con
+  // el default body), el badge desaparece aunque el override row siga ahí.
+  const customized = tpl.body.trim() !== tpl.default_body.trim();
 
   return (
     <Card>
       <CardContent className="pt-5 pb-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h3 className="font-semibold">{meta.title}</h3>
-            <p className="text-sm text-muted-foreground">{meta.description}</p>
+            <h3 className="font-semibold">{title}</h3>
+            <p className="text-sm text-muted-foreground">{description}</p>
           </div>
           <div className="flex items-center gap-2">
             {tpl.enabled ? (
@@ -131,7 +170,7 @@ function TemplateRow({
             ) : (
               <Badge variant="secondary">{t.templates.disabled}</Badge>
             )}
-            {!tpl.is_default && <Badge variant="outline">{t.templates.customized}</Badge>}
+            {customized && <Badge variant="outline">{t.templates.customized}</Badge>}
           </div>
         </div>
         <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm whitespace-pre-wrap">
@@ -174,8 +213,14 @@ function TemplateEditModal({
     }
   }, [open, template]);
 
-  const meta = t.templates.keys[template.key];
-  const variables = TEMPLATE_VARIABLES[template.key as TemplateKey] ?? [];
+  const meta = t.templates.keys[template.key as keyof typeof t.templates.keys];
+  const title = meta?.title ?? humanizeTemplateKey(template.key);
+  const description = meta?.description ?? `Plantilla del sistema (clave: ${template.key}).`;
+  // Preferimos las variables del wire (autoritativas BE-side); las del map
+  // local son fallback por si el BE no las manda en alguna versión.
+  const variables = template.variables.length > 0
+    ? template.variables.map((v) => (v.startsWith("{") ? v : `{${v}}`))
+    : TEMPLATE_VARIABLES[template.key as TemplateKey] ?? [];
 
   function previewBody(): string {
     return body.replace(/\{[a-z_]+\}/g, (m) => sample[m] ?? m);
@@ -203,7 +248,7 @@ function TemplateEditModal({
 
   async function doReset() {
     try {
-      const fresh = await reset.mutateAsync();
+      const fresh = await reset.mutateAsync(template.default_body);
       setBody(fresh.body);
       setEnabled(fresh.enabled);
       toast.success(t.templates.modal.successReset);
@@ -218,8 +263,8 @@ function TemplateEditModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{meta.title}</DialogTitle>
-            <DialogDescription>{meta.description}</DialogDescription>
+            <DialogTitle>{title}</DialogTitle>
+            <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
 
           <form onSubmit={submit} className="grid gap-4 lg:grid-cols-[2fr_1fr]" noValidate>
@@ -260,7 +305,10 @@ function TemplateEditModal({
                   variant="ghost"
                   className="text-muted-foreground"
                   onClick={() => setConfirmReset(true)}
-                  disabled={template.is_default || reset.isPending}
+                  disabled={
+                    template.body.trim() === template.default_body.trim() ||
+                    reset.isPending
+                  }
                 >
                   <RotateCcw className="h-4 w-4" />
                   {t.templates.modal.reset}

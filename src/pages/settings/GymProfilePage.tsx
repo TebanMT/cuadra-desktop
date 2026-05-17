@@ -8,6 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import {
+  DEFAULT_DIAL_CODE,
+  PhoneInput,
+  formatE164,
+  splitE164,
+} from "@/components/shared/PhoneInput";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -22,10 +28,13 @@ import {
   type UpdateGymProfileInput,
 } from "@/hooks/useGym";
 import { useRefreshIdentity } from "@/hooks/useAuth";
+import { isPlusPlan } from "@/hooks/useSubscription";
 import { ApiError } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { settings as t } from "@/strings/settings";
 import { TransferOwnershipModal } from "@/components/settings/TransferOwnershipModal";
+import { Link } from "react-router-dom";
+import { Lock } from "lucide-react";
 
 const RFC_REGEX = /^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/;
 const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/;
@@ -56,9 +65,16 @@ export default function GymProfilePage() {
   const update = useUpdateGymProfile();
   const refreshIdentity = useRefreshIdentity();
   const role = useAuthStore((s) => s.user?.role);
+  const canEdit = role === "owner";
+  const subscriptionPlan = useAuthStore((s) => s.gym?.subscription_plan);
+  const isPlus = isPlusPlan(subscriptionPlan);
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
+  // Phone se edita con dial + number locales (UX no-técnica) y se serializa
+  // a E.164 hacia form.whatsapp_number, que es lo que viaja al BE.
+  const [phoneDialCode, setPhoneDialCode] = useState<string>(DEFAULT_DIAL_CODE);
+  const [phoneNumber, setPhoneNumber] = useState("");
 
   async function onRefresh() {
     try {
@@ -82,6 +98,9 @@ export default function GymProfilePage() {
   useEffect(() => {
     if (profile.data && !form) {
       const p = profile.data;
+      const split = splitE164(p.whatsapp_number ?? "");
+      setPhoneDialCode(split.dialCode);
+      setPhoneNumber(split.number);
       setForm({
         name: p.name ?? "",
         city: p.city ?? "",
@@ -104,6 +123,17 @@ export default function GymProfilePage() {
       });
     }
   }, [profile.data, form]);
+
+  // Sincroniza form.whatsapp_number con los dos sub-campos. El form sigue
+  // siendo la fuente de verdad para el submit; los dos sub-campos son sólo
+  // UI. useEffect (no inline) para no perder dígitos en typing rápido.
+  useEffect(() => {
+    if (!form) return;
+    const e164 = formatE164(phoneDialCode, phoneNumber);
+    if (e164 !== form.whatsapp_number) {
+      setForm((f) => (f ? { ...f, whatsapp_number: e164 } : f));
+    }
+  }, [phoneDialCode, phoneNumber, form]);
 
   if (profile.isLoading || !form) {
     return (
@@ -185,6 +215,18 @@ export default function GymProfilePage() {
       await update.mutateAsync(payload);
       toast.success(t.gymProfile.saved);
     } catch (err) {
+      // Conflict de WhatsApp: el BE devuelve 422 con mensaje del sentinel
+      // ErrWhatsAppAlreadyTaken. Lo traducimos a copy específica para que
+      // el dueño sepa qué corregir, en lugar del mensaje crudo del BE.
+      if (
+        err instanceof ApiError &&
+        err.status === 422 &&
+        (/whatsapp.*registr|registr.*whatsapp/i.test(err.message) ||
+          /uq_gyms_whatsapp/i.test(err.message))
+      ) {
+        setError(t.gymProfile.errors.whatsappTaken);
+        return;
+      }
       setError(err instanceof ApiError ? err.message : t.gymProfile.saveError);
     }
   }
@@ -222,6 +264,21 @@ export default function GymProfilePage() {
         </Button>
       </div>
 
+      {!canEdit && (
+        // Banner read-only para operadores. La razón se explica explícita:
+        // "el dueño es quien edita los datos del gym". El BE también enforce
+        // owner-only en PATCH /gyms/me — esto es la otra cara de la moneda
+        // para que el operador no llene un form que va a recibir 403.
+        <Alert>
+          <AlertDescription>{t.gymProfile.readOnlyForOperator}</AlertDescription>
+        </Alert>
+      )}
+
+      {/* Envolver el form en <fieldset disabled> propaga el disabled a todos
+          los inputs/selects/buttons descendientes sin tener que tocar cada
+          uno individualmente. Es HTML nativo, accesible (screen readers
+          anuncian "disabled") y a prueba de inputs nuevos que se agreguen. */}
+      <fieldset disabled={!canEdit} className="contents">
       <form onSubmit={submit} className="space-y-4" noValidate>
         {error && (
           <Alert variant="destructive">
@@ -242,10 +299,11 @@ export default function GymProfilePage() {
                 <Input value={form.city} onChange={(e) => update_("city", e.target.value)} />
               </Field>
               <Field label={t.gymProfile.fields.whatsapp}>
-                <Input
-                  value={form.whatsapp_number}
-                  onChange={(e) => update_("whatsapp_number", e.target.value)}
-                  placeholder={t.gymProfile.placeholders.whatsapp}
+                <PhoneInput
+                  dialCode={phoneDialCode}
+                  number={phoneNumber}
+                  onDialCodeChange={setPhoneDialCode}
+                  onNumberChange={setPhoneNumber}
                 />
               </Field>
               <Field label={t.gymProfile.fields.timezone}>
@@ -269,57 +327,68 @@ export default function GymProfilePage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="pt-5 pb-5 space-y-4">
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {t.gymProfile.sections.tax}
-              </h2>
-              <p className="text-xs text-muted-foreground">{t.gymProfile.help.taxOptional}</p>
-            </div>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label={t.gymProfile.fields.rfc}>
-                <Input
-                  value={form.rfc}
-                  onChange={(e) => update_("rfc", e.target.value.toUpperCase())}
-                  placeholder={t.gymProfile.placeholders.rfc}
-                  className="uppercase tracking-wider"
-                />
-              </Field>
-              <Field label={t.gymProfile.fields.legalName}>
-                <Input
-                  value={form.legal_name}
-                  onChange={(e) => update_("legal_name", e.target.value)}
-                />
-              </Field>
-              <Field label={t.gymProfile.fields.postalCode}>
-                <Input
-                  value={form.postal_code}
-                  onChange={(e) => update_("postal_code", e.target.value)}
-                  inputMode="numeric"
-                  maxLength={5}
-                />
-              </Field>
-              <Field label={t.gymProfile.fields.taxRegime}>
-                <Select
-                  value={form.tax_regime}
-                  onValueChange={(v) => update_("tax_regime", v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={t.gymProfile.placeholders.taxRegime} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {TAX_REGIMES_MX.map((r) => (
-                      <SelectItem key={r.code} value={r.code}>
-                        {r.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Datos fiscales — feature Plus. Sólo se muestra el formulario si
+            el gym está en plan Plus; en cualquier otro caso enseñamos un
+            placeholder discreto con CTA a /settings/subscription. NO usamos
+            upsell agresivo: el dueño en Standard ya sabe que existe Plus. */}
+        {isPlus ? (
+          <Card>
+            <CardContent className="pt-5 pb-5 space-y-4">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                  {t.gymProfile.sections.tax}
+                </h2>
+                <p className="text-xs text-muted-foreground">{t.gymProfile.help.taxOptional}</p>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label={t.gymProfile.fields.rfc}>
+                  <Input
+                    value={form.rfc}
+                    onChange={(e) => update_("rfc", e.target.value.toUpperCase())}
+                    placeholder={t.gymProfile.placeholders.rfc}
+                    className="uppercase tracking-wider"
+                  />
+                </Field>
+                <Field label={t.gymProfile.fields.legalName}>
+                  <Input
+                    value={form.legal_name}
+                    onChange={(e) => update_("legal_name", e.target.value)}
+                  />
+                </Field>
+                <Field label={t.gymProfile.fields.postalCode}>
+                  <Input
+                    value={form.postal_code}
+                    onChange={(e) => update_("postal_code", e.target.value)}
+                    inputMode="numeric"
+                    maxLength={5}
+                  />
+                </Field>
+                <Field label={t.gymProfile.fields.taxRegime}>
+                  <Select
+                    value={form.tax_regime}
+                    onValueChange={(v) => update_("tax_regime", v)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t.gymProfile.placeholders.taxRegime} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TAX_REGIMES_MX.map((r) => (
+                        <SelectItem key={r.code} value={r.code}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <PlusLockedCard
+            sectionTitle={t.gymProfile.sections.tax}
+            description={t.plus.fiscalLocked}
+          />
+        )}
 
         <Card>
           <CardContent className="pt-5 pb-5 space-y-4">
@@ -405,9 +474,11 @@ export default function GymProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Access webhook — Phase 1 differentiator. The gym wires its own
-            torniquete / cerradura by configuring a URL we POST to whenever
-            a checkin resolves to allowed. */}
+        {/* Access webhook — feature Plus. Configurar torniquete / cerradura
+            externa por webhook al check-in es un diferenciador de Plus, no un
+            valor por defecto. Standard sigue funcionando con check-in manual
+            del operador. */}
+        {isPlus ? (
         <Card>
           <CardContent className="pt-5 pb-5 space-y-3">
             <div>
@@ -474,14 +545,23 @@ export default function GymProfilePage() {
             </Field>
           </CardContent>
         </Card>
+        ) : (
+          <PlusLockedCard
+            sectionTitle="Acceso por hardware (avanzado)"
+            description={t.plus.hardwareLocked}
+          />
+        )}
 
-        <div className="flex justify-end gap-2">
-          <Button type="submit" disabled={update.isPending}>
-            {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-            {update.isPending ? t.gymProfile.saving : t.gymProfile.save}
-          </Button>
-        </div>
+        {canEdit && (
+          <div className="flex justify-end gap-2">
+            <Button type="submit" disabled={update.isPending}>
+              {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+              {update.isPending ? t.gymProfile.saving : t.gymProfile.save}
+            </Button>
+          </div>
+        )}
       </form>
+      </fieldset>
 
       {role === "owner" && (
         <Card className="border-destructive/40">
@@ -525,6 +605,44 @@ function Field({
       <Label>{label}</Label>
       {children}
     </div>
+  );
+}
+
+// PlusLockedCard reemplaza una sección Plus-only cuando el gym no está en
+// Plus. Mensaje neutro (no upsell agresivo) + link discreto a la página de
+// Suscripción donde puede comparar tiers y hacer upgrade. Decisión de
+// producto: el dueño en Standard ya sabe que existe Plus — repetirle "compra
+// más" en cada sección sólo lo molesta.
+function PlusLockedCard({
+  sectionTitle,
+  description,
+}: {
+  sectionTitle: string;
+  description: string;
+}) {
+  return (
+    <Card className="border-dashed">
+      <CardContent className="pt-5 pb-5 space-y-3">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            {sectionTitle}
+          </h2>
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Lock className="h-3 w-3" />
+            {t.plus.badge}
+          </span>
+        </div>
+        <p className="text-sm text-muted-foreground">{description}</p>
+        <div>
+          <Link
+            to="/settings/subscription"
+            className="text-sm font-medium text-primary hover:underline"
+          >
+            {t.plus.cta} →
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

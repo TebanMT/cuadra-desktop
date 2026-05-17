@@ -14,16 +14,34 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/shared/PagePrimitives";
+import { PlusFeatureLock } from "@/components/shared/PlusFeatureLock";
 import { useChallenges } from "@/hooks/useChallenges";
 import { ChallengeStatusBadge } from "@/components/challenges/StatusBadge";
 import { NewChallengeDialog } from "@/components/challenges/NewChallengeDialog";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
 import { fmtDate } from "@/lib/dates";
 import type { Challenge } from "@/types/challenges";
 
 export default function ChallengesListPage() {
   const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
+  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const isPlus = canAccessPlusFeatures(plan);
+  // Retos es Plus por pricing — para gym Standard mostramos el lock
+  // visual + upsell en lugar de las queries (que de todos modos el BE
+  // bloquearía con 402, evitamos el flash de error). El hook se queda
+  // arriba con enabled para respetar el orden de hooks de React.
   const list = useChallenges({ pageSize: 50 });
+  if (!isPlus) {
+    return (
+      <PlusFeatureLock
+        icon={Trophy}
+        title="Retos es parte de Plus"
+        body="Crea competencias de recomposición corporal, mide a tus socios y publica rankings. Disponible al mejorar a Plus."
+      />
+    );
+  }
 
   const items = list.data?.items ?? [];
 

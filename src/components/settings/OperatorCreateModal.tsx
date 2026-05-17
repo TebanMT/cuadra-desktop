@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Copy, Loader2, RefreshCw } from "lucide-react";
+import { CheckCircle2, Copy, Loader2, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -13,9 +13,12 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  generatePassword,
-  useCreateOperator,
-} from "@/hooks/useOperators";
+  DEFAULT_DIAL_CODE,
+  PhoneInput,
+  formatE164,
+  phoneNumberValid,
+} from "@/components/shared/PhoneInput";
+import { useCreateOperator } from "@/hooks/useOperators";
 import { ApiError } from "@/lib/api";
 import { settings as t } from "@/strings/settings";
 
@@ -24,21 +27,28 @@ interface Props {
   onOpenChange(o: boolean): void;
 }
 
+type Result = {
+  fullName: string;
+  phone: string;
+  pin: string;
+  whatsappDelivery: boolean;
+};
+
 export function OperatorCreateModal({ open, onOpenChange }: Props) {
   const create = useCreateOperator();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
+  const [phoneDialCode, setPhoneDialCode] = useState<string>(DEFAULT_DIAL_CODE);
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+  const [created, setCreated] = useState<Result | null>(null);
 
   useEffect(() => {
     if (open) {
       setFullName("");
       setEmail("");
-      setPhone("");
-      setPassword(generatePassword(6));
+      setPhoneDialCode(DEFAULT_DIAL_CODE);
+      setPhoneNumber("");
       setError(null);
       setCreated(null);
     }
@@ -52,39 +62,48 @@ export function OperatorCreateModal({ open, onOpenChange }: Props) {
       setError(t.operators.errors.nameShort);
       return;
     }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError(t.operators.errors.emailInvalid);
+    if (!phoneNumberValid(phoneDialCode, phoneNumber)) {
+      setError(t.operators.errors.phoneRequired);
       return;
     }
-    if (password.length < 6) {
-      setError(t.operators.errors.passwordShort);
+    // Email opcional — solo se valida cuando viene poblado.
+    const emailClean = email.trim();
+    if (emailClean && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
+      setError(t.operators.errors.emailInvalid);
       return;
     }
 
     try {
       const res = await create.mutateAsync({
         full_name: fullName.trim(),
-        email: email.trim().toLowerCase(),
-        phone: phone.trim() || undefined,
-        password,
+        phone: formatE164(phoneDialCode, phoneNumber),
+        email: emailClean ? emailClean.toLowerCase() : undefined,
       });
       setCreated({
-        email: res.user.email,
-        password: res.generated_password ?? password,
+        fullName: res.full_name,
+        phone: res.phone,
+        pin: res.pin,
+        whatsappDelivery: res.whatsapp_delivery,
       });
       toast.success(t.operators.createForm.success);
     } catch (err) {
-      if (err instanceof ApiError && err.code === "email_already_in_use") {
-        setError(t.operators.errors.emailDuplicated);
+      if (err instanceof ApiError) {
+        if (err.code === "email_already_in_use") {
+          setError(t.operators.errors.emailDuplicated);
+        } else if (err.code === "phone_taken_in_gym") {
+          setError(t.operators.errors.phoneDuplicated);
+        } else {
+          setError(err.message);
+        }
       } else {
-        setError(err instanceof ApiError ? err.message : t.operators.errors.generic);
+        setError(t.operators.errors.generic);
       }
     }
   }
 
-  function copyPassword() {
+  function copyPin() {
     if (!created) return;
-    navigator.clipboard.writeText(`${created.email}\n${created.password}`).then(() => {
+    navigator.clipboard.writeText(created.pin).then(() => {
       toast.success(t.operators.createForm.copied);
     });
   }
@@ -96,7 +115,9 @@ export function OperatorCreateModal({ open, onOpenChange }: Props) {
           <>
             <DialogHeader>
               <DialogTitle>{t.operators.createForm.title}</DialogTitle>
-              <DialogDescription className="sr-only">Crear nuevo operador.</DialogDescription>
+              <DialogDescription className="sr-only">
+                Crear nuevo operador con PIN.
+              </DialogDescription>
             </DialogHeader>
             <form onSubmit={submit} className="space-y-4" noValidate>
               {error && (
@@ -114,43 +135,27 @@ export function OperatorCreateModal({ open, onOpenChange }: Props) {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="op-email">{t.operators.fields.email}</Label>
+                <Label htmlFor="op-phone">{t.operators.fields.phone}</Label>
+                <PhoneInput
+                  id="op-phone"
+                  dialCode={phoneDialCode}
+                  number={phoneNumber}
+                  onDialCodeChange={setPhoneDialCode}
+                  onNumberChange={setPhoneNumber}
+                />
+                <p className="text-xs text-muted-foreground">
+                  {t.operators.createForm.phoneHint}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="op-email">{t.operators.fields.emailOptional}</Label>
                 <Input
                   id="op-email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder="opcional@correo.com"
                 />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="op-phone">{t.operators.fields.phone}</Label>
-                <Input
-                  id="op-phone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+52 ..."
-                />
-              </div>
-              <div className="space-y-1">
-                <Label htmlFor="op-password">{t.operators.fields.password}</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="op-password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="font-mono tracking-wider"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon"
-                    onClick={() => setPassword(generatePassword(6))}
-                    title={t.operators.createForm.generatePassword}
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">{t.operators.createForm.shareHint}</p>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button
@@ -174,24 +179,44 @@ export function OperatorCreateModal({ open, onOpenChange }: Props) {
           <>
             <DialogHeader>
               <DialogTitle>✓ {t.operators.createForm.success}</DialogTitle>
-              <DialogDescription>{t.operators.createForm.successHint}</DialogDescription>
+              <DialogDescription>
+                {t.operators.createForm.successHint(created.fullName)}
+              </DialogDescription>
             </DialogHeader>
-            <div className="rounded-md border bg-muted/40 p-4 space-y-2 font-mono text-sm">
-              <div>
-                <span className="text-muted-foreground">Correo:</span>{" "}
-                <span className="font-semibold">{created.email}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Contraseña:</span>{" "}
-                <span className="font-semibold tracking-wider">{created.password}</span>
-              </div>
+            <div className="rounded-md border bg-muted/40 p-6 space-y-3 text-center">
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                {t.operators.createForm.pinLabel}
+              </p>
+              <p className="text-5xl font-mono font-bold tracking-[0.3em]">
+                {created.pin}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {t.operators.createForm.pinHint}
+              </p>
             </div>
+            {created.whatsappDelivery ? (
+              <Alert>
+                <CheckCircle2 className="h-4 w-4" />
+                <AlertDescription>
+                  {t.operators.createForm.whatsappSent(created.phone)}
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert variant="warning">
+                <MessageCircle className="h-4 w-4" />
+                <AlertDescription>
+                  {t.operators.createForm.whatsappSkipped}
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="flex justify-between pt-2">
-              <Button variant="outline" onClick={copyPassword}>
+              <Button variant="outline" onClick={copyPin}>
                 <Copy className="h-4 w-4" />
-                {t.operators.createForm.copyPassword}
+                {t.operators.createForm.copyPin}
               </Button>
-              <Button onClick={() => onOpenChange(false)}>{t.operators.createForm.done}</Button>
+              <Button onClick={() => onOpenChange(false)}>
+                {t.operators.createForm.done}
+              </Button>
             </div>
           </>
         )}

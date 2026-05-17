@@ -275,3 +275,63 @@ export function useAssignPin(memberID: string) {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// UC-046 — importación masiva desde CSV
+// ---------------------------------------------------------------------------
+
+export interface ImportedRow {
+  row_number: number;
+  member_id: string;
+  folio: string;
+  full_name: string;
+  membership_assigned: boolean;
+}
+
+export interface ImportSkipRow {
+  row_number: number;
+  full_name: string;
+  phone: string;
+  reason: "phone_taken_in_gym" | "duplicate_in_file";
+}
+
+export interface ImportErrorRow {
+  row_number: number;
+  full_name: string;
+  phone: string;
+  message: string;
+}
+
+export interface ImportMembersResponse {
+  imported: ImportedRow[];
+  skipped: ImportSkipRow[];
+  errors: ImportErrorRow[];
+  summary: {
+    imported_count: number;
+    skipped_count: number;
+    errors_count: number;
+    total_data_rows: number;
+    atomic: boolean;
+  };
+}
+
+export interface ImportMembersInput {
+  file: File;
+  allow_duplicates: boolean;
+}
+
+export function useImportMembers() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ImportMembersInput) => {
+      const fd = new FormData();
+      fd.append("file", input.file);
+      return api.postFormData<ImportMembersResponse>("/api/v1/members/import-csv", fd, {
+        allow_duplicates: input.allow_duplicates,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["members"] });
+    },
+  });
+}

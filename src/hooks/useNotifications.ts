@@ -25,24 +25,36 @@ export interface ConnectWhatsappConfirmInput {
   code: string;
 }
 
+// Keys del BE (cuadra-core/src/modules/notifications/domain/template/template.go
+// — DefaultLibrary). El enum estaba completamente fuera de sync con el BE y
+// causaba el crash en TemplatesPage al hacer `t.templates.keys[tpl.key]` con
+// claves que no existían acá (root cause del bug del runtime, no defendible
+// con `?.title`).
 export type TemplateKey =
-  | "expiry_reminder_pre"
-  | "expiry_reminder_day"
-  | "expiry_reminder_post"
-  | "payment_receipt"
-  | "birthday_greeting"
-  | "welcome_member"
-  | "balance_reminder";
+  | "expiry_reminder_3d"
+  | "expiry_reminder_today"
+  | "expiry_reminder_5d_post"
+  | "receipt_membership"
+  | "receipt_product"
+  | "owner_alert_low_stock"
+  | "owner_alert_expired_batch"
+  | "owner_alert_cash_close_diff"
+  | "owner_alert_vip_no_visit"
+  | "owner_alert_no_payments_today"
+  | "broadcast_freeform"
+  | "operator_temp_password"
+  | "member_welcome_pin"
+  | "whatsapp_connect_otp";
 
 export interface NotificationTemplate {
   key: TemplateKey;
-  name: string;
+  channel: "whatsapp" | "email";
+  category: string;
+  variables: string[];
+  default_body: string;
   body: string;
   enabled: boolean;
   is_default: boolean;
-  variables: string[];
-  description: string;
-  updated_at: string | null;
 }
 
 export interface UpdateTemplateInput {
@@ -57,18 +69,30 @@ export type AlertKey =
   | "cash_close_diff"
   | "no_payments_today";
 
+// AlertConfig espeja el wire shape del BE
+// (cuadra-core/.../notifications_controller.go alertConfigWire). Cada alerta
+// trae el toggle + la plantilla espejo en una sola lectura — la página
+// Alertas pinta ambas cosas sin un segundo fetch.
 export interface AlertConfig {
   key: AlertKey;
   enabled: boolean;
   description: string;
+  template_key: TemplateKey;
+  variables: string[];
+  default_body: string;
+  body: string;
+  is_default: boolean;
 }
 
 export interface AlertsConfigResponse {
   items: AlertConfig[];
 }
 
+// UpdateAlertInput admite mover toggle, body o ambos en la misma llamada.
+// Al menos uno tiene que ir; el BE valida y responde con el shape rico.
 export interface UpdateAlertInput {
-  enabled: boolean;
+  enabled?: boolean;
+  body?: string;
 }
 
 export type BroadcastAudience =
@@ -153,11 +177,20 @@ export function useUpdateTemplate(key: TemplateKey) {
   });
 }
 
+// useResetTemplate vuelve la plantilla a su texto original. Internamente es
+// un PATCH con `body: default_body` contra el endpoint normal de edición —
+// no existe un POST /reset en el BE. Semántica: "reset" = "submitir el body
+// por defecto como tu override". El override row queda persistido pero su
+// contenido coincide con el default; el FE compara body vs default_body
+// para decidir si mostrar el badge "Personalizada", así que el botón
+// Restaurar limpia ese badge en el acto.
 export function useResetTemplate(key: TemplateKey) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      api.post<NotificationTemplate>(`/api/v1/notification-templates/${key}/reset`, {}),
+    mutationFn: (defaultBody: string) =>
+      api.patch<NotificationTemplate>(`/api/v1/notification-templates/${key}`, {
+        body: defaultBody,
+      }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["notifications", "templates"] }),
   });
 }
@@ -198,37 +231,30 @@ export function useSendBroadcast() {
   });
 }
 
+// TEMPLATE_VARIABLES queda como referencia rápida para autocompletar en el
+// modal de edición. La fuente de verdad sigue siendo el BE — `tpl.variables`
+// del response es authoritative; este map sólo se usa cuando el BE no manda
+// variables (raro, pero defendido). Las llaves espejan
+// cuadra-core/.../template.go DefaultLibrary().
 export const TEMPLATE_VARIABLES: Record<TemplateKey, string[]> = {
-  expiry_reminder_pre: [
-    "{gym_name}",
-    "{member_first_name}",
-    "{member_name}",
-    "{expiry_date}",
-    "{membership_type}",
-    "{gym_address}",
-    "{gym_whatsapp}",
-  ],
-  expiry_reminder_day: [
-    "{gym_name}",
-    "{member_first_name}",
-    "{member_name}",
-    "{membership_type}",
-    "{gym_address}",
-  ],
-  expiry_reminder_post: [
-    "{gym_name}",
-    "{member_first_name}",
-    "{member_name}",
-    "{gym_address}",
-  ],
-  payment_receipt: [
-    "{gym_name}",
+  expiry_reminder_3d: ["{member_first_name}", "{gym_name}", "{expiry_date}"],
+  expiry_reminder_today: ["{member_first_name}", "{gym_name}"],
+  expiry_reminder_5d_post: ["{member_first_name}", "{gym_name}"],
+  receipt_membership: [
     "{member_first_name}",
     "{amount}",
-    "{concept}",
-    "{new_expiry_date}",
+    "{membership_type}",
+    "{expiry_date}",
+    "{gym_name}",
   ],
-  birthday_greeting: ["{gym_name}", "{member_first_name}"],
-  welcome_member: ["{gym_name}", "{member_first_name}", "{membership_type}", "{expiry_date}"],
-  balance_reminder: ["{gym_name}", "{member_first_name}", "{balance}"],
+  receipt_product: ["{member_first_name}", "{amount}", "{gym_name}"],
+  owner_alert_low_stock: ["{gym_name}", "{product_name}", "{stock}"],
+  owner_alert_expired_batch: ["{gym_name}", "{count}"],
+  owner_alert_cash_close_diff: ["{gym_name}", "{diff_amount}"],
+  owner_alert_vip_no_visit: ["{gym_name}", "{member_name}", "{days_inactive}"],
+  owner_alert_no_payments_today: ["{gym_name}", "{date}"],
+  broadcast_freeform: ["{member_first_name}", "{gym_name}", "{message}"],
+  operator_temp_password: ["{full_name}", "{gym_name}", "{temp_password}"],
+  member_welcome_pin: ["{member_first_name}", "{gym_name}", "{pin}"],
+  whatsapp_connect_otp: ["{code}"],
 };

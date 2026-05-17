@@ -1,5 +1,5 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
-import { ProtectedRoute, PublicOnlyRoute } from "@/components/shared/RouteGuards";
+import { OwnerOnlyRoute, ProtectedRoute, PublicOnlyRoute } from "@/components/shared/RouteGuards";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Login from "@/pages/auth/Login";
 import LoginEmail from "@/pages/auth/LoginEmail";
@@ -8,11 +8,13 @@ import RedeemInstaller from "@/pages/auth/RedeemInstaller";
 import ForgotPassword from "@/pages/auth/ForgotPassword";
 import ResetPassword from "@/pages/auth/ResetPassword";
 import SetupRequired from "@/pages/auth/SetupRequired";
+import SubscriptionBlocked from "@/pages/auth/SubscriptionBlocked";
 import DashboardPage from "@/pages/dashboard/DashboardPage";
 import AttentionRequiredPage from "@/pages/dashboard/AttentionRequiredPage";
 import MembersPage from "@/pages/members/MembersPage";
 import MemberCreatePage from "@/pages/members/MemberCreatePage";
 import MemberDetailPage from "@/pages/members/MemberDetailPage";
+import MemberImportPage from "@/pages/members/MemberImportPage";
 import ProfilePage from "@/pages/profile/ProfilePage";
 import SettingsIndex from "@/pages/settings/SettingsIndex";
 import SubscriptionPage from "@/pages/settings/SubscriptionPage";
@@ -23,6 +25,7 @@ import OperatorsPage from "@/pages/settings/OperatorsPage";
 import WhatsAppSetupPage from "@/pages/settings/WhatsAppSetupPage";
 import TemplatesPage from "@/pages/settings/TemplatesPage";
 import AlertsPage from "@/pages/settings/AlertsPage";
+import MensajesPage from "@/pages/settings/MensajesPage";
 import ProductsPage from "@/pages/products/ProductsPage";
 import ExpensesPage from "@/pages/expenses/ExpensesPage";
 import QuickSalePage from "@/pages/sales/QuickSalePage";
@@ -63,6 +66,12 @@ export const router = createBrowserRouter([
       // Reemplaza al wizard duplicado que vivía acá (Step1-5) — ese
       // flow ahora vive solo en el dashboard.
       { path: "/auth/setup-required", element: <SetupRequired /> },
+      // Pantalla terminal cuando el cloud (vía sync) marcó la suscripción
+      // como cancelada y la grace period venció. El sidecar también responde
+      // 402 a casi todas las rutas en este estado — el FE redirige aquí vía
+      // ProtectedRoute para evitar loaders intermedios. El usuario sale al
+      // dashboard cloud a pagar; al siguiente sync exitoso el bloqueo cede.
+      { path: "/auth/subscription-blocked", element: <SubscriptionBlocked /> },
       { path: "/kiosk", element: <KioskPage /> },
       {
         element: <DashboardLayout />,
@@ -70,11 +79,12 @@ export const router = createBrowserRouter([
           { index: true, element: <DashboardPage /> },
           { path: "attention-required", element: <AttentionRequiredPage /> },
           { path: "members", element: <MembersPage /> },
-          // Orden importante: "new" antes que ":id" porque react-router
-          // mata el match en el primero que pegue. Si "members/:id"
-          // viniera primero, navegar a "/members/new" lo atraparía
-          // como detail de un socio con id="new".
+          // Orden importante: rutas estáticas ("new", "import") antes que
+          // ":id" porque react-router mata el match en el primero que
+          // pegue. Si "members/:id" viniera primero, navegar a
+          // "/members/new" lo atraparía como detail con id="new".
           { path: "members/new", element: <MemberCreatePage /> },
+          { path: "members/import", element: <MemberImportPage /> },
           { path: "members/:id", element: <MemberDetailPage /> },
           { path: "profile", element: <ProfilePage /> },
           { path: "billing", element: <CobrosPage /> },
@@ -85,15 +95,29 @@ export const router = createBrowserRouter([
           { path: "reports", element: <ReportsPage /> },
           { path: "reports/cash-close", element: <CashClosePage /> },
           { path: "settings", element: <SettingsIndex /> },
-          { path: "settings/subscription", element: <SubscriptionPage /> },
           { path: "settings/gym", element: <GymProfilePage /> },
           { path: "settings/membership-types", element: <MembershipTypesPage /> },
-          { path: "settings/operators", element: <OperatorsPage /> },
-          { path: "settings/whatsapp", element: <WhatsAppSetupPage /> },
-          { path: "settings/templates", element: <TemplatesPage /> },
-          { path: "settings/alerts", element: <AlertsPage /> },
-          { path: "messaging/broadcast", element: <BroadcastPage /> },
-          { path: "admin/audit-log", element: <AuditLogPage /> },
+          // Owner-only: páginas administrativas que un operador no debe abrir
+          // por URL directa. El sidebar ya las oculta con `ownerOnly: true`,
+          // este guard es defensa en profundidad (item 9 — bitácora — y todos
+          // los demás owner-only por consistencia).
+          {
+            element: <OwnerOnlyRoute />,
+            children: [
+              { path: "settings/subscription", element: <SubscriptionPage /> },
+              { path: "settings/operators", element: <OperatorsPage /> },
+              { path: "settings/mensajes", element: <MensajesPage /> },
+              { path: "settings/alerts", element: <AlertsPage /> },
+              { path: "admin/audit-log", element: <AuditLogPage /> },
+              // Sub-rutas legacy: la consolidación (item 10) movió WhatsApp +
+              // plantillas + envío masivo a tabs internos de /settings/mensajes.
+              // Mantenemos las URLs viejas vivas para preservar deep-links —
+              // el componente de la página ahora redirige al tab equivalente.
+              { path: "settings/whatsapp", element: <WhatsAppSetupPage /> },
+              { path: "settings/templates", element: <TemplatesPage /> },
+              { path: "messaging/broadcast", element: <BroadcastPage /> },
+            ],
+          },
           { path: "retos", element: <ChallengesListPage /> },
           { path: "retos/:id", element: <ChallengeDetailPage /> },
         ],

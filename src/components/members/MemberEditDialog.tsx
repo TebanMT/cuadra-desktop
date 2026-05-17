@@ -31,7 +31,11 @@ export function MemberEditDialog({ memberId, initial, open, onOpenChange }: Prop
     const v = p.values;
     const payload: UpdateMemberInput = {
       full_name: v.full_name.trim(),
-      phone: v.phone.replace(/\D/g, "").slice(-10),
+      // v.phone ya viene en E.164 desde MemberForm (PhoneInput +
+      // formatE164). Antes hacíamos slice(-10) para forzar 10 dígitos MX,
+      // pero eso descartaba el código de país de números argentinos /
+      // españoles / etc. que el selector ya admite.
+      phone: v.phone,
       email: v.email.trim(),
       birthdate: v.birthdate,
       photo_url: v.photo_url,

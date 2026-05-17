@@ -13,11 +13,14 @@ import {
   useCheckinByPin,
   useCheckinManual,
   useCheckinMethods,
-  useKioskEvents,
   useRecentCheckins,
   type CheckinEvent,
 } from "@/hooks/useCheckin";
-import { useBiometricStatus } from "@/hooks/useBiometric";
+import {
+  useBiometricCheckinLoop,
+  useBiometricStatus,
+  useReaderConnected,
+} from "@/hooks/useBiometric";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { openKioskWindow } from "@/lib/kioskWindow";
@@ -32,10 +35,13 @@ export default function CheckinPage() {
   const operator = useAuthStore((s) => s.user);
   const kioskOpen = useKioskWindowOpen();
   const bio = useBiometricStatus();
+  const readerConnected = useReaderConnected();
   const methods = useCheckinMethods();
   const recents = useRecentCheckins();
 
-  const fingerprintAvailable = !!bio.data?.connected;
+  // Sidecar matcher ready + physical scanner plugged in. Mirror del kiosk.
+  const fingerprintAvailable =
+    !!bio.data?.available && readerConnected === true;
   const pinAvailable = methods.data?.pin_available ?? false;
 
   const initialMethod: Method = fingerprintAvailable ? "fingerprint" : pinAvailable ? "pin" : "manual";
@@ -86,18 +92,17 @@ export default function CheckinPage() {
   const checkinManual = useCheckinManual();
   const checkinPin = useCheckinByPin();
 
-  // Fingerprint events arrive via long-poll; backend reports attempts and results.
-  useKioskEvents({
+  // Fingerprint capture vive en el frontend (ADR-004-bis). El JS SDK fire
+  // un sample por dedazo; el hook lo POST-ea a /biometric/checkin y
+  // devuelve el match real (announce) o un no-match (feedback denied sin
+  // tocar la lista de recientes).
+  useBiometricCheckinLoop({
     enabled: fingerprintAvailable,
-    onEvent: (ev) => {
-      if (ev.kind === "attempt_started") {
-        setFeedback({ kind: "processing" });
-        return;
-      }
-      if (ev.kind === "checkin_result" && ev.checkin) {
-        announce(ev.checkin);
-        return;
-      }
+    onAttempt: () => setFeedback({ kind: "processing" }),
+    onCheckin: announce,
+    onNoMatch: () => {
+      setFeedback({ kind: "denied_not_found" });
+      playCheckinTone("denied");
     },
   });
 

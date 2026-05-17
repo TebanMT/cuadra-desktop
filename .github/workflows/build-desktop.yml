@@ -48,6 +48,11 @@ env:
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
+  # Release tag de cuadra-core con los binarios NBIS Windows (mindtct.exe +
+  # bozorth3.exe) que el sidecar invoca como subprocess. Se publica desde
+  # cuadra-core/.github/workflows/build-nbis-windows.yml. Bumpear acá sólo
+  # cuando se publique un release nuevo — los binarios cambian rara vez.
+  NBIS_VERSION: nbis-v1
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
@@ -247,8 +252,24 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
+      - name: Download NBIS binaries (mindtct.exe + bozorth3.exe)
+        # Los baja del release `${NBIS_VERSION}` de cuadra-core a
+        # src-tauri/binaries/nbis/. tauri.windows.conf.json los bundlea
+        # como resources al lado del .exe principal, donde el sidecar
+        # los resuelve via filepath.Dir(os.Executable()).
+        env:
+          GH_TOKEN: ${{ secrets.TINTA_CORE_TOKEN }}
+          NBIS_VERSION: ${{ env.NBIS_VERSION }}
+          TINTA_CORE_REPO: ${{ env.TINTA_CORE_REPO }}
+        shell: bash
+        run: bash scripts/prepare-nbis-windows.sh
+
       - name: Build Tauri
-        run: pnpm tauri build --target x86_64-pc-windows-msvc
+        # `--config src-tauri/tauri.windows.conf.json` merge un overlay
+        # Windows-only sobre el config base — añade los binarios NBIS como
+        # resources sin contaminar el bundle macOS (que no tiene ni necesita
+        # esos .exe). Tauri 2 aplica el overlay después del config principal.
+        run: pnpm tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
 
       - name: Upload Windows installer (NSIS .exe)
         uses: actions/upload-artifact@v4

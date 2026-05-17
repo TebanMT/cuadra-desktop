@@ -65,3 +65,20 @@ export const useAuthStore = create<AuthState>()(
 );
 
 export const isAuthenticated = () => useAuthStore.getState().user !== null;
+
+/**
+ * isSubscriptionBlocked refleja la decisión de IsAccessHardBlocked del
+ * dominio BE (gym.go). El sidecar también devuelve 402 cuando esto es
+ * true; tener el cómputo en FE permite al ProtectedRoute redirigir al
+ * usuario a la pantalla de bloqueo sin esperar a que un endpoint falle.
+ *
+ * Reglas:
+ *   - status != cancelled       → no bloqueado (trial activo, past_due, paid)
+ *   - status = cancelled        → bloqueado SALVO grace period vigente
+ */
+export function isSubscriptionBlocked(gym: AuthGym | null | undefined): boolean {
+  if (!gym) return false;
+  if (gym.subscription_status !== "cancelled") return false;
+  if (!gym.subscription_ends_at) return true;
+  return new Date(gym.subscription_ends_at).getTime() <= Date.now();
+}

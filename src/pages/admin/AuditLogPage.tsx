@@ -35,6 +35,9 @@ import {
 } from "@/hooks/useAuditLog";
 import { useOperators } from "@/hooks/useOperators";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { PlusFeatureLock } from "@/components/shared/PlusFeatureLock";
+import { History } from "lucide-react";
 import { messaging as t } from "@/strings/messaging";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -43,6 +46,8 @@ const PAGE_SIZE = 50;
 
 export default function AuditLogPage() {
   const role = useAuthStore((s) => s.user?.role);
+  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const isPlus = canAccessPlusFeatures(plan);
   const operators = useOperators(true);
 
   const [entityType, setEntityType] = useState<string>("");
@@ -77,6 +82,15 @@ export default function AuditLogPage() {
           <AlertDescription>{t.audit.notAuthorized}</AlertDescription>
         </Alert>
       </div>
+    );
+  }
+  if (!isPlus) {
+    return (
+      <PlusFeatureLock
+        icon={History}
+        title="Bitácora es parte de Plus"
+        body="Consulta el historial completo de cambios del gym: quién hizo qué, cuándo y desde dónde. Disponible al mejorar a Plus."
+      />
     );
   }
 

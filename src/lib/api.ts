@@ -84,6 +84,27 @@ export function setOnAuthExpired(handler: (() => void) | null) {
   onAuthExpired = handler;
 }
 
+// SubscriptionInactivePayload espeja el JSON que el sidecar devuelve con
+// HTTP 402 cuando el gym tiene suscripción cancelada + grace vencida (ver
+// middleware/subscription_gate.go). El handler de abajo lo recibe para que
+// el FE pueda forzar la pantalla de bloqueo aun si el operador estaba a
+// mitad de un flujo cuando el sync trajo el flip a cancelled.
+export interface SubscriptionInactivePayload {
+  error: "subscription_inactive";
+  message: string;
+  subscription_status: string;
+  subscription_ends_at: string | null;
+}
+
+let onSubscriptionInactive:
+  | ((payload: SubscriptionInactivePayload) => void)
+  | null = null;
+export function setOnSubscriptionInactive(
+  handler: ((payload: SubscriptionInactivePayload) => void) | null
+) {
+  onSubscriptionInactive = handler;
+}
+
 // refreshInFlight coalesces concurrent refresh attempts so a burst of 401s
 // only triggers one POST /auth/refresh.
 let refreshInFlight: Promise<string | null> | null = null;
@@ -165,9 +186,21 @@ async function rawRequest<T>(
         continue;
       }
       const payload = await safeJson(res);
+      // 402 con shape conocido = suscripción vencida según el sidecar. Fire
+      // del callback ANTES del throw para que el router pueda actualizar el
+      // auth store (subscription_status='cancelled') y redirigir. El throw
+      // se mantiene para que el caller que disparó el request vea el error
+      // y deje de procesar.
+      if (
+        res.status === 402 &&
+        payload?.error === "subscription_inactive" &&
+        onSubscriptionInactive
+      ) {
+        onSubscriptionInactive(payload as SubscriptionInactivePayload);
+      }
       throw new ApiError(
         res.status,
-        payload?.code || `http_${res.status}`,
+        payload?.code || payload?.error || `http_${res.status}`,
         payload?.exception || payload?.message || res.statusText,
         payload
       );
@@ -255,6 +288,41 @@ export async function getBlob(path: string, query?: RequestOptions["query"]): Pr
   return { blob: await res.blob(), filename: match?.[1] };
 }
 
+// postFormData sube un multipart/form-data preservando auth + envelope-unwrap.
+// El rawRequest se salta porque serializa siempre a JSON; acá necesitamos que
+// el browser maneje el boundary del multipart por nosotros.
+async function postFormData<T>(
+  path: string,
+  data: FormData,
+  query?: RequestOptions["query"]
+): Promise<T> {
+  const { baseUrl, localToken } = await boot();
+  const url = new URL(path.startsWith("http") ? path : `${baseUrl}${path}`);
+  if (query) {
+    Object.entries(query).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) url.searchParams.set(k, String(v));
+    });
+  }
+  const headers: Record<string, string> = { "X-Local-Token": localToken };
+  const token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  const res = await fetch(url.toString(), { method: "POST", headers, body: data });
+  if (!res.ok) {
+    const payload = await safeJson(res);
+    throw new ApiError(
+      res.status,
+      payload?.code || payload?.error || `http_${res.status}`,
+      payload?.exception || payload?.message || res.statusText,
+      payload
+    );
+  }
+  if (res.status === 204) return undefined as T;
+  const ct = res.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) return (await res.text()) as T;
+  return unwrapEnvelope<T>(await res.json());
+}
+
 export const api = {
   get: <T>(path: string, opts?: RequestOptions) => request<T>("GET", path, opts),
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) =>
@@ -265,4 +333,5 @@ export const api = {
     request<T>("PUT", path, { ...opts, body }),
   delete: <T>(path: string, opts?: RequestOptions) => request<T>("DELETE", path, opts),
   blob: getBlob,
+  postFormData,
 };

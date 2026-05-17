@@ -111,15 +111,17 @@ export function StatCard({
       </div>
 
       {/* Número central — sans-serif (NO Fraunces), tabular, ink-900 en
-          light, paper-50 en dark. truncate + title como red de seguridad:
-          cuando un monto largo ($XX,XXX.XX) cae en un grid de 5-6 cols a
-          breakpoints intermedios, se cortaba fuera del card. Ahora el
-          número se trunca con elipsis y el hover muestra el valor
-          completo. text size escala con el viewport — 2xl en mobile,
-          3xl en md+, 4xl sólo en xl+ donde el card ya tiene aire. */}
+          light, paper-50 en dark. truncate + title como red de seguridad
+          para gyms con ingresos extremos.
+          Font scaling sigue al ancho REAL del card, no al viewport:
+          en sm-md el grid es 2 cols (cards anchas) → text-3xl;
+          en lg+ el grid se aprieta a 5 cols (cards ~140-240px útil) →
+          escalamos abajo y subimos gradualmente con el breakpoint.
+          Antes saltaba a text-4xl en xl y "$225,000.00" se truncaba en
+          la mayoría de laptops. */}
       <p
         title={typeof value === "string" || typeof value === "number" ? String(value) : undefined}
-        className="mt-3 text-2xl sm:text-3xl xl:text-4xl font-bold tabular text-ink-900 dark:text-paper-50 leading-none truncate"
+        className="mt-3 text-2xl sm:text-3xl lg:text-xl xl:text-2xl 2xl:text-3xl font-bold tabular text-ink-900 dark:text-paper-50 leading-none truncate"
         style={{ letterSpacing: "-0.02em" }}
       >
         {value}

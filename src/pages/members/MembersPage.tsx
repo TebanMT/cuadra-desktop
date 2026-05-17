@@ -8,6 +8,7 @@ import {
   ChevronRight,
   CircleDollarSign,
   DollarSign,
+  FileSpreadsheet,
   Loader2,
   MessageSquare,
   MoreVertical,
@@ -34,6 +35,7 @@ import {
 import { useMembershipTypes } from "@/hooks/useMembershipTypes";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { daysFromToday } from "@/lib/dates";
 import { members as t } from "@/strings/members";
 import { cn } from "@/lib/utils";
@@ -153,6 +155,8 @@ export default function MembersPage() {
   const [pageSize, setPageSize] = useState<number>(readPageSize());
 
   const navigate = useNavigate();
+  const role = useAuthStore((s) => s.user?.role);
+  const isOwner = role === "owner";
 
   useEffect(() => {
     setPage(1);
@@ -200,14 +204,27 @@ export default function MembersPage() {
         title="Socios"
         subtitle="Base de datos de socios del gym"
         actions={
-          <Button
-            size="lg"
-            onClick={() => navigate("/members/new")}
-            className="h-10 rounded-md font-semibold shadow-sm"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo socio
-          </Button>
+          <>
+            {isOwner && (
+              <Button
+                size="lg"
+                variant="outline"
+                onClick={() => navigate("/members/import")}
+                className="h-10 rounded-md font-semibold"
+              >
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                {t.import.cta.importFromExcel}
+              </Button>
+            )}
+            <Button
+              size="lg"
+              onClick={() => navigate("/members/new")}
+              className="h-10 rounded-md font-semibold shadow-sm"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo socio
+            </Button>
+          </>
         }
       />
 

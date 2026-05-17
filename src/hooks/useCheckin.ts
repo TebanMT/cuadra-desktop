@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 
@@ -76,61 +76,6 @@ export function useOverrideCheckin() {
       qc.invalidateQueries({ queryKey: ["checkins"] });
     },
   });
-}
-
-export type KioskEventKind =
-  | "attempt_started"
-  | "checkin_result"
-  | "reader_connected"
-  | "reader_disconnected";
-
-export interface KioskEventEnvelope {
-  kind: KioskEventKind;
-  cursor: string;
-  checkin?: CheckinEvent;
-}
-
-interface UseKioskEventsOptions {
-  enabled?: boolean;
-  onEvent(event: KioskEventEnvelope): void;
-}
-
-interface KioskPollResponse {
-  events: KioskEventEnvelope[];
-  cursor: string;
-}
-
-export function useKioskEvents({ enabled = true, onEvent }: UseKioskEventsOptions) {
-  const cursorRef = useRef<string>("");
-  const handlerRef = useRef(onEvent);
-  handlerRef.current = onEvent;
-
-  useEffect(() => {
-    if (!enabled) return;
-    let stopped = false;
-
-    async function loop() {
-      while (!stopped) {
-        try {
-          const res = await api.get<KioskPollResponse>("/api/v1/kiosk/events", {
-            query: { cursor: cursorRef.current || undefined, timeout_ms: 25000 },
-            retry: 0,
-          });
-          if (stopped) return;
-          cursorRef.current = res.cursor || cursorRef.current;
-          for (const ev of res.events ?? []) handlerRef.current(ev);
-        } catch {
-          if (stopped) return;
-          await new Promise((r) => setTimeout(r, 1500));
-        }
-      }
-    }
-
-    loop();
-    return () => {
-      stopped = true;
-    };
-  }, [enabled]);
 }
 
 interface CheckinCountResponse {

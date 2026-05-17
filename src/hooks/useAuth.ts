@@ -83,6 +83,10 @@ interface SignupResponse {
   gym_id: string;
   access_token: string;
   refresh_token: string;
+  // El backend genera + asigna el PIN al alta del dueño; siempre llega true.
+  // pin viene plaintext UNA vez para que el wizard lo muestre.
+  has_pin?: boolean;
+  pin?: string;
 }
 
 interface RedeemInstallerResponse {
@@ -164,7 +168,7 @@ export function useSignup() {
           email: input.email,
           phone: null,
           role: "owner",
-          has_pin: false,
+          has_pin: data.has_pin ?? true,
         },
         {
           gym_id: data.gym_id,

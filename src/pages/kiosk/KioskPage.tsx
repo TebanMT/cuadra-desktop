@@ -11,9 +11,12 @@ import {
   useCheckinByPin,
   useCheckinCountToday,
   useCheckinMethods,
-  useKioskEvents,
 } from "@/hooks/useCheckin";
-import { useBiometricStatus } from "@/hooks/useBiometric";
+import {
+  useBiometricCheckinLoop,
+  useBiometricStatus,
+  useReaderConnected,
+} from "@/hooks/useBiometric";
 import { useSyncStatus, levelOf } from "@/hooks/useSyncStatus";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";
@@ -44,7 +47,11 @@ const KioskClock = memo(function KioskClock({ now }: { now: Date }) {
 
 export default function KioskPage() {
   const navigate = useNavigate();
+  // Matcher (sidecar) availability — does the BE have NBIS binaries + a
+  // gym keyed in? Separate from physical scanner presence (Lite Client +
+  // USB), which the JS SDK reports via useReaderConnected.
   const bio = useBiometricStatus();
+  const readerConnected = useReaderConnected();
   const methods = useCheckinMethods();
   const sync = useSyncStatus();
   const count = useCheckinCountToday();
@@ -58,7 +65,11 @@ export default function KioskPage() {
   // precisión al minuto. Reduce wakeups + repaints en el OS host.
   const [now, setNow] = useState(() => new Date());
 
-  const fingerprintAvailable = !!bio.data?.connected;
+  // "available" = sidecar matcher is ready AND physical scanner is plugged
+  // in (the SDK can talk to the Lite Client + sees a device). The pre-ADR
+  // flow only checked the sidecar; now we need both.
+  const fingerprintAvailable =
+    !!bio.data?.available && readerConnected === true;
   const pinAvailable = methods.data?.pin_available ?? false;
 
   // Clock tick al cambio de minuto. El primer setTimeout calcula los ms
@@ -123,18 +134,25 @@ export default function KioskPage() {
     else if (tone === "denied") playCheckinTone("denied");
   }
 
-  useKioskEvents({
+  // Capture vive en el frontend per ADR-004-bis. El JS SDK habla con el
+  // Lite Client local; cada huella detectada POST-ea a /biometric/checkin
+  // y el backend ejecuta UC-029 contra la galería del gym activo.
+  useBiometricCheckinLoop({
     enabled: fingerprintAvailable,
-    onEvent: (ev) => {
-      if (ev.kind === "attempt_started") {
-        setFeedback({ kind: "processing" });
-        return;
-      }
-      if (ev.kind === "checkin_result" && ev.checkin) {
-        const fb = eventToFeedback(ev.checkin);
-        setFeedback(fb);
-        announceTone(fb);
-      }
+    onAttempt: () => setFeedback({ kind: "processing" }),
+    onCheckin: (ev) => {
+      const fb = eventToFeedback(ev);
+      setFeedback(fb);
+      announceTone(fb);
+    },
+    onNoMatch: () => {
+      const fb: FeedbackState = { kind: "denied_not_found" };
+      setFeedback(fb);
+      announceTone(fb);
+    },
+    onError: () => {
+      // SDK / matcher failure mid-stream. El banner ya refleja el estado
+      // del lector vía useReaderConnected; no duplicamos aquí.
     },
   });
 
@@ -221,7 +239,7 @@ export default function KioskPage() {
           >
             {t.page.todayCount(count.data?.count_today ?? 0)}
           </div>
-          {bio.data && !bio.data.connected && (
+          {readerConnected === false && (
             <div className="text-xs text-warning bg-warning/10 px-2 py-1 rounded-md font-medium">
               {t.reader.disconnectedBanner}
             </div>

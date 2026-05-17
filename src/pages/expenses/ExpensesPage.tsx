@@ -39,7 +39,10 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/shared/PagePrimitives";
+import { PlusFeatureLock } from "@/components/shared/PlusFeatureLock";
 import { StatCard } from "@/components/shared/StatCard";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { ApiError } from "@/lib/api";
@@ -119,6 +122,8 @@ function SortableHeader({
 }
 
 export default function ExpensesPage() {
+  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const isPlus = canAccessPlusFeatures(plan);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [from, setFrom] = useState<string>(firstOfMonth());
@@ -197,6 +202,16 @@ export default function ExpensesPage() {
     totals.dominant_category && totals.dominant_category in t.categories
       ? t.categories[totals.dominant_category as ExpenseCategory]
       : t.page.stats.noneDominant;
+
+  if (!isPlus) {
+    return (
+      <PlusFeatureLock
+        icon={Wallet}
+        title="Gastos es parte de Plus"
+        body="Registra y categoriza los gastos del gym, neteándolos contra ingresos en el cierre de caja. Disponible al mejorar a Plus."
+      />
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">

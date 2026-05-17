@@ -15,6 +15,10 @@ import {
 } from "@/hooks/useCashClose";
 import { fmtMoney, type PaymentConcept, type PaymentMethod } from "@/hooks/useBilling";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { PlusFeatureLock } from "@/components/shared/PlusFeatureLock";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { Calculator } from "lucide-react";
 import { ApiError } from "@/lib/api";
 import { fmtDate, fmtIso, parseDate, todayIso } from "@/lib/dates";
 import { cashClose as t } from "@/strings/cashClose";
@@ -23,11 +27,23 @@ const METHOD_KEYS: PaymentMethod[] = ["cash", "transfer", "card"];
 const CONCEPT_KEYS: PaymentConcept[] = ["membership", "product", "balance_settlement", "other"];
 
 export default function CashClosePage() {
+  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const isPlus = canAccessPlusFeatures(plan);
   const [date, setDate] = useState<string>(todayIso());
   const report = useCashCloseReport(date);
 
   const isToday = date === todayIso();
   const isYesterday = date === fmtIso(subDays(new Date(), 1));
+
+  if (!isPlus) {
+    return (
+      <PlusFeatureLock
+        icon={Calculator}
+        title="Cierre de caja es parte de Plus"
+        body="Concilia ingresos y gastos del día, registra la cantidad contada y mantén un histórico auditable. Disponible al mejorar a Plus."
+      />
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">

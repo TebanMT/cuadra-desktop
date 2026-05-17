@@ -11,6 +11,7 @@ export interface Operator {
   role: Role;
   active: boolean;
   must_change_password: boolean;
+  has_pin: boolean;
   last_login_at: string | null;
   created_at: string;
 }
@@ -19,54 +20,58 @@ export interface OperatorsListResponse {
   items: Operator[];
 }
 
+// CreateOperatorInput espeja al wire del BE (modelo PIN-first):
+// - phone es obligatorio: el PIN se entrega por WhatsApp.
+// - email es opcional: rara vez existe en el segmento de barrio.
+// - No hay password: el server genera el PIN automáticamente.
 export interface CreateOperatorInput {
   full_name: string;
-  email: string;
-  phone?: string;
-  password?: string;
-  generate_password?: boolean;
+  phone: string;
+  email?: string;
 }
 
+// CreateOperatorResponse trae el PIN plaintext (mostrado UNA vez en el
+// modal de éxito como fallback si WhatsApp no estaba conectado).
 export interface CreateOperatorResponse {
-  user: Operator;
-  generated_password: string | null;
+  user_id: string;
+  full_name: string;
+  phone: string;
+  email: string;
+  pin: string;
+  whatsapp_delivery: boolean;
+  whatsapp_skipped?: string;
 }
 
 export interface UpdateOperatorInput {
   full_name?: string;
   email?: string;
-  phone?: string | null;
+  phone?: string;
 }
 
 export interface ToggleActiveInput {
   active: boolean;
 }
 
+// Rotate PIN — owner-only. Mismo shape de éxito que Create, sin los
+// campos de identidad (el FE ya los tiene cacheados en el row).
+export interface RotateOperatorPINResponse {
+  user_id: string;
+  pin: string;
+  whatsapp_delivery: boolean;
+  whatsapp_skipped?: string;
+}
+
+// Legacy: el dueño puede seguir reseteando password para operadores
+// pre-migración que tenían email+password. La UI sólo lo expone cuando
+// el operador tiene email.
 export interface ResetPasswordResponse {
   user_id: string;
-  new_password: string;
+  password: string;
 }
 
 const KEYS = {
   list: (includeInactive: boolean) => ["operators", "list", includeInactive] as const,
 };
-
-const PASSWORD_CHARSET = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789";
-
-export function generatePassword(length = 6): string {
-  let out = "";
-  const max = Math.floor(256 / PASSWORD_CHARSET.length) * PASSWORD_CHARSET.length;
-  while (out.length < length) {
-    const buf = new Uint8Array(length);
-    crypto.getRandomValues(buf);
-    for (const byte of buf) {
-      if (byte >= max) continue;
-      out += PASSWORD_CHARSET[byte % PASSWORD_CHARSET.length];
-      if (out.length === length) break;
-    }
-  }
-  return out;
-}
 
 export function useOperators(includeInactive = true) {
   return useQuery<OperatorsListResponse>({
@@ -106,6 +111,18 @@ export function useToggleOperatorActive(id: string) {
   });
 }
 
+export function useRotateOperatorPIN(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      api.post<RotateOperatorPINResponse>(`/api/v1/users/${id}/rotate-pin`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["operators"] }),
+  });
+}
+
+// useResetOperatorPassword conserva la ruta legacy. La UI lo esconde
+// si el operador no tiene email (un operador PIN-first sin correo no
+// necesita el flujo de password). Plan: deprecate en fase 2.
 export function useResetOperatorPassword(id: string) {
   return useMutation({
     mutationFn: () =>

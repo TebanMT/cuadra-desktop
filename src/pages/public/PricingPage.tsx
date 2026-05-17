@@ -11,44 +11,52 @@ interface PlanTier {
   priceMxn: number;
   tagline: string;
   recommended?: boolean;
+  comingSoon?: boolean;
   bullets: string[];
   cta: string;
 }
 
+// Standard es lo único vendible HOY. Plus está marcado comingSoon hasta
+// que las tres anclas (app del socio + rutinas, tap-to-sell, WhatsApp
+// completo) entren en producción. Cuando eso pase, cambia comingSoon a
+// false y deja a Plus a $1,199 como precio de lanzamiento.
 const TIERS: PlanTier[] = [
   {
     id: "standard",
     name: "Standard",
     priceMxn: 799,
     tagline: "Todo lo necesario para cobrar y operar el día a día.",
+    recommended: true,
     bullets: [
       "Socios y membresías ilimitados",
       "Cobros con comprobante por WhatsApp",
       "Kiosko con PIN o huella",
       "Dashboard del dueño desde el celular",
       "Persecución por pago automatizada",
-      "Plantillas básicas de WhatsApp",
+      "Recordatorios de vencimiento por WhatsApp",
       "Soporte por WhatsApp",
-      "1 estación incluida",
+      "1 operador + dueño",
     ],
-    cta: "Comenzar prueba 14 días",
+    cta: "Comenzar prueba 30 días",
   },
   {
     id: "plus",
     name: "Plus",
-    priceMxn: 1599,
-    tagline: "Cuando ya operas y quieres crecer sin pelearte con la libreta.",
-    recommended: true,
+    priceMxn: 1199,
+    tagline: "Para gyms que ya operan y quieren crecer.",
+    comingSoon: true,
     bullets: [
-      "Todo lo de Standard, sin límites",
-      "WhatsApp automation completa",
+      "Todo lo de Standard",
+      "App del socio con rutinas",
       "Tap-to-sell para entrenadores",
-      "Integración con hardware (torniquetes y lectores)",
-      "Rutinas personalizadas (próximamente)",
-      "Onboarding gratis",
-      "Hasta 3 estaciones",
+      "WhatsApp completo (cumpleaños, recuperación, broadcast)",
+      "Retos y gamificación",
+      "Cierre de caja + gastos + exportes",
+      "Webhook para torniquete/cerradura",
+      "Operadores ilimitados",
+      "Bitácora completa",
     ],
-    cta: "Comenzar prueba 14 días",
+    cta: "Avísame cuando esté listo",
   },
 ];
 
@@ -105,12 +113,18 @@ function PlanCard({ tier }: { tier: PlanTier }) {
     <div
       className={cn(
         "relative rounded-2xl border bg-card text-card-foreground p-8 shadow-sm flex flex-col gap-6",
-        tier.recommended ? "border-primary/60 ring-2 ring-primary/20" : "border-border"
+        tier.recommended ? "border-primary/60 ring-2 ring-primary/20" : "border-border",
+        tier.comingSoon && "opacity-80"
       )}
     >
       {tier.recommended && (
         <span className="absolute -top-3 right-6 inline-flex items-center rounded-full bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 shadow-sm">
-          Recomendada
+          Disponible ahora
+        </span>
+      )}
+      {tier.comingSoon && (
+        <span className="absolute -top-3 right-6 inline-flex items-center rounded-full bg-muted text-muted-foreground text-xs font-semibold px-3 py-1 shadow-sm border border-border">
+          Próximamente
         </span>
       )}
 
@@ -137,14 +151,24 @@ function PlanCard({ tier }: { tier: PlanTier }) {
         ))}
       </ul>
 
-      <Button
-        asChild
-        size="lg"
-        variant={tier.recommended ? "default" : "outline"}
-        className="w-full"
-      >
-        <Link to="/auth/signup">{tier.cta}</Link>
-      </Button>
+      {tier.comingSoon ? (
+        // Plus aún no se vende — el CTA va a WhatsApp para captura de
+        // lead manual ("avísame cuando esté listo"). Sin signup directo.
+        <Button asChild size="lg" variant="outline" className="w-full">
+          <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer">
+            {tier.cta}
+          </a>
+        </Button>
+      ) : (
+        <Button
+          asChild
+          size="lg"
+          variant={tier.recommended ? "default" : "outline"}
+          className="w-full"
+        >
+          <Link to="/auth/signup">{tier.cta}</Link>
+        </Button>
+      )}
     </div>
   );
 }
