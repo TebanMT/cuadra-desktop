@@ -115,6 +115,20 @@ jobs:
           cd nbis
           echo "NBIS_DIR=$(pwd -W)" >> "$GITHUB_ENV"
 
+      - name: Patch openjp2 cmake minimum (defensive)
+        # NBIS 5.0 (2014) usa cmake_minimum_required(VERSION 2.6) en openjp2,
+        # removido en CMake ≥3.5. Aunque `--STDLIBS` debería sacar openjp2 de
+        # PACKAGES, ya nos pegó una vez en CI, así que parcheamos por las
+        # dudas — si el package está filtrado el sed corre y el resultado no
+        # se usa; si por algún motivo no está filtrado, evitamos el error.
+        # Mismo tratamiento al png (libpng-1.2.23 no tiene `configure`
+        # moderno) — saltar el build vía Makefile no-op.
+        working-directory: nbis
+        run: |
+          set -euo pipefail
+          find openjp2 -name CMakeLists.txt -print0 \
+            | xargs -0 -I{} sed -i 's/^cmake_minimum_required.*$/cmake_minimum_required(VERSION 3.5)/' {} || true
+
       - name: Configure NBIS (setup.sh --MSYS --STDLIBS --64)
         # `--MSYS` activa el path rules_msys.mak.src + apaga X11. `--STDLIBS`
         # apaga libpng + openjp2 (sino el build intenta compilar libpng-1.2.23
@@ -133,6 +147,12 @@ jobs:
           mkdir -p "$INSTALL_DIR"
           ./setup.sh "$INSTALL_DIR" --MSYS --STDLIBS --64 < /dev/null
           echo "INSTALL_DIR=$INSTALL_DIR" >> "$GITHUB_ENV"
+          # Diagnóstico: mostrar el PACKAGES real que setup.sh dejó en
+          # rules.mak. Si el log entra a png/openjp2 a pesar de --STDLIBS,
+          # este print nos dice si es por una mala sustitución del PACKAGES
+          # o por algún otro mecanismo (sub-Makefile hardcoded, etc.).
+          echo "--- rules.mak PACKAGES line ---"
+          grep "^PACKAGES" rules.mak || echo "(no PACKAGES line found in rules.mak)"
 
       - name: Build NBIS (make config && make it)
         # `make it` es el target compuesto de NBIS (build + libs + bins).
