@@ -147,12 +147,21 @@ jobs:
           mkdir -p "$INSTALL_DIR"
           ./setup.sh "$INSTALL_DIR" --MSYS --STDLIBS --64 < /dev/null
           echo "INSTALL_DIR=$INSTALL_DIR" >> "$GITHUB_ENV"
-          # Diagnóstico: mostrar el PACKAGES real que setup.sh dejó en
-          # rules.mak. Si el log entra a png/openjp2 a pesar de --STDLIBS,
-          # este print nos dice si es por una mala sustitución del PACKAGES
-          # o por algún otro mecanismo (sub-Makefile hardcoded, etc.).
+
+          # Diagnóstico: PACKAGES + CFLAGS que setup.sh dejó en rules.mak.
           echo "--- rules.mak PACKAGES line ---"
           grep "^PACKAGES" rules.mak || echo "(no PACKAGES line found in rules.mak)"
+
+          # NBIS 5.0 fue escrito para GCC ≤9 donde -fcommon era default;
+          # MinGW gcc 10+ default-ea -fno-common y rompe el link con
+          # "multiple definition of histo_head" / similares (an2k tiene
+          # varios globals sin extern en headers). Inyectamos -fcommon
+          # en la línea CFLAGS de rules.mak para mantener el comportamiento
+          # viejo. p_rules.mak per-package importa CFLAGS de rules.mak, así
+          # que con tocar el archivo raíz alcanza.
+          sed -i 's|^CFLAGS[[:space:]]*:=|CFLAGS := -fcommon|' rules.mak
+          echo "--- rules.mak CFLAGS line ---"
+          grep "^CFLAGS" rules.mak || echo "(no CFLAGS line)"
 
       - name: Build NBIS (make config && make it)
         # `make it` es el target compuesto de NBIS (build + libs + bins).
