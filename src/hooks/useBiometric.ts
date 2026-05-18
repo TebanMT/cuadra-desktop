@@ -65,13 +65,19 @@ export interface CollisionMember {
   name: string;
 }
 
+// CAPTURES_TOTAL is how many times the operator places the SAME finger per
+// enrollment. Each placement is POSTed as its own template; the checkin
+// matcher then gets that many chances to recognize the member (best-of-N).
+// Must stay ≤ the backend's MaxFingerprintsPerMember.
+const CAPTURES_TOTAL = 3;
+
 // State machine the modal renders against. Keys deliberately stable across
 // the old (sidecar-driven) flow and the new (frontend-driven) flow so the
 // UI can iterate without changing the modal contract.
 export interface FingerprintProgress {
   status: "idle" | "waiting" | "capturing" | "success" | "failed";
-  // Kept for layout continuity with the old 3-sample UX. Today the flow is
-  // single-shot (BE only takes one image), so done is 0 or 1 and total is 1.
+  // captures_done / captures_total drive the modal's progress dots — the
+  // enroll flow captures the same finger CAPTURES_TOTAL times.
   captures_done: number;
   captures_total: number;
   last_quality?: number;
@@ -130,9 +136,10 @@ function mapApiError(err: ApiError): {
 }
 
 interface EnrollResponse {
-  fingerprint_id: string;
+  fingerprint_ids: string[];
   member_id: string;
   quality_score?: number | null;
+  count: number;
   registered_at: string;
   status: "success";
 }
@@ -145,7 +152,7 @@ export function useRegisterFingerprint(
   const [progress, setProgress] = useState<FingerprintProgress>({
     status: "idle",
     captures_done: 0,
-    captures_total: 1,
+    captures_total: CAPTURES_TOTAL,
   });
   const abortRef = useRef<AbortController | null>(null);
 
@@ -156,54 +163,70 @@ export function useRegisterFingerprint(
 
   const reset = useCallback(() => {
     cancel();
-    setProgress({ status: "idle", captures_done: 0, captures_total: 1 });
+    setProgress({ status: "idle", captures_done: 0, captures_total: CAPTURES_TOTAL });
   }, [cancel]);
 
   const start = useCallback(async () => {
     cancel();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
-    setProgress({ status: "waiting", captures_done: 0, captures_total: 1 });
 
-    let pngBytes: Uint8Array;
-    try {
-      pngBytes = await captureOnePng({ signal: ctrl.signal });
-    } catch (err) {
-      if (ctrl.signal.aborted) return;
-      const code =
-        err instanceof BiometricError ? mapBioError(err) : "generic";
+    // Capture the same finger CAPTURES_TOTAL times — each placement becomes
+    // its own template (best-of-N matching at checkin). The operator lifts
+    // and re-places between shots; the modal's progress dots cue them.
+    const pngs: Uint8Array[] = [];
+    for (let i = 0; i < CAPTURES_TOTAL; i++) {
       setProgress({
-        status: "failed",
-        captures_done: 0,
-        captures_total: 1,
-        error: code,
+        status: "waiting",
+        captures_done: i,
+        captures_total: CAPTURES_TOTAL,
       });
-      opts.onError?.(code);
-      return;
+      let png: Uint8Array;
+      try {
+        png = await captureOnePng({ signal: ctrl.signal });
+      } catch (err) {
+        if (ctrl.signal.aborted) return;
+        const code =
+          err instanceof BiometricError ? mapBioError(err) : "generic";
+        setProgress({
+          status: "failed",
+          captures_done: pngs.length,
+          captures_total: CAPTURES_TOTAL,
+          error: code,
+        });
+        opts.onError?.(code);
+        return;
+      }
+      if (ctrl.signal.aborted) return;
+      pngs.push(png);
     }
-    if (ctrl.signal.aborted) return;
 
-    setProgress({ status: "capturing", captures_done: 1, captures_total: 1 });
+    setProgress({
+      status: "capturing",
+      captures_done: CAPTURES_TOTAL,
+      captures_total: CAPTURES_TOTAL,
+    });
 
+    // One atomic request with all CAPTURES_TOTAL images — the BE stores the
+    // N templates in a single transaction (all or none).
     const form = new FormData();
-    form.append(
-      "image",
-      new Blob([pngBytes], { type: "image/png" }),
-      "fingerprint.png",
-    );
+    for (const png of pngs) {
+      form.append(
+        "image",
+        new Blob([png], { type: "image/png" }),
+        "fingerprint.png",
+      );
+    }
     form.append("member_id", memberId);
     form.append("consent_accepted", "true");
 
     try {
-      await api.postFormData<EnrollResponse>(
-        "/api/v1/biometric/enroll",
-        form,
-      );
+      await api.postFormData<EnrollResponse>("/api/v1/biometric/enroll", form);
       if (ctrl.signal.aborted) return;
       setProgress({
         status: "success",
-        captures_done: 1,
-        captures_total: 1,
+        captures_done: CAPTURES_TOTAL,
+        captures_total: CAPTURES_TOTAL,
       });
       qc.invalidateQueries({ queryKey: ["members"] });
       opts.onSuccess?.();
@@ -216,7 +239,7 @@ export function useRegisterFingerprint(
       setProgress({
         status: "failed",
         captures_done: 0,
-        captures_total: 1,
+        captures_total: CAPTURES_TOTAL,
         error: mapped.code,
         collisionMember: mapped.collision,
       });
