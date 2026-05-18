@@ -1,0 +1,111 @@
+# Build Tinta Desktop SOLO para Windows x86_64.
+#
+# build-desktop.yml compila las 3 plataformas — incluyendo dos jobs de
+# macOS que facturan a 10x el minuto — así que una corrida completa quema
+# ~440 minutos de Actions. Este workflow corre SOLO el job de Windows
+# (~40 minutos facturados, a 2x), para iterar el instalador Windows sin
+# drenar la cuota de Actions.
+#
+# Trigger: workflow_dispatch — botón "Run workflow" en la pestaña Actions.
+# Produce: el instalador NSIS .exe y el MSI como artifacts de la corrida
+# (se descargan desde la página del run). NO publica a R2 — para releases
+# usa build-desktop.yml con un tag desktop-v*.
+
+name: Build Windows only
+
+on:
+  workflow_dispatch:
+
+env:
+  TINTA_CORE_REPO: TebanMT/cuadra-core
+  TINTA_CORE_REF: main
+  GO_VERSION: "1.25"
+  NODE_VERSION: "20"
+  RUST_TOOLCHAIN: "stable"
+  # Release tag de cuadra-core con los binarios NBIS Windows. Mantener en
+  # sync con el mismo env de build-desktop.yml.
+  NBIS_VERSION: nbis-v1
+
+jobs:
+  build-windows:
+    name: Windows x86_64
+    runs-on: windows-latest
+    steps:
+      - name: Checkout tinta-desktop
+        uses: actions/checkout@v4
+
+      - name: Checkout tinta-core
+        # PAT con scope `Contents: Read-only` sobre cuadra-core, en el
+        # secret TINTA_CORE_TOKEN (mismo que usa build-desktop.yml).
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TINTA_CORE_REPO }}
+          ref: ${{ env.TINTA_CORE_REF }}
+          path: tinta-core
+          token: ${{ secrets.TINTA_CORE_TOKEN }}
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: tinta-core/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: x86_64-pc-windows-msvc
+
+      - name: Build Go sidecar (windows x86_64)
+        env:
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: amd64
+        shell: bash
+        run: |
+          cd tinta-core
+          go build -tags sidecar \
+            -o ../src-tauri/tinta-sidecar-x86_64-pc-windows-msvc.exe \
+            ./cmd/sidecar
+          ls -la ../src-tauri/tinta-sidecar-*.exe
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Download NBIS binaries (mindtct.exe + bozorth3.exe)
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NBIS_VERSION: ${{ env.NBIS_VERSION }}
+        shell: bash
+        run: bash scripts/prepare-nbis-windows.sh
+
+      - name: Build Tauri
+        run: pnpm tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
+
+      - name: Upload Windows installer (NSIS .exe)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinta-desktop-windows-setup
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      - name: Upload Windows installer (MSI)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinta-desktop-windows-msi
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+          if-no-files-found: warn
