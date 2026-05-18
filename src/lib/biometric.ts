@@ -190,10 +190,16 @@ function resetWebSdkSession(): void {
   readerInstance = null;
 }
 
-// Decode the SDK's URL-safe base64 PNG into a Uint8Array. The SDK helper
-// `b64UrlTo64` normalises padding + `-_` → `+/`; atob handles the rest.
+// Decode the SDK's sample payload into PNG bytes. `SamplesAcquired.samples`
+// is a JSON-encoded array of base64url strings (one element per finger
+// placement); element [0] is the PNG for our single-shot PngImage
+// acquisition. The raw `samples` string is JSON — feeding it straight to
+// atob() throws InvalidCharacterError, so it must be JSON.parsed first.
+// See @digitalpersona/fingerprint docs/usage/index.adoc.
 function decodeSample(ns: FingerprintNamespace, sample: string): Uint8Array {
-  const std = ns.b64UrlTo64(sample);
+  const parsed = JSON.parse(sample) as unknown;
+  const b64url = Array.isArray(parsed) ? String(parsed[0]) : String(parsed);
+  const std = ns.b64UrlTo64(b64url);
   const bin = atob(std);
   const out = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
