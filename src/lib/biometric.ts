@@ -358,6 +358,12 @@ export async function isReaderConnected(): Promise<boolean> {
     const devices = await reader.enumerateDevices();
     return devices.length > 0;
   } catch {
+    // Probe failed — most likely a stale WebSDK session (the cached agent
+    // port went dead). Reset so the NEXT poll re-bootstraps against the
+    // live port: the kiosk's reader-connected gate self-heals within one
+    // poll interval instead of staying stuck "disconnected" forever (which
+    // would keep useBiometricCheckinLoop disabled and the kiosk blind).
+    resetWebSdkSession();
     return false;
   }
 }
