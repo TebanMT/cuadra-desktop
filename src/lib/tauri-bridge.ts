@@ -76,6 +76,22 @@ export async function quitApp(): Promise<void> {
   await invoke("quit_app");
 }
 
+let _appVersion: string | null = null;
+
+// getAppVersion returns the bundle version from tauri.conf.json. Outside
+// the Tauri shell (plain vite dev / tests) there is no bundle, so it
+// reports "dev".
+export async function getAppVersion(): Promise<string> {
+  if (_appVersion) return _appVersion;
+  if (!isTauri()) {
+    _appVersion = "dev";
+    return _appVersion;
+  }
+  const mod = await import("@tauri-apps/api/app");
+  _appVersion = await mod.getVersion();
+  return _appVersion;
+}
+
 export function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");

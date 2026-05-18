@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   BarChart3,
@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { LogoIcon } from "@/components/shared/Logo";
 import { cn } from "@/lib/utils";
+import { getAppVersion } from "@/lib/tauri-bridge";
 import { getAvatarPalette, getInitials } from "@/lib/avatar";
 import { shell } from "@/strings/shell";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -70,10 +71,15 @@ const NAV_GROUPS = [
 
 export function Sidebar() {
   const [hovered, setHovered] = useState(false);
+  const [version, setVersion] = useState<string | null>(null);
   const user = useAuthStore((s) => s.user);
   const gym = useAuthStore((s) => s.gym);
   const logout = useLogout();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    getAppVersion().then(setVersion).catch(() => undefined);
+  }, []);
 
   const initials = getInitials(user?.full_name);
   const palette = getAvatarPalette(user?.full_name);
@@ -213,6 +219,11 @@ export function Sidebar() {
               <LogOut className="h-4 w-4" />
             </button>
           </div>
+          {hovered && version && (
+            <p className="px-2 pb-0.5 text-[10px] leading-none text-sidebar-muted tabular-nums">
+              {version === "dev" ? "dev" : `v${version}`}
+            </p>
+          )}
         </div>
       </div>
     </aside>

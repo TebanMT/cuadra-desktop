@@ -64,9 +64,21 @@ interface FingerprintNamespace {
   b64UrlTo64(s: string): string;
 }
 
+// @digitalpersona/websdk attaches its internal namespace to window as
+// `WebSdkCore`. `configurator` is a page-life singleton; its connection
+// fields (`m_port` etc.) are the stale-port cache we have to clear — see
+// resetWebSdkSession(). Only the fields we touch are declared here.
+interface WebSdkConfigurator {
+  m_port?: number;
+  m_host?: string;
+  m_isSecure?: boolean;
+  m_srp?: unknown;
+}
+
 declare global {
   interface Window {
     Fingerprint?: FingerprintNamespace;
+    WebSdkCore?: { configurator?: WebSdkConfigurator };
   }
 }
 
@@ -135,21 +147,45 @@ async function getReader(): Promise<FingerprintReader> {
   return readerInstance;
 }
 
-// resetWebSdkSession drops the cached WebSDK connection state. The
-// @digitalpersona/websdk Configurator caches the agent's *ephemeral* data
-// port + SRP keys in sessionStorage under "websdk" (and "websdk.sessionId").
-// That port rotates — the Lite Client agent recycles it per connection —
-// so a cached entry goes stale fast: the WebChannel keeps dialing a dead
-// port and every call fails with "communication failure" (the SDK's own
-// docs call this "obsolete data in local storage"). Clearing the cache and
-// dropping the WebApi singleton forces a fresh `/get_connection` bootstrap
-// on the next getReader(), so each capture session dials the live port.
+// resetWebSdkSession drops the cached WebSDK connection state so the next
+// capture re-bootstraps against the agent's live data port.
+//
+// The @digitalpersona/websdk Configurator caches the agent's *ephemeral*
+// data port + SRP keys in two places: sessionStorage ("websdk" /
+// "websdk.sessionId") AND its own in-memory fields. The Configurator is a
+// page-life singleton (window.WebSdkCore.configurator) whose constructor
+// reads sessionStorage exactly once; from then on its `ensureLoaded()`
+// short-circuits whenever its in-memory `url`+`srp` are populated and
+// never re-runs `/get_connection`.
+//
+// That port rotates — the Lite Client agent recycles it (agent restart,
+// idle timeout, sleep/resume) — so a cached entry goes stale: the
+// WebChannel keeps dialing a dead port and every call fails with
+// "communication failure". Clearing *only* sessionStorage is not enough,
+// because the singleton still holds the dead port in memory. We must also
+// null the singleton's in-memory fields so `ensureLoaded()` re-runs the
+// `/get_connection` bootstrap and every capture session dials the live
+// port.
 function resetWebSdkSession(): void {
   try {
     window.sessionStorage.removeItem("websdk");
     window.sessionStorage.removeItem("websdk.sessionId");
   } catch {
     // sessionStorage can throw in locked-down webviews — best effort.
+  }
+  try {
+    const cfg = window.WebSdkCore?.configurator;
+    if (cfg) {
+      // `url` getter returns null when m_port/m_host are unset, which makes
+      // ensureLoaded() fall through to a fresh /get_connection.
+      cfg.m_port = undefined;
+      cfg.m_host = undefined;
+      cfg.m_isSecure = undefined;
+      cfg.m_srp = undefined;
+    }
+  } catch {
+    // WebSDK not loaded yet, or fields renamed in a future version — best
+    // effort. The sessionStorage clear above still helps on a fresh page.
   }
   readerInstance = null;
 }
@@ -259,7 +295,10 @@ export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<Uint8
       else sig.addEventListener("abort", abort, { once: true });
     }
 
-    reader.startAcquisition(ns.SampleFormat.PngImage).catch((err) => {
+    // Pass the real device UID from enumerateDevices(). The SDK's
+    // all-zeros "default device" GUID is rejected with E_INVALIDARG
+    // (0x80070057) by the U.are.U Legacy driver.
+    reader.startAcquisition(ns.SampleFormat.PngImage, devices[0]).catch((err) => {
       finish(classify(err));
     });
   });
@@ -297,6 +336,15 @@ export async function startCaptureStream(
   const ns = await ensureSdk();
   const reader = await getReader();
 
+  // Resolve the real device UID — the all-zeros "default device" GUID is
+  // rejected with E_INVALIDARG by the U.are.U Legacy driver.
+  const devices = await reader.enumerateDevices().catch((e) => {
+    throw classify(e);
+  });
+  if (!devices || devices.length === 0) {
+    throw new BiometricError("no_device", "no scanner plugged in");
+  }
+
   const onSamples = (e: unknown) => {
     try {
       const ev = e as SamplesAcquiredEvent;
@@ -321,7 +369,7 @@ export async function startCaptureStream(
   reader.on("CommunicationFailed", onComm);
 
   try {
-    await reader.startAcquisition(ns.SampleFormat.PngImage);
+    await reader.startAcquisition(ns.SampleFormat.PngImage, devices[0]);
   } catch (err) {
     reader.off("SamplesAcquired", onSamples);
     reader.off("DeviceConnected", onConnect);
