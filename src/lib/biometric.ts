@@ -135,6 +135,25 @@ async function getReader(): Promise<FingerprintReader> {
   return readerInstance;
 }
 
+// resetWebSdkSession drops the cached WebSDK connection state. The
+// @digitalpersona/websdk Configurator caches the agent's *ephemeral* data
+// port + SRP keys in sessionStorage under "websdk" (and "websdk.sessionId").
+// That port rotates — the Lite Client agent recycles it per connection —
+// so a cached entry goes stale fast: the WebChannel keeps dialing a dead
+// port and every call fails with "communication failure" (the SDK's own
+// docs call this "obsolete data in local storage"). Clearing the cache and
+// dropping the WebApi singleton forces a fresh `/get_connection` bootstrap
+// on the next getReader(), so each capture session dials the live port.
+function resetWebSdkSession(): void {
+  try {
+    window.sessionStorage.removeItem("websdk");
+    window.sessionStorage.removeItem("websdk.sessionId");
+  } catch {
+    // sessionStorage can throw in locked-down webviews — best effort.
+  }
+  readerInstance = null;
+}
+
 // Decode the SDK's URL-safe base64 PNG into a Uint8Array. The SDK helper
 // `b64UrlTo64` normalises padding + `-_` → `+/`; atob handles the rest.
 function decodeSample(ns: FingerprintNamespace, sample: string): Uint8Array {
@@ -173,6 +192,9 @@ interface CaptureOneOptions {
  */
 export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<Uint8Array> {
   const timeoutMs = opts.timeoutMs ?? 30_000;
+  // Force a fresh /get_connection bootstrap — the cached agent port goes
+  // stale between captures and causes "communication failure".
+  resetWebSdkSession();
   const ns = await ensureSdk();
   const reader = await getReader();
 
@@ -270,6 +292,8 @@ export interface CaptureStream {
 export async function startCaptureStream(
   handlers: CaptureStreamHandlers,
 ): Promise<CaptureStream> {
+  // Fresh bootstrap before the stream — see resetWebSdkSession().
+  resetWebSdkSession();
   const ns = await ensureSdk();
   const reader = await getReader();
 
