@@ -21,6 +21,9 @@
 import fingerprintSdkUrl from "@digitalpersona/fingerprint?url";
 import websdkUrl from "@digitalpersona/websdk?url";
 
+export const ENROLL_QUALITY_FLOOR = 60;
+export const CHECKIN_QUALITY_FLOOR = 40;
+
 export type BiometricErrorCode =
   | "lite_client_unreachable"
   | "no_device"
@@ -50,6 +53,10 @@ interface AcquisitionEvent {
 interface ErrorEvent {
   deviceUid: string;
   error: number;
+}
+interface QualityReportedEvent {
+  deviceUid: string;
+  quality: number;
 }
 interface FingerprintReader {
   enumerateDevices(): Promise<string[]>;
@@ -232,7 +239,7 @@ interface CaptureOneOptions {
  *
  * Throws BiometricError with a code the hook can map to a Spanish string.
  */
-export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<Uint8Array> {
+export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<{ png: Uint8Array; sdkQuality: number }> {
   const timeoutMs = opts.timeoutMs ?? 30_000;
   // Force a fresh /get_connection bootstrap — the cached agent port goes
   // stale between captures and causes "communication failure".
@@ -247,11 +254,13 @@ export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<Uint8
     throw new BiometricError("no_device", "no scanner plugged in");
   }
 
-  return new Promise<Uint8Array>((resolve, reject) => {
+  return new Promise<{ png: Uint8Array; sdkQuality: number }>((resolve, reject) => {
+    let lastQuality = 0;
     let settled = false;
-    const finish = (value: Uint8Array | BiometricError) => {
+    const finish = (value: { png: Uint8Array; sdkQuality: number } | BiometricError) => {
       if (settled) return;
       settled = true;
+      reader.off("QualityReported", onQuality);
       reader.off("SamplesAcquired", onSamples);
       reader.off("ErrorOccurred", onError);
       reader.off("DeviceDisconnected", onDisconnect);
@@ -260,14 +269,17 @@ export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<Uint8
       reader.stopAcquisition().catch(() => {
         // Best effort — if we're already stopped, ignore.
       });
-      if (value instanceof Uint8Array) resolve(value);
-      else reject(value);
+      if (value instanceof BiometricError) reject(value);
+      else resolve(value);
     };
 
+    const onQuality = (e: unknown) => {
+      lastQuality = (e as QualityReportedEvent).quality ?? 0;
+    };
     const onSamples = (e: unknown) => {
       try {
         const ev = e as SamplesAcquiredEvent;
-        finish(decodeSample(ns, ev.samples));
+        finish({ png: decodeSample(ns, ev.samples), sdkQuality: lastQuality });
       } catch (err) {
         finish(classify(err));
       }
@@ -283,6 +295,7 @@ export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<Uint8
       finish(new BiometricError("lite_client_unreachable", "comm failed"));
     };
 
+    reader.on("QualityReported", onQuality);
     reader.on("SamplesAcquired", onSamples);
     reader.on("ErrorOccurred", onError);
     reader.on("DeviceDisconnected", onDisconnect);
@@ -311,7 +324,7 @@ export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<Uint8
 }
 
 interface CaptureStreamHandlers {
-  onSample(png: Uint8Array): void;
+  onSample(png: Uint8Array, sdkQuality: number): void;
   onDeviceConnected?(): void;
   onDeviceDisconnected?(): void;
   // onError fires on transient SDK errors (low quality, etc) and on
@@ -351,10 +364,20 @@ export async function startCaptureStream(
     throw new BiometricError("no_device", "no scanner plugged in");
   }
 
+  let streamLastQuality = 0;
+  const onStreamQuality = (e: unknown) => {
+    streamLastQuality = (e as QualityReportedEvent).quality ?? 0;
+  };
   const onSamples = (e: unknown) => {
     try {
       const ev = e as SamplesAcquiredEvent;
-      handlers.onSample(decodeSample(ns, ev.samples));
+      const quality = streamLastQuality;
+      // Discard captures whose SDK quality is too low for reliable matching.
+      // The caller never sees them — the stream keeps running for the next
+      // finger placement. quality === 0 means the SDK didn't report quality
+      // for this placement, so we let it through rather than silently drop.
+      if (quality > 0 && quality < CHECKIN_QUALITY_FLOOR) return;
+      handlers.onSample(decodeSample(ns, ev.samples), quality);
     } catch (err) {
       handlers.onError?.(classify(err));
     }
@@ -368,6 +391,7 @@ export async function startCaptureStream(
   const onComm = () =>
     handlers.onError?.(new BiometricError("lite_client_unreachable", "comm failed"));
 
+  reader.on("QualityReported", onStreamQuality);
   reader.on("SamplesAcquired", onSamples);
   reader.on("DeviceConnected", onConnect);
   reader.on("DeviceDisconnected", onDisconnect);
@@ -377,6 +401,7 @@ export async function startCaptureStream(
   try {
     await reader.startAcquisition(ns.SampleFormat.PngImage, devices[0]);
   } catch (err) {
+    reader.off("QualityReported", onStreamQuality);
     reader.off("SamplesAcquired", onSamples);
     reader.off("DeviceConnected", onConnect);
     reader.off("DeviceDisconnected", onDisconnect);
@@ -387,6 +412,7 @@ export async function startCaptureStream(
 
   return {
     async stop() {
+      reader.off("QualityReported", onStreamQuality);
       reader.off("SamplesAcquired", onSamples);
       reader.off("DeviceConnected", onConnect);
       reader.off("DeviceDisconnected", onDisconnect);

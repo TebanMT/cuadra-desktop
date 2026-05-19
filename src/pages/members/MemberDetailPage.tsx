@@ -27,8 +27,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { MemberPhotoLightbox } from "@/components/members/MemberPhotoLightbox";
-import { useMember } from "@/hooks/useMembers";
+import { useMember, useDeleteFingerprint } from "@/hooks/useMembers";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useBiometricStatus } from "@/hooks/useBiometric";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -80,6 +90,8 @@ export default function MemberDetailPage() {
   const [payOpen, setPayOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
   const [fpOpen, setFpOpen] = useState(false);
+  const [confirmFpDeleteOpen, setConfirmFpDeleteOpen] = useState(false);
+  const deleteFingerprint = useDeleteFingerprint(memberId ?? "");
   const bio = useBiometricStatus(true);
   const fingerprintAvailable = !!bio.data?.connected;
 
@@ -408,9 +420,20 @@ export default function MemberDetailPage() {
             completo en gyms sin huella. */}
         {fingerprintAvailable && (
           <div className="border-t pt-4 flex flex-wrap gap-2">
-            <Button variant="outline" onClick={() => setFpOpen(true)}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (member?.has_fingerprint) {
+                  setConfirmFpDeleteOpen(true);
+                } else {
+                  setFpOpen(true);
+                }
+              }}
+            >
               <Fingerprint className="h-4 w-4 mr-2" />
-              {ct.fingerprint.triggerLabel}
+              {member?.has_fingerprint
+                ? ct.fingerprint.triggerLabelHas
+                : ct.fingerprint.triggerLabel}
             </Button>
           </div>
         )}
@@ -423,6 +446,30 @@ export default function MemberDetailPage() {
           <div>{t.detail.shortcuts.close}</div>
         </div>
       </div>
+
+      <AlertDialog open={confirmFpDeleteOpen} onOpenChange={setConfirmFpDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Borrar la huella actual?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminará la huella registrada de {member?.full_name} y se abrirá
+              el asistente para registrar una nueva.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                deleteFingerprint.mutate(undefined, {
+                  onSuccess: () => setFpOpen(true),
+                });
+              }}
+            >
+              Borrar y re-registrar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <MemberEditDialog
         memberId={member.id}

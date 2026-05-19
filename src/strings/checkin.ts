@@ -104,6 +104,11 @@ export const checkin = {
     errorCollision: (name: string) => `Esta huella ya está registrada para ${name}.`,
     seeExisting: (name: string) => `Ver perfil de ${name}`,
     collisionCancel: "Cancelar y saltar",
+    captureByIndex: [
+      "Coloca tu dedo centrado en el lector.",
+      "Inclínalo ligeramente hacia la izquierda.",
+      "Inclínalo ligeramente hacia la derecha.",
+    ] as const,
     waitingPlace: "Esperando dedo en el lector…",
     capturing: (n: number) => `Captura ${n} en proceso…`,
   },

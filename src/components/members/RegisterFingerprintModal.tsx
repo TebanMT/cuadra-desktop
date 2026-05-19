@@ -222,7 +222,7 @@ function CaptureStep({
           {status === "capturing"
             ? t.fingerprint.processing
             : status === "waiting"
-            ? t.fingerprint.waitingPlace
+            ? (t.fingerprint.captureByIndex[done] ?? t.fingerprint.waitingPlace)
             : status === "success"
             ? t.fingerprint.success
             : failed

@@ -29,6 +29,7 @@ export interface Member {
   enrollment_paid: boolean;
   last_maintenance_paid?: string;
   has_pin: boolean;
+  has_fingerprint: boolean;
   // PIN de 4 dígitos visible en el perfil. Vacío sólo en sócios viejos
   // (pre-auto-assign) o cuando la generación falló al inscribir.
   pin?: string;
@@ -332,6 +333,16 @@ export function useImportMembers() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["members"] });
+    },
+  });
+}
+
+export function useDeleteFingerprint(memberID: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.delete(`/api/v1/members/${memberID}/fingerprint`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: KEYS.detail(memberID) });
     },
   });
 }

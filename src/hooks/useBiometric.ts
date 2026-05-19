@@ -6,6 +6,7 @@ import {
   captureOnePng,
   isReaderConnected,
   startCaptureStream,
+  ENROLL_QUALITY_FLOOR,
   type BiometricErrorCode,
   type CaptureStream,
 } from "@/lib/biometric";
@@ -183,7 +184,23 @@ export function useRegisterFingerprint(
       });
       let png: Uint8Array;
       try {
-        png = await captureOnePng({ signal: ctrl.signal });
+        const result = await captureOnePng({ signal: ctrl.signal });
+        // Reject low-quality captures at the door of enrollment so that
+        // only well-formed templates are stored. sdkQuality === 0 means
+        // the SDK didn't fire QualityReported (older driver) — let it through.
+        if (result.sdkQuality > 0 && result.sdkQuality < ENROLL_QUALITY_FLOOR) {
+          if (ctrl.signal.aborted) return;
+          setProgress({
+            status: "failed",
+            captures_done: pngs.length,
+            captures_total: CAPTURES_TOTAL,
+            last_quality: result.sdkQuality,
+            error: "capture",
+          });
+          opts.onError?.("capture");
+          return;
+        }
+        png = result.png;
       } catch (err) {
         if (ctrl.signal.aborted) return;
         const code =
@@ -301,7 +318,7 @@ export function useBiometricCheckinLoop(opts: UseBiometricCheckinLoopOptions) {
     (async () => {
       try {
         stream = await startCaptureStream({
-          onSample: (png) => {
+          onSample: (png, _sdkQuality) => {
             if (cancelled || inflightRef.current) return;
             inflightRef.current = true;
             optsRef.current.onAttempt?.();
