@@ -57,8 +57,7 @@ export function AuthShell({
 
       {!hideFooter && (
         <p className="mt-6 text-center text-xs text-muted-foreground max-w-xs leading-relaxed">
-          Hecho en San Miguel de Allende para gyms de barrio que están
-          operando como negocio.
+          Hecho para gyms de barrio que están operando como negocio.
         </p>
       )}
     </div>
