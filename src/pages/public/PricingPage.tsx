@@ -3,7 +3,7 @@ import { Check, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const SUPPORT_WHATSAPP_URL = "https://wa.me/525555555555";
+const SUPPORT_WHATSAPP_URL = "https://wa.me/524461057446";
 
 interface PlanTier {
   id: "standard" | "plus";

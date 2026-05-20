@@ -23,7 +23,7 @@ const DASHBOARD_URL =
   "https://entinta.app";
 
 const BILLING_URL = `${DASHBOARD_URL}/settings/subscription`;
-const SUPPORT_WHATSAPP_URL = "https://wa.me/525555555555";
+const SUPPORT_WHATSAPP_URL = "https://wa.me/524461057446";
 
 export default function SubscriptionBlocked() {
   const clearAuth = useAuthStore((s) => s.clear);

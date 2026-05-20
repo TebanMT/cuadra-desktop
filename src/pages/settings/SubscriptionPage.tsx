@@ -32,7 +32,7 @@ import { fmtMoney } from "@/hooks/useBilling";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { fmtDate } from "@/lib/dates";
 
-const SUPPORT_WHATSAPP_URL = "https://wa.me/525555555555";
+const SUPPORT_WHATSAPP_URL = "https://wa.me/524461057446";
 
 // El flujo de activación / cambio de plan vive end-to-end en el dashboard
 // cloud (entinta.app). Razones:
