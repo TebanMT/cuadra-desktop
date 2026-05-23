@@ -61,6 +61,9 @@ export default function MemberCreatePage() {
       birthdate: v.birthdate || undefined,
       photo_url: v.photo_url || undefined,
       notes: v.notes.trim() || undefined,
+      // Sólo lo mandamos si el operador eligió algo. "" significa
+      // "no se capturó" y se traduce a NULL en BD (no enviarlo).
+      gender: v.gender || undefined,
       membership_type_id: v.membership_type_id,
       start_date: v.start_date || undefined,
       allow_duplicate_phone: allowDup,

@@ -1,15 +1,17 @@
 import { useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { DevModeBanner } from "@/components/layout/DevModeBanner";
 import { SidecarFailed } from "@/pages/shell/SidecarFailed";
 import { useSidecarUrl } from "@/hooks/useSidecarUrl";
 import { useHydrateAuth } from "@/hooks/useAuth";
 import { router } from "@/routes";
 import { queryClient } from "@/lib/queryClient";
-import { setOnSubscriptionInactive } from "@/lib/api";
+import { setOnPlanRequired, setOnSubscriptionInactive } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 function Bootstrapped() {
@@ -34,7 +36,23 @@ function Bootstrapped() {
         subscription_ends_at: payload.subscription_ends_at,
       });
     });
-    return () => setOnSubscriptionInactive(null);
+    // 402 plan_required: el FE gatea casi todas las entradas a features
+    // Plus con PlusFeatureLock; este toast cubre el path no-gateado (deep
+    // link, botón sin gate, request directo). El CTA lleva al upsell.
+    setOnPlanRequired((payload) => {
+      toast.error(payload.message, {
+        action: {
+          label: "Mejorar plan",
+          onClick: () => {
+            window.location.assign("/settings/subscription");
+          },
+        },
+      });
+    });
+    return () => {
+      setOnSubscriptionInactive(null);
+      setOnPlanRequired(null);
+    };
   }, []);
   return <RouterProvider router={router} />;
 }
@@ -46,6 +64,7 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
+          <DevModeBanner />
           {state === "ready" ? <Bootstrapped /> : <SidecarFailed state={state} />}
           <Toaster />
         </TooltipProvider>

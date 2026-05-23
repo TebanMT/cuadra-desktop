@@ -21,6 +21,7 @@ import { getAvatarPalette, getInitials } from "@/lib/avatar";
 import { shell } from "@/strings/shell";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useLogout } from "@/hooks/useAuth";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
 
 // Sidebar agrupado por frecuencia de uso. Los items diarios (Inicio,
 // Check-in, Cobros, Venta rápida, Socios) van arriba en "Operación".
@@ -32,7 +33,22 @@ import { useLogout } from "@/hooks/useAuth";
 // En estado colapsado (sidebar hover-off) los headers de grupo
 // desaparecen y queda sólo una línea divisoria para preservar la
 // jerarquía visual sin invadir el ancho de 70px.
-const NAV_GROUPS = [
+interface NavItem {
+  to: string;
+  icon: typeof CreditCard;
+  label: string;
+  end?: boolean;
+  // plusOnly: el item se OCULTA cuando el gym no es Plus. Mientras Plus
+  // siga sin venderse, mostrarlo con badge "Próximamente" contamina la
+  // experiencia Standard. Cuando Plus se libere, revertir a render con
+  // badge (ver `CUANDO PLUS SE LIBERE` en src/hooks/useSubscription.ts).
+  plusOnly?: boolean;
+}
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+const NAV_GROUPS: NavGroup[] = [
   {
     label: shell.navGroups.operation,
     items: [
@@ -52,12 +68,14 @@ const NAV_GROUPS = [
       // ventas, no merece estar enterrado.
       { to: "/settings/membership-types", icon: CreditCard, label: shell.nav.membershipTypes },
       { to: "/products", icon: Package, label: shell.nav.products },
-      { to: "/expenses", icon: Receipt, label: shell.nav.expenses },
+      // Gastos es feature Plus — oculto hasta que Plus se libere.
+      { to: "/expenses", icon: Receipt, label: shell.nav.expenses, plusOnly: true },
     ],
   },
   {
     label: shell.navGroups.programs,
-    items: [{ to: "/retos", icon: Trophy, label: shell.nav.challenges }],
+    // Retos también es Plus — oculto hasta que Plus se libere.
+    items: [{ to: "/retos", icon: Trophy, label: shell.nav.challenges, plusOnly: true }],
   },
   {
     label: shell.navGroups.reports,
@@ -67,15 +85,24 @@ const NAV_GROUPS = [
     label: shell.navGroups.settings,
     items: [{ to: "/settings", icon: Settings, label: shell.nav.settings, end: true }],
   },
-] as const;
+];
 
 export function Sidebar() {
   const [hovered, setHovered] = useState(false);
   const [version, setVersion] = useState<string | null>(null);
   const user = useAuthStore((s) => s.user);
   const gym = useAuthStore((s) => s.gym);
+  const isPlus = canAccessPlusFeatures(gym?.subscription_plan);
   const logout = useLogout();
   const navigate = useNavigate();
+
+  // Plus aún no se vende — ocultamos los items Plus en lugar de mostrarlos
+  // con badge "Próximamente". Cuando Plus se libere, revertir a render con
+  // `plusOnly` badge (ver git history de este archivo y comentario
+  // `CUANDO PLUS SE LIBERE` en src/hooks/useSubscription.ts).
+  const visibleGroups = NAV_GROUPS
+    .map((g) => ({ ...g, items: g.items.filter((i) => isPlus || !i.plusOnly) }))
+    .filter((g) => g.items.length > 0);
 
   useEffect(() => {
     getAppVersion().then(setVersion).catch(() => undefined);
@@ -119,7 +146,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-2 space-y-1">
-          {NAV_GROUPS.map((group, gi) => (
+          {visibleGroups.map((group, gi) => (
             <div key={group.label} className="space-y-0.5">
               {/* Header de grupo: visible sólo cuando el sidebar está
                   expandido. En modo colapsado mostramos una línea
@@ -142,15 +169,7 @@ export function Sidebar() {
                     cn(
                       "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors h-10",
                       isActive
-                        // Active = soft pill (brick-100 bg + brick-600 text)
-                        // vía CSS vars --sidebar-active / -foreground que
-                        // ya apuntan a los tokens correctos en globals.css.
                         ? "bg-[hsl(var(--sidebar-active))] text-[hsl(var(--sidebar-active-foreground))]"
-                        // Inactive: ink-500 sobre transparente con hover
-                        // paper-200. Explicit en lugar de heredar del
-                        // sidebar-foreground (que sigue siendo ink-900,
-                        // usado por el wordmark "Tinta"). Dark variants
-                        // mantienen jerarquía sobre canvas oscuro.
                         : "text-ink-500 hover:bg-paper-200 hover:text-ink-700 dark:text-ink-300 dark:hover:bg-ink-700 dark:hover:text-paper-50"
                     )
                   }
@@ -161,7 +180,7 @@ export function Sidebar() {
                   />
                   <span
                     className={cn(
-                      "whitespace-nowrap transition-opacity duration-200",
+                      "whitespace-nowrap transition-opacity duration-200 flex-1",
                       hovered ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
                     )}
                   >

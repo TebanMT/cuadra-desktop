@@ -30,6 +30,14 @@ import { CameraCaptureModal } from "@/components/shared/CameraCaptureModal";
 
 export type FormMode = "create" | "edit";
 
+// Gender en el form vive como "" | "hombre" | "mujer" | "no_especificado".
+// "" significa "el operador no eligió ningún valor" → no se manda al BE.
+// "no_especificado" es captura deliberada ("Prefiero no decir") → SÍ se
+// manda. La distinción importa porque NULL en BD ≡ "histórico sin captura"
+// (más adelante el dueño puede correr una campaña para capturar género),
+// mientras que "no_especificado" es respuesta consciente del socio.
+export type GenderFormValue = "" | "hombre" | "mujer" | "no_especificado";
+
 export interface MemberFormValues {
   full_name: string;
   phone: string;
@@ -37,6 +45,7 @@ export interface MemberFormValues {
   birthdate: string;
   photo_url: string;
   notes: string;
+  gender: GenderFormValue;
   membership_type_id: string;
   start_date: string;
   charge_first_payment: boolean;
@@ -90,6 +99,9 @@ const baseSchema = z.object({
   birthdate: z.string().optional(),
   photo_url: z.string().optional(),
   notes: z.string().optional(),
+  // Mirror del enum de dominio + el "" del default vacío. Cualquier otro
+  // string que llegue acá es bug del FE (los radios sólo emiten estos 4).
+  gender: z.enum(["", "hombre", "mujer", "no_especificado"]).default(""),
 });
 
 const createSchema = baseSchema.extend({
@@ -110,6 +122,7 @@ const emptyValues: MemberFormValues = {
   birthdate: "",
   photo_url: "",
   notes: "",
+  gender: "",
   membership_type_id: "",
   start_date: todayIso(),
   charge_first_payment: true,
@@ -159,6 +172,9 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
   const [showBirthdate, setShowBirthdate] = useState(!!initial?.birthdate);
   const [showPhoto, setShowPhoto] = useState(!!initial?.photo_url);
   const [showNotes, setShowNotes] = useState(!!initial?.notes);
+  // Gender visible cuando el socio ya tiene captura (edit) o cuando el
+  // operador eligió añadir el campo. Mismo patrón que el resto de optionals.
+  const [showGender, setShowGender] = useState(!!initial?.gender);
   const [error, setError] = useState<string | null>(null);
   const [photoErr, setPhotoErr] = useState<string | null>(null);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -419,6 +435,11 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
               {t.form.addNotes}
             </Button>
           )}
+          {!showGender && (
+            <Button type="button" variant="link" size="sm" onClick={() => setShowGender(true)} className="h-auto p-0">
+              {t.form.addGender}
+            </Button>
+          )}
         </div>
 
         {showEmail && (
@@ -530,6 +551,40 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
               onChange={(e) => update("notes", e.target.value)}
               rows={3}
             />
+          </div>
+        )}
+
+        {showGender && (
+          <div className="space-y-2">
+            <OptionalFieldHeader
+              label={t.form.gender.label}
+              onRemove={() => {
+                // Quitar la sección limpia el valor — al BE le llegará ""
+                // en edit (sentinel para "limpiar captura"); en create
+                // simplemente no se envía.
+                update("gender", "");
+                setShowGender(false);
+              }}
+            />
+            <RadioGroup
+              value={values.gender}
+              onValueChange={(v) => update("gender", v as GenderFormValue)}
+              className="flex flex-wrap gap-4"
+            >
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="hombre" id="g-hombre" />
+                <span>{t.form.gender.options.hombre}</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="mujer" id="g-mujer" />
+                <span>{t.form.gender.options.mujer}</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <RadioGroupItem value="no_especificado" id="g-no_especificado" />
+                <span>{t.form.gender.options.no_especificado}</span>
+              </label>
+            </RadioGroup>
+            <p className="text-xs text-muted-foreground">{t.form.gender.hint}</p>
           </div>
         )}
       </section>

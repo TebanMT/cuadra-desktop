@@ -40,6 +40,10 @@ export function MemberEditDialog({ memberId, initial, open, onOpenChange }: Prop
       birthdate: v.birthdate,
       photo_url: v.photo_url,
       notes: v.notes.trim(),
+      // En edit SÍ mandamos el campo (incluso ""), porque "" = "limpiar
+      // captura" — el operador puede pulsar "Quitar" para volver a NULL.
+      // Distingue de create donde omitir significa "no toques".
+      gender: v.gender,
     };
     try {
       await update.mutateAsync(payload);
@@ -71,6 +75,7 @@ export function MemberEditDialog({ memberId, initial, open, onOpenChange }: Prop
             birthdate: initial.birthdate ?? "",
             photo_url: initial.photo_url ?? "",
             notes: initial.notes ?? "",
+            gender: initial.gender ?? "",
           }}
           submitting={update.isPending}
           onSubmit={handleSubmit}

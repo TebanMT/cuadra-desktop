@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { isDev } from "@/lib/runtime";
 
 export type SubscriptionStatus = "active" | "past_due" | "cancelled";
 export type SubscriptionPlan =
@@ -22,15 +23,28 @@ export function isPlusPlan(plan: string | undefined | null): boolean {
 }
 
 /**
- * Devuelve true si el gym debe poder acceder a features Plus.
- * Incluye trial: el dueño en trial gratuito de 30 días debe poder probar
- * todo lo que vende Plus para evaluar el upgrade. Si excluyéramos trial,
- * el trial se quedaría con Standard-only y no convertiría.
+ * True si el gym debe ver las features Plus.
  *
- * Espeja `gymDomain.CanAccessPlusFeatures` del backend.
+ * HOY (Plus aún no se vende — landing dice "Próximamente"): trial NO pasa.
+ * Mientras el bundle Plus no esté completo (faltan rutinas + app del socio),
+ * mostrar features Plus al trial es prometer algo que no se vende. Trial
+ * opera como Standard hasta que se libere Plus.
+ *
+ * CUANDO PLUS SE LIBERE: añadir `plan === "trial"` aquí — el trial debe
+ * poder probar Plus para evaluar el upgrade (estrategia ADR-009). Buscar
+ * este comentario al hacer el cambio.
+ *
+ * DEV-MODE BYPASS: cuando `VITE_TINTA_MODE=dev`, devuelve true para
+ * cualquier plan. Espeja el bypass equivalente del backend en
+ * `gymDomain.CanAccessPlusFeatures`. `isPlusPlan` e `isPaidPlan` NO se
+ * tocan — billing y SubscriptionPage siguen viendo el SKU real.
+ *
+ * Espeja `gymDomain.CanAccessPlusFeatures` del backend — si cambia allá,
+ * cambia acá.
  */
 export function canAccessPlusFeatures(plan: string | undefined | null): boolean {
-  return plan === "trial" || plan === "plus_monthly" || plan === "plus_annual";
+  if (isDev) return true;
+  return plan === "plus_monthly" || plan === "plus_annual";
 }
 
 /** Devuelve true si el gym está en cualquier SKU pagado (no trial). */
@@ -132,11 +146,16 @@ export function bannerLevelFor(detail: {
   if (status === "past_due") return "past_due";
   if (status === "cancelled") return "cancelled";
   if (detail.subscription_plan === "trial") {
-    const ends = detail.trial_ends_at ? new Date(detail.trial_ends_at).getTime() : 0;
-    if (!ends) return "ok";
-    const now = Date.now();
-    if (ends < now) return "trial_over";
-    const days = Math.ceil((ends - now) / (1000 * 60 * 60 * 24));
+    if (!detail.trial_ends_at) return "ok";
+    const end = new Date(detail.trial_ends_at);
+    if (Number.isNaN(end.getTime())) return "ok";
+    if (end.getTime() < Date.now()) return "trial_over";
+    // Días calendario en TZ local, no diff de ms. Coherente con la fecha
+    // que pinta SubscriptionPage en la card "Tu prueba termina el ___".
+    const endMidnight = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+    const now = new Date();
+    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const days = Math.round((endMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
     if (days <= 7) return "trial_soon";
   }
   return "ok";

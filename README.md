@@ -74,6 +74,77 @@ Ver `IMPLEMENTATION_NOTES.md` para detalle. Resumen:
 - `../adr/ADR-001-sync-protocol.md` §3.9 — estados del indicador de sync.
 - `./DESIGN.md` — principios de diseño visual.
 
+## Lector de huella en Windows
+
+El installer Windows de Tinta integra el flujo del **HID Authentication Device
+Client** (antes "DigitalPersona Lite Client") — el agente que la app necesita
+para hablar con el lector U.are.U 4500. La integración está en
+`src-tauri/windows/installer-hooks.nsh` y se conecta vía `bundle.windows.nsis.installerHooks`
+en `tauri.windows.conf.json`.
+
+### Cómo funciona
+
+1. El `.exe` de Tinta-Setup NO bundlea el binario de HID. El EULA de HID
+   prohíbe redistribuirlo (ver `../adr/ADR-004-ter-installer-bundling.md`).
+2. Después de copiar los archivos de Tinta, el hook NSIS detecta si el agente
+   ya está instalado (registry 5.x, registry legacy 4.x, o presencia del
+   binario en `C:\Program Files\DigitalPersona\Bin\dpcagnt.exe`).
+3. Si **ya está** → skip silencioso.
+4. Si **falta** → descarga el setup oficial desde
+   `https://crossmatch.hid.gl/lite-client/store/5.2.0/...` con PowerShell
+   `Invoke-WebRequest`, verifica el SHA256 publicado por HID, y lo ejecuta
+   silent (`/s /v"/qn"`). Windows pide elevación UAC una sola vez para ese
+   paso.
+5. Si la descarga o instalación falla (sin internet, hash mismatch, exit code
+   distinto de cero) → mensaje claro al operador en español + Tinta queda
+   instalada y funcional sin el lector. La app muestra un banner pidiendo
+   reintentar manualmente.
+
+### Requisito: internet en el momento de instalar
+
+Si la PC del gym no tiene internet cuando se corre `Tinta-Setup.exe`, el
+hook cae en el branch "instálalo manual" — la app queda instalada pero el
+lector queda inactivo hasta que el dueño corra el setup de HID por su
+cuenta. Trade-off documentado y aceptado: el primer handshake desktop↔cloud
+también requiere internet (ver memoria `project_first_handshake.md`), así que
+no es una regresión vs el offline-first del producto en operación normal.
+
+### Versión del Lite Client (pin manual)
+
+La URL y el hash SHA256 están hardcodeados en `installer-hooks.nsh`. Para
+bumpear:
+
+1. Validar la nueva versión en una VM Windows 10/11 limpia (sin DP previo).
+2. Confirmar que `@digitalpersona/fingerprint` sigue conectando con la nueva
+   versión del agente sin cambios al FE.
+3. Actualizar `TINTA_DP_URL` y `TINTA_DP_SHA256` en el `.nsh`.
+4. Cortar release de Tinta.
+
+NO apuntar a "latest" — HID podría publicar una versión rota y se
+distribuiría instantáneamente a todo gym nuevo.
+
+### Cómo probarlo en VM Windows limpia
+
+```powershell
+# 1. Verificar que no hay DP previo
+Get-ItemProperty 'HKLM:\SOFTWARE\HID Global\HID Authentication Device Client' -ErrorAction SilentlyContinue
+Get-ItemProperty 'HKLM:\SOFTWARE\DigitalPersona\Bin' -ErrorAction SilentlyContinue
+Test-Path 'C:\Program Files\DigitalPersona\Bin\dpcagnt.exe'
+
+# 2. Correr Tinta-Setup_X.Y.Z_x64-setup.exe
+# Observar: barra de progreso "Descargando soporte (~50 MB)" + 1 UAC + "Instalando..."
+
+# 3. Confirmar post-install
+Get-Service -Name 'DpHostW' -ErrorAction SilentlyContinue   # agente como servicio
+Test-Path 'C:\Program Files\DigitalPersona\Bin\dpcagnt.exe'  # binario
+
+# 4. Abrir Tinta → conectar U.are.U 4500 → ir a Ajustes → biometría → debería
+#    ver el reader.
+```
+
+Para test del modo "sin internet": desconectar la VM antes de correr el
+setup, observar que el `MessageBox` claro aparece y que Tinta arranca igual.
+
 ## Branding y UI
 
 - Color primario: deep navy (`#1E3A8A`, HSL 224 76% 33%).

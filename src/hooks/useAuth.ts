@@ -339,24 +339,42 @@ export function useHydrateAuth() {
   const markHydrated = useAuthStore((s) => s.markHydrated);
 
   useEffect(() => {
-    (async () => {
+    let alive = true;
+
+    const reload = async () => {
       const token = await getAccessToken();
-      if (!token) {
-        markHydrated();
-        return;
-      }
+      if (!token) return;
       try {
         const me = await api.get<MeResponse>("/api/v1/auth/me");
-        setSession(me.user, me.gym);
+        if (alive) setSession(me.user, me.gym);
       } catch {
         // /auth/me failed — sidecar might be booting, JWT_SECRET might
         // have rotated, network might be flaky. None of these justify
         // logging the operator out. Keep the tokens; the next user
         // action will retry. The route guards still see no session
         // until /me succeeds, so we don't show stale data either.
-      } finally {
-        markHydrated();
       }
+    };
+
+    (async () => {
+      await reload();
+      if (alive) markHydrated();
     })();
+
+    // Refetch on window focus so the FE picks up plan/status changes
+    // that landed in the local SQLite mirror via sync (Stripe webhook
+    // → cloud → sync agent → local SQLite). Sin esto, el authStore se
+    // queda frozen en los valores del boot hasta que el dueño cierra
+    // y reabre el desktop, o aprieta "Refrescar datos" en /settings/gym.
+    // Escenario típico: el dueño hace checkout en el dashboard del
+    // browser, vuelve al desktop, y espera que la app reconozca su
+    // nuevo plan sin reiniciar. No es polling — sólo dispara cuando
+    // el dueño regresa a la ventana.
+    const onFocus = () => { void reload(); };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      alive = false;
+      window.removeEventListener("focus", onFocus);
+    };
   }, [markHydrated, setSession]);
 }

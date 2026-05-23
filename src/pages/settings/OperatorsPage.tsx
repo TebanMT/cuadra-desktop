@@ -47,16 +47,26 @@ import {
   type Operator,
 } from "@/hooks/useOperators";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
 import { ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/dates";
 import { settings as t } from "@/strings/settings";
+import { Link } from "react-router-dom";
 
-const HARD_LIMIT = 10;
+// Caps en FE. El BE es la fuente de verdad (CreateOperator usa
+// MaxOperatorsStandard=2 → dueño + 1 op para Standard; MaxOperatorsPerGym=11
+// → dueño + 10 op para Plus/Trial). Mantener acá los mismos números le
+// ahorra al dueño el 402 cuando ya llegó al cap.
+const HARD_LIMIT_PLUS = 10;
+const HARD_LIMIT_STANDARD = 1;
 const SOFT_WARN = 5;
 
 export default function OperatorsPage() {
   const list = useOperators(true);
   const me = useAuthStore((s) => s.user);
+  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const isPlus = canAccessPlusFeatures(plan);
+  const hardLimit = isPlus ? HARD_LIMIT_PLUS : HARD_LIMIT_STANDARD;
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Operator | null>(null);
   const [resetting, setResetting] = useState<Operator | null>(null);
@@ -78,13 +88,13 @@ export default function OperatorsPage() {
             {t.operators.title}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {t.operators.subtitle(HARD_LIMIT, activeCount)}
+            {t.operators.subtitle(hardLimit, activeCount)}
           </p>
         </div>
         <Button
           size="lg"
           onClick={() => setCreateOpen(true)}
-          disabled={activeCount >= HARD_LIMIT}
+          disabled={activeCount >= hardLimit}
           className="h-10 rounded-md font-semibold shadow-sm"
         >
           <Plus className="h-4 w-4 mr-2" />
@@ -93,12 +103,29 @@ export default function OperatorsPage() {
       </div>
       <div className="space-y-4">
 
-      {activeCount >= HARD_LIMIT && (
+      {activeCount >= hardLimit && (
         <Alert variant="warning">
-          <AlertDescription>{t.operators.hardLimit}</AlertDescription>
+          <AlertDescription>
+            {isPlus ? (
+              t.operators.hardLimit
+            ) : (
+              <>
+                Tu plan Standard incluye 1 operador. Para sumar más,{" "}
+                <Link
+                  to="/settings/subscription"
+                  className="font-semibold underline underline-offset-2"
+                >
+                  mejora a Plus
+                </Link>
+                .
+              </>
+            )}
+          </AlertDescription>
         </Alert>
       )}
-      {activeCount >= SOFT_WARN && activeCount < HARD_LIMIT && (
+      {/* SOFT_WARN sólo aplica al cap Plus — en Standard el cap es 1 y el
+          warning sería ruido (siempre se dispara antes de la creación). */}
+      {isPlus && activeCount >= SOFT_WARN && activeCount < hardLimit && (
         <Alert>
           <AlertDescription>{t.operators.softWarning}</AlertDescription>
         </Alert>

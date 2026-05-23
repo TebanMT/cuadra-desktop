@@ -155,6 +155,16 @@ export const members = {
     addBirthdate: "+ Agregar fecha de nacimiento",
     addPhoto: "+ Agregar foto",
     addNotes: "+ Agregar notas",
+    addGender: "+ Agregar género",
+    gender: {
+      label: "Género",
+      hint: "Opcional. Lo usamos sólo para reportes.",
+      options: {
+        hombre: "Hombre",
+        mujer: "Mujer",
+        no_especificado: "Prefiero no decir",
+      },
+    },
     chooseFile: "Subir archivo",
     takePhoto: "Tomar foto",
     removePhoto: "Quitar foto",

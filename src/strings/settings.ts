@@ -40,10 +40,12 @@ export const settings = {
         body: "Envía un comunicado a un grupo de socios.",
       },
       // Sección consolidada (item 10): WhatsApp + plantillas + envío masivo
-      // viven juntas en MensajesPage con tabs internos.
+      // viven juntas en MensajesPage con tabs internos. Mientras Plus no
+      // se vende, sólo Plantillas se muestra (Standard sí envía comprobantes
+      // y recordatorios — necesita editar esas plantillas).
       mensajes: {
         title: "Mensajes",
-        body: "WhatsApp del gym, plantillas automáticas y envíos al socio.",
+        body: "Personaliza los comprobantes y recordatorios que reciben tus socios.",
       },
       profile: {
         title: "Mi perfil",
@@ -71,9 +73,14 @@ export const settings = {
       "Esta función llega con el plan Plus en los próximos meses. Mientras tanto Standard cubre tu operación diaria. Te avisamos cuando Plus esté listo.",
   },
   // Página parent que agrupa WhatsApp + Plantillas + Envío al socio en tabs.
+  // El subtitle Standard refleja lo que el dueño realmente puede tocar hoy
+  // (sólo Plantillas, porque WhatsApp connect propio y broadcast son Plus).
+  // Cuando Plus se libere, ambos planes muestran `subtitle`.
   mensajes: {
     title: "Mensajes",
     subtitle: "WhatsApp del gym, plantillas automáticas y envíos al socio.",
+    subtitleStandard:
+      "Plantillas de los comprobantes y recordatorios que Tinta envía a tus socios por ti.",
     tabs: {
       whatsapp: "WhatsApp",
       templates: "Plantillas",

@@ -6,6 +6,7 @@ export type MemberSort = "name" | "expiry" | "created_at";
 export type SortDir = "asc" | "desc";
 
 export type MemberStatus = "active" | "inactive" | "lost";
+export type Gender = "hombre" | "mujer" | "no_especificado";
 export type MembershipStatus = "active" | "expired" | "replaced" | "cancelled" | "pending_payment";
 export type AccessStatus =
   | "allowed_active"
@@ -34,6 +35,10 @@ export interface Member {
   // (pre-auto-assign) o cuando la generación falló al inscribir.
   pin?: string;
   last_contact_attempt_at?: string;
+  // gender es opcional. null = no se capturó (estado por default para
+  // socios pre-feature); en otro caso un valor del enum. Se manda al BE
+  // sólo cuando el operador seleccionó algo en el form.
+  gender?: Gender | null;
   created_at: string;
 }
 
@@ -85,6 +90,9 @@ export interface CreateMemberInput {
   birthdate?: string;
   photo_url?: string;
   notes?: string;
+  // omitir si el operador no eligió valor; cualquier valor del enum
+  // pasa por ValidateGender en el dominio (server + sidecar).
+  gender?: Gender;
   membership_type_id: string;
   start_date?: string;
   allow_duplicate_phone?: boolean;
@@ -128,6 +136,9 @@ export interface UpdateMemberInput {
   birthdate?: string;
   photo_url?: string;
   notes?: string;
+  // gender — undefined = no tocar (consistente con el resto del PATCH).
+  // "" string vacío limpia la captura (vuelve a NULL en BE).
+  gender?: Gender | "";
 }
 
 export interface ToggleStatusInput {

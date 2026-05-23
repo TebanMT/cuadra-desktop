@@ -105,6 +105,27 @@ export function setOnSubscriptionInactive(
   onSubscriptionInactive = handler;
 }
 
+// PlanRequiredPayload espeja el JSON que el BE devuelve con HTTP 402
+// `plan_required` (shared/middleware/plus_gate.go). Diferente al
+// `subscription_inactive`: aquí el gym SÍ tiene acceso válido (active /
+// trial / past_due) pero su SKU es Standard y la acción exigía Plus.
+// El FE desktop ya gatea las páginas con PlusFeatureLock, así que este
+// callback es defensa en profundidad para deep-links o llamadas que se
+// hayan colado.
+export interface PlanRequiredPayload {
+  error: "plan_required";
+  required_plan: string;
+  current_plan: string;
+  message: string;
+}
+
+let onPlanRequired: ((payload: PlanRequiredPayload) => void) | null = null;
+export function setOnPlanRequired(
+  handler: ((payload: PlanRequiredPayload) => void) | null,
+) {
+  onPlanRequired = handler;
+}
+
 // refreshInFlight coalesces concurrent refresh attempts so a burst of 401s
 // only triggers one POST /auth/refresh.
 let refreshInFlight: Promise<string | null> | null = null;
@@ -197,6 +218,16 @@ async function rawRequest<T>(
         onSubscriptionInactive
       ) {
         onSubscriptionInactive(payload as SubscriptionInactivePayload);
+      }
+      // 402 plan_required → handler app-level muestra toast con CTA
+      // a /settings/subscription. NO bloqueamos la sesión; el dueño
+      // sigue operando en Standard.
+      if (
+        res.status === 402 &&
+        payload?.error === "plan_required" &&
+        onPlanRequired
+      ) {
+        onPlanRequired(payload as PlanRequiredPayload);
       }
       throw new ApiError(
         res.status,

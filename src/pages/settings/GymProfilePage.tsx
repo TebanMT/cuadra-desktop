@@ -327,11 +327,12 @@ export default function GymProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Datos fiscales — feature Plus. Sólo se muestra el formulario si
-            el gym está en plan Plus; en cualquier otro caso enseñamos un
-            placeholder discreto con CTA a /settings/subscription. NO usamos
-            upsell agresivo: el dueño en Standard ya sabe que existe Plus. */}
-        {isPlus ? (
+        {/* Datos fiscales — feature Plus. Mientras Plus no se vende, la
+            sección entera se oculta para Standard (sin placeholder
+            "Próximamente"). Cuando Plus se libere, revertir al patrón
+            isPlus ? Card : PlusLockedCard — ver git history y comentario
+            `CUANDO PLUS SE LIBERE` en src/hooks/useSubscription.ts. */}
+        {isPlus && (
           <Card>
             <CardContent className="pt-5 pb-5 space-y-4">
               <div className="flex items-baseline justify-between">
@@ -383,44 +384,45 @@ export default function GymProfilePage() {
               </div>
             </CardContent>
           </Card>
-        ) : (
-          <PlusLockedCard
-            sectionTitle={t.gymProfile.sections.tax}
-            description={t.plus.fiscalLocked}
-          />
         )}
 
-        <Card>
-          <CardContent className="pt-5 pb-5 space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              {t.gymProfile.sections.branding}
-            </h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <Field label={t.gymProfile.fields.logo}>
-                <Input
-                  value={form.logo_url}
-                  onChange={(e) => update_("logo_url", e.target.value)}
-                  placeholder="https://…"
-                />
-                <p className="text-xs text-muted-foreground mt-1">{t.gymProfile.help.logo}</p>
-              </Field>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label={t.gymProfile.fields.primaryColor}>
-                  <ColorInput
-                    value={form.primary_color}
-                    onChange={(v) => update_("primary_color", v)}
+        {/* Branding (logo + colores) — feature Plus, mismo trato que Tax.
+            El BE sigue gateando inline en PATCH /gyms/me cuando vienen
+            LogoURL / PrimaryColor / SecondaryColor (gym.HasPlusOnlyFields),
+            así que la defensa en profundidad sigue activa. */}
+        {isPlus && (
+          <Card>
+            <CardContent className="pt-5 pb-5 space-y-4">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                {t.gymProfile.sections.branding}
+              </h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <Field label={t.gymProfile.fields.logo}>
+                  <Input
+                    value={form.logo_url}
+                    onChange={(e) => update_("logo_url", e.target.value)}
+                    placeholder="https://…"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">{t.gymProfile.help.logo}</p>
                 </Field>
-                <Field label={t.gymProfile.fields.secondaryColor}>
-                  <ColorInput
-                    value={form.secondary_color}
-                    onChange={(v) => update_("secondary_color", v)}
-                  />
-                </Field>
+                <div className="grid grid-cols-2 gap-4">
+                  <Field label={t.gymProfile.fields.primaryColor}>
+                    <ColorInput
+                      value={form.primary_color}
+                      onChange={(v) => update_("primary_color", v)}
+                    />
+                  </Field>
+                  <Field label={t.gymProfile.fields.secondaryColor}>
+                    <ColorInput
+                      value={form.secondary_color}
+                      onChange={(v) => update_("secondary_color", v)}
+                    />
+                  </Field>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardContent className="pt-5 pb-5 space-y-4">
@@ -474,11 +476,11 @@ export default function GymProfilePage() {
           </CardContent>
         </Card>
 
-        {/* Access webhook — feature Plus. Configurar torniquete / cerradura
-            externa por webhook al check-in es un diferenciador de Plus, no un
-            valor por defecto. Standard sigue funcionando con check-in manual
-            del operador. */}
-        {isPlus ? (
+        {/* Access webhook — feature Plus. Mismo trato que Tax/Branding:
+            sección oculta entera para Standard mientras Plus no se vende.
+            Cuando Plus se libere, revertir al patrón isPlus ? Card :
+            PlusLockedCard. */}
+        {isPlus && (
         <Card>
           <CardContent className="pt-5 pb-5 space-y-3">
             <div>
@@ -545,11 +547,6 @@ export default function GymProfilePage() {
             </Field>
           </CardContent>
         </Card>
-        ) : (
-          <PlusLockedCard
-            sectionTitle="Acceso por hardware (avanzado)"
-            description={t.plus.hardwareLocked}
-          />
         )}
 
         {canEdit && (

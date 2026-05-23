@@ -31,9 +31,14 @@ const TONE: Record<SubscriptionBannerLevel, { bg: string; text: string; icon: ty
 
 function daysUntil(iso: string | null | undefined): number | null {
   if (!iso) return null;
-  const ms = new Date(iso).getTime() - Date.now();
-  if (Number.isNaN(ms)) return null;
-  return Math.ceil(ms / (1000 * 60 * 60 * 24));
+  const end = new Date(iso);
+  if (Number.isNaN(end.getTime())) return null;
+  // Días calendario en TZ local — alineado con la fecha que muestra
+  // SubscriptionPage en la card "Tu prueba termina el ___".
+  const endMidnight = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+  const now = new Date();
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return Math.round((endMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
 }
 
 function copyFor(level: SubscriptionBannerLevel, daysLeft: number | null): string {

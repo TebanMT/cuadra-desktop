@@ -63,6 +63,8 @@ import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { downloadBlob } from "@/lib/tauri-bridge";
 import { reports as t } from "@/strings/reports";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
 import { StatCard } from "@/components/shared/StatCard";
 import {
   DataTable,
@@ -230,6 +232,8 @@ function ReportsContent({
   );
   const money = useMoneyVisibility();
   const navigate = useNavigate();
+  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const isPlus = canAccessPlusFeatures(plan);
 
   async function exportFile(format: ExportFormat) {
     setExporting(format);
@@ -671,7 +675,12 @@ function ReportsContent({
         )}
       </SectionCard>
 
-      {/* Export actions */}
+      {/* Export actions — Excel/CSV/PDF export es feature Plus según landing.
+          Standard ve los reportes en pantalla; los botones de export sólo
+          aparecen para Plus. Mientras Plus no se vende, Standard ni siquiera
+          ve el upsell — cuando Plus se libere, agregar la rama else con
+          el link de upgrade (ver git history y comentario
+          `CUANDO PLUS SE LIBERE` en src/hooks/useSubscription.ts). */}
       <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
         <span className="inline-flex items-center gap-2">
           <Receipt className="h-3.5 w-3.5" />
@@ -679,39 +688,41 @@ function ReportsContent({
             {fmtDate(data.from)} — {fmtDate(data.to)}
           </span>
         </span>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!!exporting}
-            onClick={() => exportFile("pdf")}
-            className="rounded-md"
-          >
-            {exporting === "pdf" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileText className="h-4 w-4" />
-            )}
-            {exporting === "pdf" ? t.page.exportingPdf : t.page.exportPdf}
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!!exporting}
-            onClick={() => exportFile("xlsx")}
-            className="rounded-md"
-          >
-            {exporting === "xlsx" ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <FileSpreadsheet className="h-4 w-4" />
-            )}
-            {exporting === "xlsx" ? t.page.exportingXlsx : t.page.exportXlsx}
-          </Button>
-          <Button variant="ghost" size="sm" disabled className="rounded-md">
-            <Download className="h-4 w-4" />
-          </Button>
-        </div>
+        {isPlus && (
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!!exporting}
+              onClick={() => exportFile("pdf")}
+              className="rounded-md"
+            >
+              {exporting === "pdf" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+              {exporting === "pdf" ? t.page.exportingPdf : t.page.exportPdf}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={!!exporting}
+              onClick={() => exportFile("xlsx")}
+              className="rounded-md"
+            >
+              {exporting === "xlsx" ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4" />
+              )}
+              {exporting === "xlsx" ? t.page.exportingXlsx : t.page.exportXlsx}
+            </Button>
+            <Button variant="ghost" size="sm" disabled className="rounded-md">
+              <Download className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Drill-down dialog */}

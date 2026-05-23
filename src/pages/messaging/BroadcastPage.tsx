@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Megaphone, Send } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,6 +30,8 @@ import {
   type BroadcastAudience,
 } from "@/hooks/useNotifications";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { PlusFeatureLock } from "@/components/shared/PlusFeatureLock";
 import { ApiError } from "@/lib/api";
 import { messaging as t } from "@/strings/messaging";
 
@@ -51,6 +53,8 @@ export default function BroadcastPage() {
   const whatsapp = useWhatsappState();
   const send = useSendBroadcast();
   const gymName = useAuthStore((s) => s.gym?.name) ?? "tu gym";
+  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const isPlus = canAccessPlusFeatures(plan);
 
   const [audience, setAudience] = useState<BroadcastAudience | null>(null);
   const [body, setBody] = useState("");
@@ -96,6 +100,21 @@ export default function BroadcastPage() {
       toast.error(err instanceof ApiError ? err.message : t.broadcast.error);
       setConfirmOpen(false);
     }
+  }
+
+  // Broadcast (envío masivo a socios) es Plus por pricing — Standard sólo
+  // envía mensajes transaccionales (recordatorios, comprobantes). El
+  // SettingsIndex ya bloquea el card de Mensajes para Standard, pero un
+  // deep-link a /messaging/broadcast o un menú futuro podrían saltarse
+  // ese gate. Defensa-en-profundidad con PlusFeatureLock.
+  if (!isPlus) {
+    return (
+      <PlusFeatureLock
+        icon={Megaphone}
+        title="Envío masivo a socios es parte de Plus"
+        body="Manda recordatorios, promociones y avisos a grupos completos (todos los activos, por vencer, inactivos, VIP). Disponible al mejorar a Plus."
+      />
+    );
   }
 
   return (

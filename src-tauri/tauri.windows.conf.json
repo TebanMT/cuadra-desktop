@@ -5,6 +5,12 @@
       "tinta-sidecar",
       "binaries/nbis/mindtct",
       "binaries/nbis/bozorth3"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerHooks": "./windows/installer-hooks.nsh"
+      }
+    }
   }
 }
+
