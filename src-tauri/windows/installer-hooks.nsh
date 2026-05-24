@@ -42,6 +42,29 @@
 !define TINTA_DP_TEMP_EXE "$TEMP\tinta-hid-adc.exe"
 !define TINTA_DP_TEMP_PS1 "$TEMP\tinta-dp-fetch.ps1"
 
+; ─── Driver del U.are.U 4500 (separado del Lite Client) ─────────────────────
+; El Lite Client (agente) NO incluye el driver kernel del reader. Validado
+; empíricamente: instalación limpia del agente deja el reader con "Code 28
+; - The drivers for this device are not installed" en Device Manager.
+;
+; URL: best-guess basada en el pattern observado en otros SFW de HID
+; (ej. https://www.hidglobal.com/sites/default/files/drivers/sfw-01357_reve_dtc1500_v5.5.0.2_setup.zip).
+; Si HID cambia el path, la descarga retorna 404 y caemos al fallback
+; (MessageBox + abrir browser a la página oficial). NO bake-eamos hash
+; porque HID no lo publica al lado del ZIP del driver (a diferencia del
+; agente que sí lo expone). Confiamos en la firma WHQL de Microsoft del
+; .cat embebido, que Windows valida al hacer pnputil /add-driver /install.
+;
+; ARCH: el driver del 49061 es x86_64 ONLY. En Windows 11 ARM64 el .sys no
+; carga (kernel drivers no emulan). Documentado en README — Tinta no soporta
+; Windows ARM64 hoy. El hook intenta el install de todas formas; pnputil
+; falla limpio en ARM64 y caemos al MessageBox.
+!define TINTA_DP_DRIVER_URL "https://www.hidglobal.com/sites/default/files/drivers/sfw-02580-dp4500_fingerprint_reader_driver_legacy_with_installer_v.4.1.1.221.zip"
+!define TINTA_DP_DRIVER_HELP_URL "https://www.hidglobal.com/drivers/49061"
+!define TINTA_DP_DRIVER_TEMP_ZIP "$TEMP\tinta-dp-driver.zip"
+!define TINTA_DP_DRIVER_TEMP_DIR "$TEMP\tinta-dp-driver"
+!define TINTA_DP_DRIVER_TEMP_PS1 "$TEMP\tinta-dp-driver.ps1"
+
 !macro NSIS_HOOK_POSTINSTALL
   Push $0
   Push $1
@@ -153,6 +176,110 @@
     Goto tinta_dp_done
 
   tinta_dp_done:
+    ; ─── Driver del reader: check + auto-install, independiente del agente ─
+    ; Agente y driver son DOS componentes separados. El agente puede estar
+    ; instalado sin el driver (típico cuando la PC nunca tuvo un U.are.U
+    ; antes). Sin driver, Device Manager muestra Code 28 y el FE recibe
+    ; "no_device" eternamente. Esta sección lo cubre.
+    DetailPrint "Verificando driver del lector de huella..."
+
+    ; Detección: pnputil enum-drivers retorna todos los drivers del store.
+    ; Si alguna fila matchea "dPersona" o "U.are.U", está registrado.
+    ; Esto NO requiere que el reader esté conectado físicamente al instalar
+    ; — chequeamos el driver store, no Device Manager.
+    nsExec::ExecToStack 'powershell.exe -NoProfile -Command "if (pnputil /enum-drivers | Select-String -Pattern ''dPersona|U\.are\.U'' -Quiet) { exit 0 } else { exit 1 }"'
+    Pop $0
+    Pop $1  ; output, descarted
+    StrCmp $0 "0" tinta_drv_already tinta_drv_download
+
+  tinta_drv_download:
+    DetailPrint "Driver del lector no detectado. Descargando (~5 MB)."
+
+    ; Script PowerShell que: (1) descarga el ZIP del driver desde HID,
+    ; (2) lo extrae, (3) detecta arquitectura (x86 vs x64), (4) corre
+    ; pnputil /add-driver /install. Mismo patrón que el .ps1 del agente
+    ; — archivo temporal, argv quoted, sin escapar comillas inline.
+    ;
+    ; Exit codes:
+    ;   0 = ok (driver registrado en el store, listo para bindear cuando
+    ;       el reader se conecte físicamente)
+    ;   1 = falló la descarga (404, sin internet, URL stale)
+    ;   2 = falló la extracción (ZIP corrupto)
+    ;   3 = falló pnputil (driver incompatible con arch — típicamente ARM64)
+    FileOpen $2 "${TINTA_DP_DRIVER_TEMP_PS1}" w
+    FileWrite $2 'param([string]$$Url,[string]$$ZipPath,[string]$$ExtractDir)$\r$\n'
+    FileWrite $2 '$$ErrorActionPreference = ''Stop''$\r$\n'
+    FileWrite $2 '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12$\r$\n'
+    FileWrite $2 'try { Invoke-WebRequest -Uri $$Url -OutFile $$ZipPath -UseBasicParsing -TimeoutSec 120 } catch { exit 1 }$\r$\n'
+    FileWrite $2 'try { if (Test-Path $$ExtractDir) { Remove-Item $$ExtractDir -Recurse -Force } } catch {}$\r$\n'
+    FileWrite $2 'try { Expand-Archive -Path $$ZipPath -DestinationPath $$ExtractDir -Force } catch { exit 2 }$\r$\n'
+    ; Busca el INF en la subcarpeta x64. El ZIP tiene estructura
+    ; Legacy-X.Y.Z/DP4500-X.Y.Z/x64/dPersona_x64.inf, así que -Recurse.
+    FileWrite $2 '$$inf = Get-ChildItem -Path $$ExtractDir -Filter ''dPersona_x64.inf'' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1$\r$\n'
+    FileWrite $2 'if (-not $$inf) { exit 2 }$\r$\n'
+    ; pnputil necesita admin. El instalador de Tinta corre sin elevación
+    ; (perfilUser por default en Tauri NSIS), así que pedimos elevación
+    ; específicamente para este step via -Verb RunAs. Eso dispara un UAC
+    ; adicional al del Lite Client — dos UAC en total en la primera
+    ; instalación, una por componente. Acepable; el alternativo era forzar
+    ; perMachine install para todo Tinta, lo cual agrega friction al 100%
+    ; de instalaciones (incluyendo re-installs y updates donde el driver
+    ; ya está). -NoNewWindow es incompatible con -Verb RunAs así que lo
+    ; quitamos — el flash del console window es trade-off aceptable.
+    ; pnputil retorna 0 en éxito, no-cero en cualquier fallo (firma, arch,
+    ; INF inválido). Mapeamos cualquier fallo a exit 3.
+    FileWrite $2 '$$proc = Start-Process -FilePath ''pnputil.exe'' -ArgumentList ''/add-driver'', $$inf.FullName, ''/install'' -Wait -PassThru -Verb RunAs$\r$\n'
+    FileWrite $2 'if ($$proc.ExitCode -ne 0) { exit 3 }$\r$\n'
+    FileWrite $2 'exit 0$\r$\n'
+    FileClose $2
+
+    nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${TINTA_DP_DRIVER_TEMP_PS1}" "${TINTA_DP_DRIVER_URL}" "${TINTA_DP_DRIVER_TEMP_ZIP}" "${TINTA_DP_DRIVER_TEMP_DIR}"'
+    Pop $0
+    Delete "${TINTA_DP_DRIVER_TEMP_PS1}"
+    Delete "${TINTA_DP_DRIVER_TEMP_ZIP}"
+    ; El extract dir lo dejamos como evidencia para debug si algo falló.
+    ; pnputil ya copió lo que necesitaba al driver store; no hace falta el
+    ; staging. Si quieres limpiarlo: RMDir /r "${TINTA_DP_DRIVER_TEMP_DIR}".
+
+    StrCmp $0 "0" tinta_drv_ok
+    StrCmp $0 "1" tinta_drv_download_fail
+    StrCmp $0 "2" tinta_drv_extract_fail
+    StrCmp $0 "3" tinta_drv_install_fail
+    ; Cualquier otro código (PowerShell murió, signal, etc.) → tratamos
+    ; como download_fail (el branch más informativo + URL al manual).
+    Goto tinta_drv_download_fail
+
+  tinta_drv_ok:
+    DetailPrint "Driver del lector de huella instalado en el driver store."
+    DetailPrint "Cuando conectes el lector, Windows lo va a reconocer automaticamente."
+    Goto tinta_drv_done
+
+  tinta_drv_download_fail:
+    ; URL del ZIP cambió, sin internet, o el host bloqueó la descarga.
+    ; Abrimos browser a la página oficial — es 2 clicks más para el
+    ; operador pero no es un dealbreaker.
+    Delete "${TINTA_DP_DRIVER_TEMP_ZIP}"
+    MessageBox MB_OK|MB_ICONINFORMATION "No pude descargar el driver del lector de huella automaticamente. Tinta queda instalada y funcional, pero el lector no va a responder hasta que instales el driver.$\r$\n$\r$\nVoy a abrirte la pagina oficial de HID. Descarga el archivo (.zip), descomprimelo, y ejecuta setup_x64.msi adentro de la carpeta x64.$\r$\n$\r$\n${TINTA_DP_DRIVER_HELP_URL}"
+    ExecShell "open" "${TINTA_DP_DRIVER_HELP_URL}"
+    Goto tinta_drv_done
+
+  tinta_drv_extract_fail:
+    Delete "${TINTA_DP_DRIVER_TEMP_ZIP}"
+    MessageBox MB_OK|MB_ICONEXCLAMATION "El driver del lector se descargo pero el archivo parece corrupto. Tinta queda instalada. Descarga el driver manualmente desde:$\r$\n${TINTA_DP_DRIVER_HELP_URL}"
+    ExecShell "open" "${TINTA_DP_DRIVER_HELP_URL}"
+    Goto tinta_drv_done
+
+  tinta_drv_install_fail:
+    ; pnputil falló: arquitectura incompatible (ARM64 host), Windows
+    ; rechazó por policy, o firma del driver vencida.
+    MessageBox MB_OK|MB_ICONINFORMATION "El driver del lector se descargo pero Windows no lo acepto (posiblemente esta maquina es ARM64, donde el driver no funciona). Tinta queda instalada. Si necesitas usar el lector, asegurate de estar en Windows x86_64 e instala el driver manualmente desde:$\r$\n${TINTA_DP_DRIVER_HELP_URL}"
+    Goto tinta_drv_done
+
+  tinta_drv_already:
+    DetailPrint "Driver del lector de huella ya esta registrado en el sistema."
+    Goto tinta_drv_done
+
+  tinta_drv_done:
     Pop $2
     Pop $1
     Pop $0
