@@ -187,7 +187,9 @@
     ; Si alguna fila matchea "dPersona" o "U.are.U", está registrado.
     ; Esto NO requiere que el reader esté conectado físicamente al instalar
     ; — chequeamos el driver store, no Device Manager.
-    nsExec::ExecToStack 'powershell.exe -NoProfile -Command "if (pnputil /enum-drivers | Select-String -Pattern ''dPersona|U\.are\.U'' -Quiet) { exit 0 } else { exit 1 }"'
+    ; NSIS escape: '' NO es escape de apóstrofe; uso $\' para que PowerShell
+    ; reciba el regex literal 'dPersona|U\.are\.U' en su Pattern parameter.
+    nsExec::ExecToStack 'powershell.exe -NoProfile -Command "if (pnputil /enum-drivers | Select-String -Pattern $\'dPersona|U\.are\.U$\' -Quiet) { exit 0 } else { exit 1 }"'
     Pop $0
     Pop $1  ; output, descarted
     StrCmp $0 "0" tinta_drv_already tinta_drv_download
@@ -208,14 +210,22 @@
     ;   3 = falló pnputil (driver incompatible con arch — típicamente ARM64)
     FileOpen $2 "${TINTA_DP_DRIVER_TEMP_PS1}" w
     FileWrite $2 'param([string]$$Url,[string]$$ZipPath,[string]$$ExtractDir)$\r$\n'
-    FileWrite $2 '$$ErrorActionPreference = ''Stop''$\r$\n'
+    ; NOTA escape NSIS: dentro de un single-quoted NSIS string '...', usar
+    ; `''` NO es escape de apóstrofe — NSIS lo lee como "cierra string,
+    ; reabre string", produciendo múltiples argumentos a FileWrite (de ahí
+    ; el error que vi en CI: "FileWrite expects 2 parameters, got 4").
+    ; Las apóstrofes literales se escapan con $\' o se evitan usando comillas
+    ; dobles en PowerShell, que dentro de '...' de NSIS son literales sin
+    ; ningún escape necesario. Voy por las dobles — mismo patrón que el
+    ; bloque del Lite Client arriba.
+    FileWrite $2 '$$ErrorActionPreference = $\"Stop$\"$\r$\n'
     FileWrite $2 '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12$\r$\n'
     FileWrite $2 'try { Invoke-WebRequest -Uri $$Url -OutFile $$ZipPath -UseBasicParsing -TimeoutSec 120 } catch { exit 1 }$\r$\n'
     FileWrite $2 'try { if (Test-Path $$ExtractDir) { Remove-Item $$ExtractDir -Recurse -Force } } catch {}$\r$\n'
     FileWrite $2 'try { Expand-Archive -Path $$ZipPath -DestinationPath $$ExtractDir -Force } catch { exit 2 }$\r$\n'
     ; Busca el INF en la subcarpeta x64. El ZIP tiene estructura
     ; Legacy-X.Y.Z/DP4500-X.Y.Z/x64/dPersona_x64.inf, así que -Recurse.
-    FileWrite $2 '$$inf = Get-ChildItem -Path $$ExtractDir -Filter ''dPersona_x64.inf'' -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1$\r$\n'
+    FileWrite $2 '$$inf = Get-ChildItem -Path $$ExtractDir -Filter $\"dPersona_x64.inf$\" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1$\r$\n'
     FileWrite $2 'if (-not $$inf) { exit 2 }$\r$\n'
     ; pnputil necesita admin. El instalador de Tinta corre sin elevación
     ; (perfilUser por default en Tauri NSIS), así que pedimos elevación
@@ -228,7 +238,7 @@
     ; quitamos — el flash del console window es trade-off aceptable.
     ; pnputil retorna 0 en éxito, no-cero en cualquier fallo (firma, arch,
     ; INF inválido). Mapeamos cualquier fallo a exit 3.
-    FileWrite $2 '$$proc = Start-Process -FilePath ''pnputil.exe'' -ArgumentList ''/add-driver'', $$inf.FullName, ''/install'' -Wait -PassThru -Verb RunAs$\r$\n'
+    FileWrite $2 '$$proc = Start-Process -FilePath $\"pnputil.exe$\" -ArgumentList $\"/add-driver$\", $$inf.FullName, $\"/install$\" -Wait -PassThru -Verb RunAs$\r$\n'
     FileWrite $2 'if ($$proc.ExitCode -ne 0) { exit 3 }$\r$\n'
     FileWrite $2 'exit 0$\r$\n'
     FileClose $2
