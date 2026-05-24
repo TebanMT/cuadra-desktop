@@ -223,7 +223,16 @@
     ; bloque del Lite Client arriba.
     FileWrite $2 '$$ErrorActionPreference = $\"Stop$\"$\r$\n'
     FileWrite $2 '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12$\r$\n'
-    FileWrite $2 'try { Invoke-WebRequest -Uri $$Url -OutFile $$ZipPath -UseBasicParsing -TimeoutSec 120 } catch { exit 1 }$\r$\n'
+    ; Headers de browser. hidglobal.com tiene Cloudflare Bot Management
+    ; sobre /sites/default/files/drivers/... — un request "pelado" desde
+    ; PowerShell se topa con challenge JS que no podemos resolver
+    ; (PowerShell no ejecuta JS). Con User-Agent + Referer + Accept
+    ; "realistas", CF usa heurística distinta y normalmente sirve el
+    ; archivo estático sin challenge. NO garantiza pass al 100%; si CF
+    ; aprieta más adelante, caemos al MessageBox que abre el browser
+    ; (donde el JS challenge SÍ corre).
+    FileWrite $2 '$$headers = @{ $\"User-Agent$\" = $\"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36$\"; $\"Accept$\" = $\"text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8$\"; $\"Accept-Language$\" = $\"en-US,en;q=0.9$\"; $\"Referer$\" = $\"https://www.hidglobal.com/drivers/49061$\" }$\r$\n'
+    FileWrite $2 'try { Invoke-WebRequest -Uri $$Url -OutFile $$ZipPath -UseBasicParsing -TimeoutSec 180 -Headers $$headers } catch { exit 1 }$\r$\n'
     FileWrite $2 'try { if (Test-Path $$ExtractDir) { Remove-Item $$ExtractDir -Recurse -Force } } catch {}$\r$\n'
     FileWrite $2 'try { Expand-Archive -Path $$ZipPath -DestinationPath $$ExtractDir -Force } catch { exit 2 }$\r$\n'
     ; Busca el INF en la subcarpeta x64. El ZIP tiene estructura
