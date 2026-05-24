@@ -47,19 +47,22 @@
 ; empíricamente: instalación limpia del agente deja el reader con "Code 28
 ; - The drivers for this device are not installed" en Device Manager.
 ;
-; URL: best-guess basada en el pattern observado en otros SFW de HID
-; (ej. https://www.hidglobal.com/sites/default/files/drivers/sfw-01357_reve_dtc1500_v5.5.0.2_setup.zip).
-; Si HID cambia el path, la descarga retorna 404 y caemos al fallback
-; (MessageBox + abrir browser a la página oficial). NO bake-eamos hash
-; porque HID no lo publica al lado del ZIP del driver (a diferencia del
-; agente que sí lo expone). Confiamos en la firma WHQL de Microsoft del
-; .cat embebido, que Windows valida al hacer pnputil /add-driver /install.
+; URL: extraída via scrape del HTML de /drivers/49061 (Mi best-guess inicial
+; era wrong — HID NO normaliza nombres a lowercase+underscores como otros
+; SFW de su sitio; mantiene espacios y paréntesis, URL-encoded como
+; %20 y %28%29 respectivamente). Verificado HTTP 200 / 5.48 MB /
+; application/zip el 2026-05-24. Si HID rota el path, la descarga retorna
+; 404 y caemos al fallback (MessageBox + abrir browser a la página
+; oficial). NO bake-eamos hash porque HID no lo publica al lado del ZIP
+; del driver (a diferencia del agente que sí lo expone). Confiamos en la
+; firma WHQL de Microsoft del .cat embebido, que Windows valida al hacer
+; pnputil /add-driver /install.
 ;
 ; ARCH: el driver del 49061 es x86_64 ONLY. En Windows 11 ARM64 el .sys no
 ; carga (kernel drivers no emulan). Documentado en README — Tinta no soporta
 ; Windows ARM64 hoy. El hook intenta el install de todas formas; pnputil
 ; falla limpio en ARM64 y caemos al MessageBox.
-!define TINTA_DP_DRIVER_URL "https://www.hidglobal.com/sites/default/files/drivers/sfw-02580-dp4500_fingerprint_reader_driver_legacy_with_installer_v.4.1.1.221.zip"
+!define TINTA_DP_DRIVER_URL "https://www.hidglobal.com/sites/default/files/drivers/SFW-02580-DP4500%20Fingerprint%20Reader%20Driver%20%28Legacy%29%20with%20installer%20v.4.1.1.221.zip"
 !define TINTA_DP_DRIVER_HELP_URL "https://www.hidglobal.com/drivers/49061"
 !define TINTA_DP_DRIVER_TEMP_ZIP "$TEMP\tinta-dp-driver.zip"
 !define TINTA_DP_DRIVER_TEMP_DIR "$TEMP\tinta-dp-driver"
