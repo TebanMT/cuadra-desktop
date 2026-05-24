@@ -235,8 +235,29 @@
     FileWrite $2 'try { Invoke-WebRequest -Uri $$Url -OutFile $$ZipPath -UseBasicParsing -TimeoutSec 180 -Headers $$headers } catch { exit 1 }$\r$\n'
     FileWrite $2 'try { if (Test-Path $$ExtractDir) { Remove-Item $$ExtractDir -Recurse -Force } } catch {}$\r$\n'
     FileWrite $2 'try { Expand-Archive -Path $$ZipPath -DestinationPath $$ExtractDir -Force } catch { exit 2 }$\r$\n'
-    ; Busca el INF en la subcarpeta x64. El ZIP tiene estructura
-    ; Legacy-X.Y.Z/DP4500-X.Y.Z/x64/dPersona_x64.inf, así que -Recurse.
+    ; El paquete SFW-02580 de HID contiene un ZIP ANIDADO:
+    ;   Legacy-X.Y.Z/DP4500-X.Y.Z.zip  ← este tiene el driver adentro
+    ;   Legacy-X.Y.Z/Release Notes ...pdf
+    ; Expand-Archive solo descomprime un nivel; sin recursión sobre los
+    ; .zip que aparezcan después, Get-ChildItem nunca encuentra el .inf
+    ; (vive adentro del .zip nested que sigue sin tocar). Loopeamos hasta
+    ; que no queden .zip nuevos — con cap a 5 vueltas por defensa contra
+    ; loops infinitos (ZIP malicioso con auto-referencias improbable
+    ; pero no imposible).
+    FileWrite $2 'for ($$i = 0; $$i -lt 5; $$i++) {$\r$\n'
+    FileWrite $2 '  $$nested = Get-ChildItem -Path $$ExtractDir -Filter $\"*.zip$\" -Recurse -ErrorAction SilentlyContinue$\r$\n'
+    FileWrite $2 '  if (-not $$nested) { break }$\r$\n'
+    FileWrite $2 '  foreach ($$nz in $$nested) {$\r$\n'
+    FileWrite $2 '    $$dst = Join-Path $$nz.DirectoryName ($$nz.BaseName + $\"_x$\")$\r$\n'
+    FileWrite $2 '    try { Expand-Archive -Path $$nz.FullName -DestinationPath $$dst -Force } catch { }$\r$\n'
+    ; Remove-Item siempre, dentro o fuera del try — si Expand falló queremos
+    ; sacar el .zip corrupto del filesystem para que la próxima iteración no
+    ; lo re-encuentre y queme las 5 vueltas del cap sin progreso.
+    FileWrite $2 '    Remove-Item $$nz.FullName -Force -ErrorAction SilentlyContinue$\r$\n'
+    FileWrite $2 '  }$\r$\n'
+    FileWrite $2 '}$\r$\n'
+    ; Busca el INF en cualquier subcarpeta. Después del unzip recursivo,
+    ; la estructura típica es Legacy-X.Y.Z/DP4500-X.Y.Z_x/x64/dPersona_x64.inf.
     FileWrite $2 '$$inf = Get-ChildItem -Path $$ExtractDir -Filter $\"dPersona_x64.inf$\" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1$\r$\n'
     FileWrite $2 'if (-not $$inf) { exit 2 }$\r$\n'
     ; pnputil necesita admin. El instalador de Tinta corre sin elevación
