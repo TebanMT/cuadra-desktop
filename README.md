@@ -106,6 +106,52 @@ emulan en Windows on ARM). Implicaciones:
   (ver `build-windows-only.yml` línea 65), consistente con esta
   restricción.
 
+### Setup de VM Windows x64 en UTM (Mac Apple Silicon)
+
+Si tu host es Mac M-series y necesitas validar el `.exe` end-to-end (con
+flujo biométrico incluido), UTM con emulación QEMU es la única ruta:
+
+1. **Instalar UTM**: [mac.getutm.app](https://mac.getutm.app) (~30 MB, MIT).
+2. **Bajar ISO de Windows 11 x64** desde Microsoft directo:
+   [https://www.microsoft.com/software-download/windows11](https://www.microsoft.com/software-download/windows11)
+   → "Download Windows 11 Disk Image (ISO) for x64 devices". ~5 GB.
+3. **Crear VM en UTM**:
+   - File → New → **Emulate** (NO "Virtualize" — virtualize es solo ARM64).
+   - Operating System: Windows.
+   - Architecture: **x86_64** (importantísimo, NO aarch64).
+   - Boot ISO: el archivo descargado.
+   - RAM: 8 GB mínimo (cuanto más mejor — la emulación es CPU-bound).
+   - CPU cores: dejá 4-6 asignados al guest.
+   - Storage: 60 GB virtual disk.
+   - TPM: habilítalo en Settings → System (Windows 11 lo exige).
+4. **Instalar Windows**: proceso normal. Esperar 1-2 horas — la emulación
+   QEMU sobre Apple Silicon es lentísima. Una vez instalado, los reboots
+   subsecuentes son ~5-10 min.
+5. **USB passthrough del U.are.U** (con VM corriendo): Devices → USB →
+   seleccionar "DigitalPersona U.are.U 4500" en la lista.
+6. **Verificar arch antes de bajar el .exe**:
+   ```powershell
+   Get-CimInstance Win32_OperatingSystem | Select OSArchitecture
+   ```
+   Debe decir `OSArchitecture : 64-bit` (NO "ARM 64-bit Processor"). Si
+   dice ARM64, te equivocaste de architecture en el paso 3.
+
+#### Quirks conocidos de UTM x86_64 emulado
+
+- **Unblock-File necesario en cada descarga.** Cuando bajes el `.exe`
+  desde `dl.entinta.app` (o desde el artifact del GitHub Action),
+  Windows le pone Mark-of-the-Web. Antes de doble-click:
+  ```powershell
+  Unblock-File "$env:USERPROFILE\Downloads\Tinta-Setup.exe"
+  ```
+  Y al ejecutar, SmartScreen va a mostrar "Windows protected your PC" —
+  click "More info" → "Run anyway". (Esto desaparece cuando tengamos
+  code-signing cert en V1.0+ — ver `build-desktop.yml:24-27`.)
+- **Velocidad para iterar:** correr el .exe en UTM toma ~30s (vs ~5s
+  nativo). Suficiente para validar el hook, no para dev loop.
+- **Si el USB passthrough se cuelga:** Devices → USB → unmark y remark
+  el reader. UTM a veces pierde el binding cuando suspendes la VM.
+
 Si el hook detecta que la instalación del driver falla (típicamente
 porque la máquina es ARM64), Tinta queda instalada y funcional sin
 biometría; el `MessageBox` apunta al operador a instalar el driver
