@@ -42,10 +42,31 @@ export function KioskExitDialog({ open, onOpenChange, onAuthorized }: Props) {
       onAuthorized();
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        setError(t.kiosk.exitWrongPassword);
+      // Distinguir tres modos de falla. El handler del sidecar
+      // (auth_controller_sidecar.handleVerifyPassword) NUNCA hace round-trip
+      // al cloud — todo es contra el cache local SQLite, así que "sin
+      // internet" no es una excusa válida. Las únicas causas de error son:
+      //
+      //   1. 401 invalid_credentials — contraseña incorrecta (el operador
+      //      se equivocó). Mensaje clásico.
+      //   2. 401 no_cache — el sidecar nunca tuvo un login con internet,
+      //      no hay password_hash que comparar. El operador tiene que
+      //      conectarse al menos una vez con red antes de poder salir.
+      //   3. No-ApiError (fetch falló, sidecar no arranca, timeout) — el
+      //      proceso del sidecar no responde. Pre-fix devolvíamos
+      //      "contraseña incorrecta" y el operador re-intentaba password,
+      //      perdía tiempo y se frustraba.
+      if (err instanceof ApiError) {
+        if (err.status === 401 && err.code === "auth.verify.errors.no_cache") {
+          setError(t.kiosk.exitNoCache);
+        } else if (err.status === 401) {
+          setError(t.kiosk.exitWrongPassword);
+        } else {
+          setError(t.kiosk.exitGenericError);
+        }
       } else {
-        setError(t.kiosk.exitWrongPassword);
+        // TypeError / abort / timeout — el sidecar no es accesible.
+        setError(t.kiosk.exitOffline);
       }
     }
   }

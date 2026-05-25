@@ -72,7 +72,11 @@ export const checkin = {
     exitSubmit: "Salir",
     exitCancel: "Cancelar",
     exitWrongPassword: "Contraseña incorrecta.",
-    exitHint: "Atajo: Ctrl + Shift + K",
+    exitNoCache: "Inicia sesión una vez con internet para poder salir desde aquí.",
+    exitOffline: "No logro contactar al sistema. Reintenta en unos segundos.",
+    exitGenericError: "No pude validar la contraseña. Reintenta.",
+    exitButtonAriaLabel: "Salir del modo kiosko",
+    exitHint: "Salir: Esc o Ctrl + Shift + K",
   },
   fingerprint: {
     triggerLabel: "Registrar huella",

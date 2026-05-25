@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, AlertTriangle, AlertCircle } from "lucide-react";
+import { CheckCircle2, AlertTriangle, AlertCircle, LogOut } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CheckinFeedback, eventToFeedback, feedbackTone, useAutoFade, type FeedbackState } from "@/components/checkin/CheckinFeedback";
@@ -192,17 +192,35 @@ export default function KioskPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pin]);
 
-  // Hidden Ctrl+Shift+K combo to exit
+  // Salida del kiosko: tres affordances complementarios para no dejar al
+  // operador atrapado (el bug del piloto: la X de la ventana NO existe
+  // porque la WebviewWindow corre fullscreen sin decorations).
+  //
+  //   - Ctrl+Shift+K — atajo histórico, mantenido para no romper hábitos.
+  //   - Esc — combo de teclado más natural ("salir" universal).
+  //   - Tap-target visible (corner abajo-derecha, opacidad 30%) — el ÚNICO
+  //     que sirve si el operador clickeó otra ventana primero y la kiosko
+  //     perdió focus de teclado.
+  //
+  // Los tres abren el mismo KioskExitDialog (password gate intacto: un
+  // socio que toque la pantalla no debe poder salir, sólo affordance).
+  // Esc dentro del dialog cierra el dialog (handler default de Radix);
+  // sólo dispara open cuando NO hay dialog abierto.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setExitOpen(true);
+        return;
+      }
+      if (e.key === "Escape" && !exitOpen) {
         e.preventDefault();
         setExitOpen(true);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [exitOpen]);
 
   // Mensaje del idle priorizando el contexto: ambos métodos > solo huella
   // > solo PIN > nada configurado (último caso es edge: gym sin operadores
@@ -282,7 +300,10 @@ export default function KioskPage() {
         </div>
       </main>
 
-      {/* Bottom bar — sync status + exit hint. Sutil, no distrae. */}
+      {/* Bottom bar — sync status + exit affordance. El contenedor sigue
+          pointer-events-none para que el área grande no atrape clicks
+          accidentales (un socio recargando la pantalla, etc.); sólo el
+          botón de salir reactiva pointer-events. */}
       <div className="absolute bottom-4 left-6 right-6 flex items-center justify-between text-xs text-muted-foreground pointer-events-none">
         {/* Brand mark sutil — confirma "esto corre con Tinta" sin
             competir con el branding visual del gym. */}
@@ -298,7 +319,22 @@ export default function KioskPage() {
             <span>{syncLevel === "fail" ? t.kiosk.syncOffline : t.kiosk.sync}</span>
           </span>
           <span className="opacity-50" aria-hidden="true">·</span>
-          <span className="opacity-70">{t.kiosk.exitHint}</span>
+          {/* Tap-target visible para salir — opacidad baja (no compite con
+              el look "appliance") pero clickeable. Razón de existir: si el
+              operador clickeó la ventana main primero, la kiosko pierde
+              focus de teclado y los atajos (Esc / Ctrl+Shift+K) no llegan.
+              Sin este botón quedaba atrapado. El password gate del dialog
+              sigue intacto: un socio que toque la pantalla no puede salir,
+              sólo abre el prompt. */}
+          <button
+            type="button"
+            aria-label={t.kiosk.exitButtonAriaLabel}
+            onClick={() => setExitOpen(true)}
+            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 opacity-30 transition-opacity hover:opacity-90 focus:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            <span>{t.kiosk.exitHint}</span>
+          </button>
         </div>
       </div>
 
