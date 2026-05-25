@@ -13,6 +13,7 @@ import { router } from "@/routes";
 import { queryClient } from "@/lib/queryClient";
 import { setOnPlanRequired, setOnSubscriptionInactive } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { BiometricStreamProvider } from "@/lib/biometricStreamProvider";
 
 function Bootstrapped() {
   useHydrateAuth();
@@ -64,9 +65,16 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <DevModeBanner />
-          {state === "ready" ? <Bootstrapped /> : <SidecarFailed state={state} />}
-          <Toaster />
+          {/* BiometricStreamProvider: owner único del stream del lector
+              en esta ventana. alwaysOn se infiere por window label
+              (kiosk → true; main → false, sólo cuando hay subscribers).
+              Vivir aquí (por encima del router) hace que el stream
+              sobreviva navegación entre rutas. */}
+          <BiometricStreamProvider>
+            <DevModeBanner />
+            {state === "ready" ? <Bootstrapped /> : <SidecarFailed state={state} />}
+            <Toaster />
+          </BiometricStreamProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>

@@ -5,11 +5,13 @@ import {
   BiometricError,
   captureOnePng,
   isReaderConnected,
-  startCaptureStream,
   ENROLL_QUALITY_FLOOR,
   type BiometricErrorCode,
-  type CaptureStream,
 } from "@/lib/biometric";
+import {
+  useBiometricClaim,
+  useBiometricSubscription,
+} from "@/lib/biometricStreamProvider";
 
 // El sidecar (GET /api/v1/biometric/status) responde flat:
 //   { device_id, vendor, model, connected, available }
@@ -167,15 +169,31 @@ export function useRegisterFingerprint(
     setProgress({ status: "idle", captures_done: 0, captures_total: CAPTURES_TOTAL });
   }, [cancel]);
 
+  // Claim del lector para enroll. captureOnePng llama internamente a
+  // resetWebSdkSession() + reader.startAcquisition(), que el Lite Client
+  // sólo permite a un consumidor a la vez por proceso. Si la ventana del
+  // kiosko tenía su stream activo y entráramos a captureOnePng sin
+  // pausarlo, le tumbamos el WebSocket (Bug 3 del piloto). El claim
+  // emite un evento Tauri que la otra ventana escucha y pausa su stream;
+  // el release lo reanuda.
+  const claim = useBiometricClaim();
+
   const start = useCallback(async () => {
     cancel();
     const ctrl = new AbortController();
     abortRef.current = ctrl;
 
+    // Adquirimos el lector antes de tocar la SDK. release() se invoca en
+    // el finally al final del enroll completo — no por cada placement —
+    // para que entre placement y placement el kiosko siga pausado en
+    // lugar de bouncear entre running y paused.
+    const release = await claim();
+
     // Capture the same finger CAPTURES_TOTAL times — each placement becomes
     // its own template (best-of-N matching at checkin). The operator lifts
     // and re-places between shots; the modal's progress dots cue them.
     const pngs: Uint8Array[] = [];
+    try {
     for (let i = 0; i < CAPTURES_TOTAL; i++) {
       setProgress({
         status: "waiting",
@@ -262,7 +280,13 @@ export function useRegisterFingerprint(
       });
       opts.onError?.(mapped.code);
     }
-  }, [memberId, cancel, opts, qc]);
+    } finally {
+      // Soltamos el lector pase lo que pase (éxito, error, abort por
+      // unmount, return temprano por low-quality). Sin esto, una falla
+      // mid-enroll dejaría el kiosko paused para siempre.
+      await release().catch(() => undefined);
+    }
+  }, [memberId, cancel, opts, qc, claim]);
 
   useEffect(() => () => cancel(), [cancel]);
 
@@ -292,87 +316,79 @@ interface UseBiometricCheckinLoopOptions {
 }
 
 /**
- * useBiometricCheckinLoop owns the JS SDK acquisition stream while the
- * kiosk page is mounted (and `enabled`). Each finger placement turns into
- * a POST /api/v1/biometric/checkin; the result is handed back via
- * onCheckin so the page can render feedback.
+ * useBiometricCheckinLoop traduce samples del provider de stream en POSTs
+ * a /api/v1/biometric/checkin. NO posee el stream — sólo se suscribe al
+ * BiometricStreamProvider que vive en App.tsx. Esto fixea dos cosas:
  *
- * Inflight requests are tracked with an AbortController so unmounting the
- * page cancels the request mid-flight without a leaked render.
+ *   1. Navegar fuera de KioskPage YA no mata el stream (el provider
+ *      decide cuándo arrancarlo/pararlo; en la ventana del kiosko siempre
+ *      está vivo, en main vive mientras haya al menos un subscriber).
+ *   2. Cuando el enroll modal claim-ea el lector (en cualquier ventana),
+ *      el provider pausa el stream automáticamente; nuestros onSample
+ *      simplemente no llegan durante el enroll. Al release, vuelven.
+ *
+ * Inflight POSTs se serializan con un flag — un dedazo doble no genera
+ * dos checkins. AbortController por request para cancelar pendientes
+ * cuando el consumer se desmonta.
  */
 export function useBiometricCheckinLoop(opts: UseBiometricCheckinLoopOptions) {
   const optsRef = useRef(opts);
   optsRef.current = opts;
-  // Serialise checkin requests so a fast double-tap doesn't race two POSTs
-  // and produce two checkin rows. The SDK fires SamplesAcquired one at a
-  // time, but the BE call takes 50-200ms — long enough for the operator to
-  // re-place a finger if they're nervous.
   const inflightRef = useRef(false);
+  // Tracking de aborts para cancelar requests pendientes al desmontar.
+  // Vive en ref para que el subscriber (definido en el render) lo vea.
+  const abortsRef = useRef<Set<AbortController>>(new Set());
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    if (!opts.enabled) return;
-    let stream: CaptureStream | null = null;
-    let cancelled = false;
-    const aborts = new Set<AbortController>();
-
-    (async () => {
-      try {
-        stream = await startCaptureStream({
-          onSample: (png, _sdkQuality) => {
-            if (cancelled || inflightRef.current) return;
-            inflightRef.current = true;
-            optsRef.current.onAttempt?.();
-            const ctrl = new AbortController();
-            aborts.add(ctrl);
-            const form = new FormData();
-            form.append(
-              "image",
-              new Blob([png], { type: "image/png" }),
-              "fingerprint.png",
-            );
-            api
-              .postFormData<CheckinEvent>("/api/v1/biometric/checkin", form)
-              .then((ev) => {
-                if (!cancelled) optsRef.current.onCheckin(ev);
-              })
-              .catch((err) => {
-                if (cancelled) return;
-                // Reader/matcher unavailable on the BE side (NBIS binaries
-                // missing, GMK not seeded) is operational — surface via
-                // onError so the page can hint. Anything else from the BE
-                // (no-match, low quality, not-enrolled) is the "no te
-                // identifiqué" case — the page should show denied
-                // feedback without prepending a fake row.
-                if (err instanceof ApiError && err.status === 503) {
-                  optsRef.current.onError?.("sdk_error");
-                  return;
-                }
-                if (err instanceof ApiError) {
-                  optsRef.current.onNoMatch?.();
-                  return;
-                }
-                optsRef.current.onError?.("sdk_error");
-              })
-              .finally(() => {
-                aborts.delete(ctrl);
-                inflightRef.current = false;
-              });
-          },
-          onDeviceConnected: () => optsRef.current.onReaderConnected?.(),
-          onDeviceDisconnected: () => optsRef.current.onReaderDisconnected?.(),
-          onError: (err) => optsRef.current.onError?.(err.code),
-        });
-      } catch (err) {
-        if (cancelled) return;
-        if (err instanceof BiometricError) optsRef.current.onError?.(err.code);
-        else optsRef.current.onError?.("sdk_error");
-      }
-    })();
-
+    cancelledRef.current = false;
+    const aborts = abortsRef.current;
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
       aborts.forEach((c) => c.abort());
-      stream?.stop().catch(() => undefined);
+      aborts.clear();
+      inflightRef.current = false;
     };
-  }, [opts.enabled]);
+  }, []);
+
+  useBiometricSubscription({
+    enabled: opts.enabled,
+    onSample: (png) => {
+      if (cancelledRef.current || inflightRef.current) return;
+      inflightRef.current = true;
+      optsRef.current.onAttempt?.();
+      const ctrl = new AbortController();
+      abortsRef.current.add(ctrl);
+      const form = new FormData();
+      form.append("image", new Blob([png], { type: "image/png" }), "fingerprint.png");
+      api
+        .postFormData<CheckinEvent>("/api/v1/biometric/checkin", form)
+        .then((ev) => {
+          if (!cancelledRef.current) optsRef.current.onCheckin(ev);
+        })
+        .catch((err) => {
+          if (cancelledRef.current) return;
+          // 503 desde el sidecar = matcher / GMK no listo. Operacional —
+          // mostramos hint del lector. Otros errores ApiError = el BE
+          // procesó pero no encontró match: caso "no te identifiqué"
+          // sin row en checkins.
+          if (err instanceof ApiError && err.status === 503) {
+            optsRef.current.onError?.("sdk_error");
+            return;
+          }
+          if (err instanceof ApiError) {
+            optsRef.current.onNoMatch?.();
+            return;
+          }
+          optsRef.current.onError?.("sdk_error");
+        })
+        .finally(() => {
+          abortsRef.current.delete(ctrl);
+          inflightRef.current = false;
+        });
+    },
+    onDeviceConnected: () => optsRef.current.onReaderConnected?.(),
+    onDeviceDisconnected: () => optsRef.current.onReaderDisconnected?.(),
+    onError: (code) => optsRef.current.onError?.(code),
+  });
 }
