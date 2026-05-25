@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CreditCard,
   History,
+  Info,
   MessageSquare,
   User,
   Users,
@@ -93,6 +94,15 @@ const SECTIONS: Section[] = [
     body: t.index.sections.auditLog.body,
     ownerOnly: true,
     plusOnly: true,
+  },
+  // "Sobre Tinta" al final: es informativo (versión + actualizaciones),
+  // no de configuración del gym. Lo ven dueño y operador — el operador
+  // también necesita saber la versión cuando llama a soporte.
+  {
+    to: "/settings/about",
+    icon: Info,
+    title: t.index.sections.aboutTinta.title,
+    body: t.index.sections.aboutTinta.body,
   },
 ];
 

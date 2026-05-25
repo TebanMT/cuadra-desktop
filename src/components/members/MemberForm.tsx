@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Image as ImageIcon, X as XIcon, Upload, Camera, ChevronRight, UserPlus } from "lucide-react";
+import { Loader2, Image as ImageIcon, X as XIcon, Upload, Camera, ChevronRight, UserPlus, Tag } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +27,10 @@ import { getAvatarPalette, getInitials } from "@/lib/avatar";
 import { members as t } from "@/strings/members";
 import { MemberPhoto, useMemberPhotoSrc } from "./MemberPhoto";
 import { CameraCaptureModal } from "@/components/shared/CameraCaptureModal";
+import type { Promotion } from "@/hooks/usePromotions";
+import { formatPromotionValue, promotions as pt } from "@/strings/promotions";
+import { PromotionPickerModal } from "@/components/billing/PromotionPickerModal";
+import { CompanionSelectorModal } from "@/components/billing/CompanionSelectorModal";
 
 export type FormMode = "create" | "edit";
 
@@ -66,6 +70,10 @@ export interface MemberFormSubmitPayload {
   // operador.
   enrollmentAmount: number;
   maintenanceAmount: number;
+  // Promo opcional aplicada al primer pago. Vacío cuando no hubo. Los
+  // companionMemberIDs vienen poblados sólo si la promo es 2x1.
+  promotionID?: string;
+  companionMemberIDs?: string[];
 }
 
 interface Props {
@@ -159,6 +167,12 @@ function calcTotal(
 
 export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCancel, serverError }: Props) {
   const [values, setValues] = useState<MemberFormValues>({ ...emptyValues, ...initial });
+  // Promo opcional al primer pago. Sólo se activa cuando charge_first_payment
+  // está prendido. Para companion_memberships abrimos selector en cascada.
+  const [promo, setPromo] = useState<Promotion | null>(null);
+  const [companionIDs, setCompanionIDs] = useState<string[]>([]);
+  const [promoPickerOpen, setPromoPickerOpen] = useState(false);
+  const [companionOpen, setCompanionOpen] = useState(false);
   // El teléfono vive split en dial-code + número nacional sólo para el
   // render del PhoneInput. La fuente de verdad sigue siendo
   // `values.phone` en E.164 (lo que la schema y MemberCreatePage esperan).
@@ -280,13 +294,38 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
   }, [mode, activeTypes, values.membership_type_id]);
 
   const selectedPlan = activeTypes.find((p) => p.id === values.membership_type_id);
-  const total = calcTotal(
+  const subtotal = calcTotal(
     selectedPlan,
     values.charge_enrollment,
     values.charge_maintenance,
     gymCharges.defaultEnrollmentAmount,
     gymCharges.defaultMaintenanceAmount,
   );
+  // Promo preview client-side. Espeja Calculate() del BE — los kinds
+  // de efectos (extra_days, companion) no descuentan; free_enrollment
+  // descuenta el fee de inscripción si el operador está cobrando esa
+  // cuota; percent/fixed son lo obvio.
+  const enrollmentForPromo = selectedPlan && values.charge_enrollment
+    ? effectiveFee(selectedPlan.enrollment_fee, gymCharges.defaultEnrollmentAmount)
+    : 0;
+  const promoDiscount = useMemo(() => {
+    if (!promo || !values.charge_first_payment || subtotal <= 0) return 0;
+    switch (promo.kind) {
+      case "percent":
+        if (promo.value == null) return 0;
+        return Math.min(subtotal, subtotal * (promo.value / 100));
+      case "fixed_amount":
+        if (promo.value == null) return 0;
+        return Math.min(subtotal, promo.value);
+      case "free_enrollment":
+        if (!values.charge_enrollment || enrollmentForPromo <= 0) return 0;
+        return Math.min(subtotal, enrollmentForPromo);
+      case "extra_days":
+      case "companion_memberships":
+        return 0;
+    }
+  }, [promo, values.charge_first_payment, values.charge_enrollment, subtotal, enrollmentForPromo]);
+  const total = Math.max(0, subtotal - promoDiscount);
   const expiryStr = useMemo(() => {
     if (!selectedPlan || !values.start_date) return null;
     return previewExpiry(values.start_date, selectedPlan.duration_days);
@@ -356,11 +395,24 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
       return;
     }
 
+    if (promo && promo.kind === "companion_memberships") {
+      const want = promo.companion_count ?? 0;
+      if (companionIDs.length !== want) {
+        setError("Elige los socios destinatarios de la promoción antes de inscribir.");
+        return;
+      }
+    }
+
     onSubmit({
       values,
       totalCharge: total,
       enrollmentAmount: effectiveFee(selectedPlan?.enrollment_fee, gymCharges.defaultEnrollmentAmount),
       maintenanceAmount: effectiveFee(selectedPlan?.maintenance_fee, gymCharges.defaultMaintenanceAmount),
+      promotionID: promo && values.charge_first_payment ? promo.id : undefined,
+      companionMemberIDs:
+        promo && values.charge_first_payment && companionIDs.length > 0
+          ? companionIDs
+          : undefined,
     });
   }
 
@@ -708,12 +760,110 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                       </label>
                     )}
 
+                    {promoDiscount > 0 && (
+                      <div className="flex items-center justify-between text-sm text-success">
+                        <span>− Promoción ({promo?.name})</span>
+                        <span className="tabular-nums">−{formatMoney(promoDiscount)}</span>
+                      </div>
+                    )}
                     <div className="border-t pt-2 flex items-center justify-between text-sm font-semibold">
                       <span>{t.form.chargeTotal}</span>
                       <span className="tabular-nums">{formatMoney(total)}</span>
                     </div>
                   </div>
                 </div>
+
+                {/* Promoción opcional al primer pago. Botón "Aplicar
+                    promoción" abre el picker compartido (target=membership).
+                    Si la promo es 2x1 abre en cascada el CompanionSelector. */}
+                <div className="rounded-md border border-dashed bg-card p-3">
+                  {!promo ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="w-full h-9"
+                      onClick={() => setPromoPickerOpen(true)}
+                    >
+                      <Tag className="h-4 w-4 mr-2" />
+                      Aplicar promoción
+                    </Button>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Tag className="h-4 w-4 text-primary" />
+                            <span className="font-medium text-sm">{promo.name}</span>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {formatPromotionValue(promo.kind, promo.value, promo.companion_count)}
+                            </Badge>
+                          </div>
+                          {promoDiscount > 0 && (
+                            <div className="text-xs text-success mt-1">
+                              {pt.picker.discountPreview(formatMoney(promoDiscount))}
+                            </div>
+                          )}
+                          {promo.kind === "extra_days" && promo.value != null && (
+                            <div className="text-xs text-success mt-1">
+                              {pt.picker.extraDaysPreview(promo.value)}
+                            </div>
+                          )}
+                          {promo.kind === "companion_memberships" && (
+                            <div className="text-xs text-success mt-1">
+                              {pt.picker.companionPreview(promo.companion_count ?? 0)} ·{" "}
+                              {companionIDs.length === (promo.companion_count ?? 0)
+                                ? `${companionIDs.length} ya elegidos`
+                                : `Faltan ${(promo.companion_count ?? 0) - companionIDs.length}`}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setPromo(null);
+                            setCompanionIDs([]);
+                          }}
+                          aria-label={pt.picker.remove}
+                        >
+                          <XIcon className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {promo.kind === "companion_memberships" && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCompanionOpen(true)}
+                        >
+                          {companionIDs.length > 0 ? "Cambiar socios" : "Elegir socios"}
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <PromotionPickerModal
+                  open={promoPickerOpen}
+                  onOpenChange={setPromoPickerOpen}
+                  target="membership"
+                  onApply={(p) => {
+                    setPromo(p);
+                    setCompanionIDs([]);
+                    if (p.kind === "companion_memberships") {
+                      setCompanionOpen(true);
+                    }
+                  }}
+                />
+                <CompanionSelectorModal
+                  open={companionOpen}
+                  onOpenChange={setCompanionOpen}
+                  companionCount={promo?.companion_count ?? 0}
+                  excludeMemberID={memberId ?? null}
+                  onConfirm={(ids) => setCompanionIDs(ids)}
+                />
 
                 <RadioGroup
                   value={values.payment_method}

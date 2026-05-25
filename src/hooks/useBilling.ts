@@ -57,6 +57,15 @@ export interface RegisterMembershipPaymentInput {
   maintenance_amount?: number;
   payment_date: string;
   notes?: string;
+  // Promo opcional. promotion_id y code son excluyentes — operador
+  // eligió de la lista vigente o tecleó un código. companion_member_ids
+  // sólo para kind=companion_memberships (cantidad debe matchear).
+  promotion?: {
+    promotion_id?: string;
+    code?: string;
+    companion_member_ids?: string[];
+    notes?: string;
+  };
 }
 
 // Espeja registerPaymentResp del backend (payment_controller.go). Es un
@@ -75,6 +84,12 @@ export interface RegisterMembershipPaymentResponse {
   enrollment_charged: boolean;
   maintenance_charged: boolean;
   pending_offline_sync?: boolean;
+  // Datos de promo aplicada (vacíos cuando no hubo).
+  promotion_applied_id?: string;
+  promotion_name?: string;
+  promotion_kind?: string;
+  promotion_extra_days?: number;
+  promotion_gifted_membership_ids?: string[];
 }
 
 export interface SettleBalanceInput {

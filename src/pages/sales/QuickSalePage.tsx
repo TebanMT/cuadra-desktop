@@ -8,6 +8,7 @@ import {
   PackagePlus,
   Plus,
   Search,
+  Tag,
   Trash2,
   UserCheck,
   UserPlus,
@@ -41,6 +42,10 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { sales as t } from "@/strings/sales";
+import type { Promotion } from "@/hooks/usePromotions";
+import { formatPromotionValue } from "@/strings/promotions";
+import { PromotionPickerModal } from "@/components/billing/PromotionPickerModal";
+import { Badge } from "@/components/ui/badge";
 
 interface CartLine {
   product: Product;
@@ -103,6 +108,10 @@ export default function QuickSalePage() {
   // ignora — el BE recibe paid omitido y cobra todo. Requiere socio.
   const [creditMode, setCreditMode] = useState(false);
   const [paidValue, setPaidValue] = useState("");
+  // Promo opcional. En ventas sólo aplican percent / fixed_amount; el BE
+  // tira no-op para los demás kinds. El target del picker es "sale".
+  const [promo, setPromo] = useState<Promotion | null>(null);
+  const [promoPickerOpen, setPromoPickerOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   const items = useMemo(() => products.data ?? [], [products.data]);
@@ -118,9 +127,30 @@ export default function QuickSalePage() {
       .filter((x): x is CartLine => x !== null && x.qty > 0);
   }, [cart, items]);
 
-  const total = useMemo(
+  const subtotal = useMemo(
     () => cartLines.reduce((sum, l) => sum + l.product.price * l.qty, 0),
     [cartLines]
+  );
+
+  // Promo preview client-side (espeja Calculate del BE). Para ventas sólo
+  // percent y fixed_amount dan descuento; los demás kinds → 0.
+  const promoDiscount = useMemo(() => {
+    if (!promo || subtotal <= 0) return 0;
+    switch (promo.kind) {
+      case "percent":
+        if (promo.value == null) return 0;
+        return Math.min(subtotal, subtotal * (promo.value / 100));
+      case "fixed_amount":
+        if (promo.value == null) return 0;
+        return Math.min(subtotal, promo.value);
+      default:
+        return 0;
+    }
+  }, [promo, subtotal]);
+
+  const total = useMemo(
+    () => Math.max(0, subtotal - promoDiscount),
+    [subtotal, promoDiscount]
   );
 
   // Filtra los productos por (a) la búsqueda visible — substring +
@@ -201,6 +231,7 @@ export default function QuickSalePage() {
     setGivenCash("");
     setCreditMode(false);
     setPaidValue("");
+    setPromo(null);
   }
 
   function close() {
@@ -369,6 +400,7 @@ export default function QuickSalePage() {
       payment_method: method,
       ...(member ? { member_id: member.member_id } : {}),
       ...(creditMode && paidNow < total ? { paid: paidNow } : {}),
+      ...(promo ? { promotion: { promotion_id: promo.id } } : {}),
     };
 
     try {
@@ -541,10 +573,69 @@ export default function QuickSalePage() {
               </Alert>
             )}
 
-            <div className="flex items-baseline justify-between">
-              <span className="text-sm font-medium">{t.page.cart.total}</span>
-              <span className="text-2xl font-semibold tabular-nums">{fmtMoney(total)}</span>
+            <div className="space-y-1">
+              {promoDiscount > 0 && (
+                <div className="flex items-baseline justify-between text-xs text-muted-foreground">
+                  <span>Subtotal</span>
+                  <span className="tabular-nums">{fmtMoney(subtotal)}</span>
+                </div>
+              )}
+              {promoDiscount > 0 && (
+                <div className="flex items-baseline justify-between text-xs text-success">
+                  <span>− Promoción ({promo?.name})</span>
+                  <span className="tabular-nums">−{fmtMoney(promoDiscount)}</span>
+                </div>
+              )}
+              <div className="flex items-baseline justify-between">
+                <span className="text-sm font-medium">{t.page.cart.total}</span>
+                <span className="text-2xl font-semibold tabular-nums">{fmtMoney(total)}</span>
+              </div>
             </div>
+
+            {/* Promoción — opcional. Botón "Aplicar promoción" abre el
+                picker compartido con el flujo de membresía. La promo
+                sólo se aplica al subtotal de productos. */}
+            <div className="rounded-md border border-dashed bg-card p-2.5">
+              {!promo ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full h-9"
+                  onClick={() => setPromoPickerOpen(true)}
+                  disabled={cartLines.length === 0}
+                >
+                  <Tag className="h-4 w-4 mr-2" />
+                  Aplicar promoción
+                </Button>
+              ) : (
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex items-center gap-2 flex-wrap">
+                    <Tag className="h-4 w-4 text-primary shrink-0" />
+                    <span className="text-sm font-medium truncate">{promo.name}</span>
+                    <Badge variant="secondary" className="text-[10px]">
+                      {formatPromotionValue(promo.kind, promo.value, promo.companion_count)}
+                    </Badge>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setPromo(null)}
+                    aria-label="Quitar promoción"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
+            <PromotionPickerModal
+              open={promoPickerOpen}
+              onOpenChange={setPromoPickerOpen}
+              target="sale"
+              onApply={(p) => setPromo(p)}
+            />
 
             {/* Método de pago como segmented control con hint de tecla
                 (E/T/C). Hace descubrible el shortcut sin meter un

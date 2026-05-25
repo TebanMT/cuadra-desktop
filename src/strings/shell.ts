@@ -7,7 +7,7 @@ export const shell = {
     sales: "Venta rápida",
     products: "Productos",
     expenses: "Gastos",
-    membershipTypes: "Tipos de membresía",
+    membershipTypes: "Membresías y promociones",
     checkin: "Check-in",
     challenges: "Retos",
     reports: "Reportes",

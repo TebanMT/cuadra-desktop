@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:* https://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:* https://api.entinta.app https://releases.entinta.app ipc: http://ipc.localhost"
+      "csp": "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:* https://127.0.0.1:* ws://127.0.0.1:* wss://127.0.0.1:* https://api.entinta.app https://releases.entinta.app https://github.com https://*.githubusercontent.com ipc: http://ipc.localhost"
     }
   },
   "bundle": {
@@ -54,12 +54,15 @@
   },
   "plugins": {
     "updater": {
-      "active": false,
+      "active": true,
       "endpoints": [
-        "https://releases.tinta.app/{{target}}/{{current_version}}"
+        "https://api.entinta.app/api/v1/releases/latest/{{target}}/{{current_version}}"
       ],
       "dialog": false,
-      "pubkey": ""
+      "windows": {
+        "installMode": "passive"
+      },
+      "pubkey": "REEMPLAZAR_CON_PUBKEY_REAL_VER_docs_release_md"
     }
   }
 }

@@ -104,6 +104,15 @@ export interface CreateMemberInput {
   enrollment_amount?: number;
   maintenance_amount?: number;
   payment_method?: "cash" | "transfer" | "card";
+  // Promo opcional aplicada al primer pago. Sólo se honra cuando
+  // charge_first_payment=true. promotion_id y code son excluyentes.
+  // companion_member_ids únicamente para kind=companion_memberships.
+  promotion?: {
+    promotion_id?: string;
+    code?: string;
+    companion_member_ids?: string[];
+    notes?: string;
+  };
 }
 
 export interface PinDispatch {
@@ -127,6 +136,15 @@ export interface CreateMemberResponse {
   // muestra "enviado a {recipient_phone}"; si false, copia "escríbelo
   // en la credencial".
   pin_dispatch?: PinDispatch;
+  // Datos del primer pago + promo aplicada (vacíos si no hubo cobro).
+  payment_id?: string;
+  payment_folio?: string;
+  payment_total?: number;
+  promotion_applied_id?: string;
+  promotion_name?: string;
+  promotion_kind?: string;
+  promotion_extra_days?: number;
+  promotion_gifted_membership_ids?: string[];
 }
 
 export interface UpdateMemberInput {

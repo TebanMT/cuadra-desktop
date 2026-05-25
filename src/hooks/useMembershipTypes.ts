@@ -16,7 +16,13 @@ export interface MembershipType {
   id: string;
   name: string;
   price: number;
+  // duration_days es el valor aproximado en días (mantiene compatibilidad
+  // con reportes legacy y filtros UI). duration_months, cuando viene NO
+  // null, manda en el backend para calcular expiry como meses naturales.
+  // Mensual=1, bimestral=2, trimestral=3, semestral=6, anual=12.
+  // Personalizada/paso/semana/quincenal mandan null.
   duration_days: number;
+  duration_months?: number | null;
   enrollment_fee: number;
   maintenance_fee: number;
   maintenance_frequency?: MaintenanceFrequency;
@@ -27,6 +33,7 @@ export interface UpsertMembershipTypeInput {
   name: string;
   price: number;
   duration_days: number;
+  duration_months?: number | null;
   enrollment_fee: number;
   maintenance_fee: number;
   maintenance_frequency?: MaintenanceFrequency;

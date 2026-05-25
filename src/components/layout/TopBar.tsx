@@ -56,7 +56,7 @@ const ROUTE_LABELS: Record<string, string> = {
   settings: "Configuración",
   profile: "Mi perfil",
   gym: "Perfil del gym",
-  "membership-types": "Membresías",
+  "membership-types": "Membresías y promociones",
   operators: "Operadores",
   whatsapp: "WhatsApp",
   templates: "Plantillas",

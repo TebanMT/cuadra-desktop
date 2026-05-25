@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Check, Loader2, Plus, Pencil, BadgeMinus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -25,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApiError } from "@/lib/api";
 import { cn, formatMoney } from "@/lib/utils";
 import {
@@ -39,6 +41,17 @@ import {
 import { useGymChargeSettings, useUpdateGymChargeSettings } from "@/hooks/useGymChargeSettings";
 import { members as t } from "@/strings/members";
 import { MembershipTypeForm } from "@/components/settings/MembershipTypeForm";
+import { PromotionsTab } from "@/components/settings/PromotionsTab";
+
+// Página con dos tabs: "Membresías" (el CRUD de planes existente) y
+// "Promociones" (catálogo de promos del BC promotions). El tab activo
+// se preserva en `?tab=`. La ruta sigue siendo /settings/membership-types
+// — el rename del sidebar a "Membresías y promociones" no rompe deep-links.
+type TabKey = "membresias" | "promociones";
+
+function parseTab(raw: string | null): TabKey {
+  return raw === "promociones" ? "promociones" : "membresias";
+}
 
 // Gym-level feature flags. Fuente de verdad: `gyms.charge_settings`
 // en BE (JSONB que sincroniza entre dispositivos del mismo gym via
@@ -64,6 +77,46 @@ const FREQ_OPTIONS: { value: MaintenanceFrequency; label: string }[] = [
 ];
 
 export default function MembershipTypesPage() {
+  const [params, setParams] = useSearchParams();
+  const tab = parseTab(params.get("tab"));
+  return (
+    <div className="p-6 space-y-4 max-w-5xl mx-auto">
+      <div className="space-y-1">
+        <h1
+          className="text-3xl font-bold text-foreground"
+          style={{ letterSpacing: "-0.02em" }}
+        >
+          Membresías y promociones
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          Tus planes de membresía + las promociones que aplicas al cobrar.
+        </p>
+      </div>
+      <Tabs
+        value={tab}
+        onValueChange={(v) => {
+          const next = new URLSearchParams(params);
+          if (v === "membresias") next.delete("tab");
+          else next.set("tab", v);
+          setParams(next, { replace: true });
+        }}
+      >
+        <TabsList>
+          <TabsTrigger value="membresias">Membresías</TabsTrigger>
+          <TabsTrigger value="promociones">Promociones</TabsTrigger>
+        </TabsList>
+        <TabsContent value="membresias" className="pt-4">
+          <MembershipsTab />
+        </TabsContent>
+        <TabsContent value="promociones" className="pt-4">
+          <PromotionsTab />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
+
+function MembershipsTab() {
   const types = useMembershipTypes(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<MembershipType | null>(null);
@@ -135,17 +188,8 @@ export default function MembershipTypesPage() {
   }, [savedAt]);
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="space-y-1">
-          <h1
-            className="text-3xl font-bold text-foreground"
-            style={{ letterSpacing: "-0.02em" }}
-          >
-            {t.types.pageTitle}
-          </h1>
-          <p className="text-sm text-muted-foreground">{t.types.pageSubtitle}</p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex items-start justify-end gap-4 flex-wrap">
         <Button
           size="lg"
           onClick={() => setCreateOpen(true)}
@@ -308,7 +352,7 @@ export default function MembershipTypesPage() {
                 <TableRow key={p.id} className={p.active ? "" : "opacity-60"}>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell>{formatMoney(p.price)}</TableCell>
-                  <TableCell>{t.types.durationDays(p.duration_days)}</TableCell>
+                  <TableCell>{t.types.durationLabel(p.duration_days, p.duration_months)}</TableCell>
                   <TableCell>
                     {p.active ? (
                       <Badge variant="secondary">{t.types.statusActive}</Badge>

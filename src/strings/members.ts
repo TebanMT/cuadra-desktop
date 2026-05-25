@@ -301,6 +301,16 @@ export const members = {
       actions: "Acciones",
     },
     durationDays: (n: number) => `${n} ${n === 1 ? "día" : "días"}`,
+    // durationLabel: renderea el período según la unidad del plan. Si
+    // duration_months viene, mostramos "1 mes" / "6 meses" / "1 año";
+    // si no, caemos al display por días.
+    durationLabel: (days: number, months?: number | null) => {
+      if (months != null && months > 0) {
+        if (months === 12) return "1 año";
+        return `${months} ${months === 1 ? "mes" : "meses"}`;
+      }
+      return `${days} ${days === 1 ? "día" : "días"}`;
+    },
     activeMembers: (n: number) => `${n}`,
     statusActive: "Activa",
     statusInactive: "Desactivada",

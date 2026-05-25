@@ -16,6 +16,13 @@ export interface RegisterSaleInput {
   // como balance_pending en el Payment ("fiado"). El backend rechaza
   // fiado sin member_id — la UI debe gatear el flujo en consecuencia.
   paid?: number;
+  // Promo opcional. En ventas sólo aplican percent / fixed_amount; los
+  // demás kinds el backend los recibe pero el Calculator devuelve 0.
+  promotion?: {
+    promotion_id?: string;
+    code?: string;
+    notes?: string;
+  };
 }
 
 export interface SaleItemResponse {
@@ -41,6 +48,9 @@ export interface RegisterSaleResponse {
   balance_pending: number;
   items: SaleItemResponse[];
   pending_offline_sync?: boolean;
+  promotion_applied_id?: string;
+  promotion_name?: string;
+  promotion_kind?: string;
 }
 
 export interface MemberSearchResult {

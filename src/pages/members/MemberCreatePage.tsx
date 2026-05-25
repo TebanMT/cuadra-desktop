@@ -76,6 +76,18 @@ export default function MemberCreatePage() {
       enrollment_amount: v.charge_first_payment && v.charge_enrollment ? p.enrollmentAmount : undefined,
       maintenance_amount: v.charge_first_payment && v.charge_maintenance ? p.maintenanceAmount : undefined,
       payment_method: v.charge_first_payment && v.payment_method ? v.payment_method : undefined,
+      // Promo del primer pago — sólo se manda si efectivamente hay cobro.
+      // El BE rechaza promotion sin charge_first_payment con un noop
+      // silencioso, pero igual filtramos en el FE para no ensuciar el wire.
+      promotion:
+        v.charge_first_payment && p.promotionID
+          ? {
+              promotion_id: p.promotionID,
+              ...(p.companionMemberIDs && p.companionMemberIDs.length > 0
+                ? { companion_member_ids: p.companionMemberIDs }
+                : {}),
+            }
+          : undefined,
     };
   }
 

@@ -20,6 +20,34 @@ import type {
 
 const CUSTOM = "custom"; // sentinel del select para "Personalizada"
 
+// presetToMonths mapea los presets ambiguos (los que el operador entiende
+// como "1 mes natural" pero el schema persistía como N días corridos) a
+// su equivalente en meses. Los demás presets (1 día / semana / quincenal)
+// son exactos en días y NO tienen equivalente en meses — devolvemos null
+// para que el backend caiga al cálculo por días.
+//
+// Tabla:
+//   30  → 1 mes      | 60  → 2 meses     | 90  → 3 meses
+//   180 → 6 meses    | 365 → 12 meses    | otros → null (días)
+//
+// Coincide con el backfill de la migración 027/022.
+function presetToMonths(days: number): number | null {
+  switch (days) {
+    case 30:
+      return 1;
+    case 60:
+      return 2;
+    case 90:
+      return 3;
+    case 180:
+      return 6;
+    case 365:
+      return 12;
+    default:
+      return null;
+  }
+}
+
 interface FormState {
   name: string;
   price: string;
@@ -109,18 +137,27 @@ export function MembershipTypeForm({
     }
 
     let duration: number;
+    let durationMonths: number | null = null;
     if (inCustomMode) {
       duration = parseInt(form.duration_custom, 10);
       if (!Number.isFinite(duration) || duration < 1) {
         setError(t.types.form.errors.durationCustomInvalid);
         return;
       }
+      // Personalizada SIEMPRE va en días — el dueño está pidiendo
+      // explícitamente días naturales.
+      durationMonths = null;
     } else {
       duration = parseInt(form.duration_days, 10);
       if (!Number.isFinite(duration) || duration < 1) {
         setError(t.types.form.errors.durationRequired);
         return;
       }
+      // Preset: si es uno de los ambiguos (30/60/90/180/365) mandamos
+      // también duration_months para que el cálculo sea por meses
+      // naturales. Si es exacto (1/7/15) duration_months = null y
+      // el backend cae al modo "días corridos".
+      durationMonths = presetToMonths(duration);
     }
 
     // Inscripción y mantenimiento vienen 100% del gym-level. Si la
@@ -137,6 +174,7 @@ export function MembershipTypeForm({
       name,
       price,
       duration_days: duration,
+      duration_months: durationMonths,
       enrollment_fee: enrollment,
       maintenance_fee: maintenance,
       maintenance_frequency: freq,

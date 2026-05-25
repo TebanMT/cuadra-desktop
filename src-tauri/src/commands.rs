@@ -1,3 +1,4 @@
+use crate::boot_guard;
 use crate::secure_storage;
 use crate::AppState;
 use tauri::{AppHandle, Manager, State};
@@ -79,4 +80,17 @@ pub fn print_pdf(_bytes: Vec<u8>) -> Result<(), String> {
 #[tauri::command]
 pub fn quit_app(app: AppHandle) {
     app.exit(0);
+}
+
+// Lee el marker de auto-rollback (ADR-005 §2.5). El FE lo consulta al
+// boot para mostrar un banner si la corrida anterior crasheó dos veces y
+// disparamos rollback. Sin marker → None.
+#[tauri::command]
+pub fn read_auto_rollback_marker() -> Option<boot_guard::RollbackMarker> {
+    boot_guard::read_marker()
+}
+
+#[tauri::command]
+pub fn clear_auto_rollback_marker() {
+    boot_guard::clear_marker();
 }

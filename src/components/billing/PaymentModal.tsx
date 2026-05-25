@@ -1,14 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { Loader2, Printer, MessageCircle } from "lucide-react";
+import { Loader2, Printer, MessageCircle, Tag, X } from "lucide-react";
 import { addDays, max as dateMax } from "date-fns";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import type { Promotion } from "@/hooks/usePromotions";
+import {
+  promotions as pt,
+  formatPromotionValue,
+} from "@/strings/promotions";
+import { PromotionPickerModal } from "./PromotionPickerModal";
+import { CompanionSelectorModal } from "./CompanionSelectorModal";
 import {
   Select,
   SelectContent,
@@ -144,6 +152,14 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
   // operador. Reset al abrir el modal.
   const [chargeEnrollment, setChargeEnrollment] = useState<boolean | null>(null);
   const [chargeMaintenance, setChargeMaintenance] = useState<boolean | null>(null);
+  // Promo state: el operador puede elegir una promo de la lista vigente
+  // o por código (PromotionPickerModal). Si la promo es
+  // companion_memberships, abre CompanionSelectorModal en cascada para
+  // recolectar los IDs de socios destinatarios.
+  const [promo, setPromo] = useState<Promotion | null>(null);
+  const [companionIDs, setCompanionIDs] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [companionOpen, setCompanionOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<RegisterMembershipPaymentResponse | null>(null);
   const [whatsappState, setWhatsappState] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -161,6 +177,10 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
       setPartialAmount("");
       setChargeEnrollment(null);
       setChargeMaintenance(null);
+      setPromo(null);
+      setCompanionIDs([]);
+      setPickerOpen(false);
+      setCompanionOpen(false);
       setError(null);
       setSuccess(null);
       setWhatsappState("idle");
@@ -241,10 +261,32 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
     return Number.isFinite(v) && v > 0 ? v : 0;
   }, [discountOpen, discountAmount]);
 
+  // Promo preview client-side. Espeja Calculate() del BE (calculator.go).
+  // El BE recalcula auth y rebota cualquier discrepancia (la promo puede
+  // estar expirada o sobre-límite). Para los kinds no-descuento (extra_days,
+  // companion_memberships, free_enrollment no-aplicable) el discount es 0.
+  const promoDiscount = useMemo(() => {
+    if (!promo || !breakdown) return 0;
+    switch (promo.kind) {
+      case "percent":
+        if (promo.value == null) return 0;
+        return Math.min(breakdown.subtotal, breakdown.subtotal * (promo.value / 100));
+      case "fixed_amount":
+        if (promo.value == null) return 0;
+        return Math.min(breakdown.subtotal, promo.value);
+      case "free_enrollment":
+        if (!willChargeEnrollment) return 0;
+        return Math.min(breakdown.subtotal, enrollmentAmount);
+      case "extra_days":
+      case "companion_memberships":
+        return 0;
+    }
+  }, [promo, breakdown, willChargeEnrollment, enrollmentAmount]);
+
   const total = useMemo(() => {
     if (!breakdown) return 0;
-    return Math.max(0, breakdown.subtotal - discountValue);
-  }, [breakdown, discountValue]);
+    return Math.max(0, breakdown.subtotal - discountValue - promoDiscount);
+  }, [breakdown, discountValue, promoDiscount]);
 
   const partialValue = useMemo(() => {
     if (!partialOpen) return null;
@@ -269,6 +311,10 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
     if (!selectedType) return t.payment.errors.amountInvalid;
     if (!method) return t.payment.errors.methodRequired;
     if (total <= 0) return t.payment.errors.amountInvalid;
+    if (discountOpen && promo) {
+      // Mismo gate que el BE: stacking manual+promo prohibido.
+      return "No puedes combinar descuento manual con promoción.";
+    }
     if (discountOpen) {
       if (discountValue <= 0 || !breakdown || discountValue > breakdown.subtotal) {
         return t.payment.errors.discountInvalid;
@@ -278,6 +324,12 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
     if (partialOpen) {
       if (partialValue === null || partialValue <= 0 || partialValue > total) {
         return t.payment.errors.partialInvalid;
+      }
+    }
+    if (promo && promo.kind === "companion_memberships") {
+      const want = promo.companion_count ?? 0;
+      if (companionIDs.length !== want) {
+        return "Elige los socios destinatarios antes de cobrar.";
       }
     }
     return null;
@@ -312,6 +364,14 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
         : {}),
       ...(partialOpen && partialValue !== null ? { partial_amount: partialValue } : {}),
       ...(notes.trim() ? { notes: notes.trim() } : {}),
+      ...(promo
+        ? {
+            promotion: {
+              promotion_id: promo.id,
+              ...(companionIDs.length > 0 ? { companion_member_ids: companionIDs } : {}),
+            },
+          }
+        : {}),
     };
 
     try {
@@ -523,9 +583,113 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
                       <span className="tabular-nums">−{fmtMoney(discountValue)}</span>
                     </div>
                   )}
+                  {promoDiscount > 0 && (
+                    <div className="flex justify-between text-success">
+                      <span>− Promoción</span>
+                      <span className="tabular-nums">−{fmtMoney(promoDiscount)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
+
+            {/* Promoción — sección entre subtotal y total (UC del prompt).
+                Sin promo: botón "Aplicar promoción" → abre Picker. Con
+                promo: card resumen con badge + botón Quitar. Para
+                companion_memberships, badge adicional con la cantidad de
+                socios elegidos + botón para re-elegir si los slots están
+                vacíos. */}
+            <div className="rounded-md border border-dashed bg-card p-3">
+              {!promo ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full"
+                  onClick={() => setPickerOpen(true)}
+                  disabled={discountOpen}
+                  title={discountOpen ? "Quita el descuento manual primero" : undefined}
+                >
+                  <Tag className="h-4 w-4 mr-2" />
+                  Aplicar promoción
+                </Button>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Tag className="h-4 w-4 text-primary" />
+                        <span className="font-medium text-sm">{promo.name}</span>
+                        <Badge variant="secondary" className="text-[10px]">
+                          {formatPromotionValue(promo.kind, promo.value, promo.companion_count)}
+                        </Badge>
+                      </div>
+                      {promoDiscount > 0 && (
+                        <div className="text-xs text-success mt-1">
+                          {pt.picker.discountPreview(fmtMoney(promoDiscount))}
+                        </div>
+                      )}
+                      {promo.kind === "extra_days" && promo.value != null && (
+                        <div className="text-xs text-success mt-1">
+                          {pt.picker.extraDaysPreview(promo.value)}
+                        </div>
+                      )}
+                      {promo.kind === "companion_memberships" && (
+                        <div className="text-xs text-success mt-1">
+                          {pt.picker.companionPreview(promo.companion_count ?? 0)} ·
+                          {" "}
+                          {companionIDs.length === (promo.companion_count ?? 0)
+                            ? `${companionIDs.length} ya elegidos`
+                            : `Faltan ${(promo.companion_count ?? 0) - companionIDs.length}`}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setPromo(null);
+                        setCompanionIDs([]);
+                      }}
+                      title={pt.picker.remove}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {promo.kind === "companion_memberships" && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCompanionOpen(true)}
+                    >
+                      {companionIDs.length > 0 ? "Cambiar socios" : "Elegir socios"}
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <PromotionPickerModal
+              open={pickerOpen}
+              onOpenChange={setPickerOpen}
+              target="membership"
+              onApply={(p) => {
+                setPromo(p);
+                setCompanionIDs([]);
+                if (p.kind === "companion_memberships") {
+                  setCompanionOpen(true);
+                }
+              }}
+            />
+            <CompanionSelectorModal
+              open={companionOpen}
+              onOpenChange={setCompanionOpen}
+              companionCount={promo?.companion_count ?? 0}
+              excludeMemberID={member.id}
+              onConfirm={(ids) => setCompanionIDs(ids)}
+            />
 
             <div className="space-y-3">
               <button

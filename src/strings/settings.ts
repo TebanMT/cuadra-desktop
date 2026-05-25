@@ -51,6 +51,10 @@ export const settings = {
         title: "Mi perfil",
         body: "Tu nombre, teléfono y PIN de recepción.",
       },
+      aboutTinta: {
+        title: "Sobre Tinta",
+        body: "Versión instalada, buscar actualizaciones, notas del cambio.",
+      },
     },
   },
   // Mini-strings reusables para gateo Plus (cards/secciones que sólo se

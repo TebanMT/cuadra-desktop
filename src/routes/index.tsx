@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { OwnerOnlyRoute, ProtectedRoute, PublicOnlyRoute } from "@/components/shared/RouteGuards";
+import { UpdaterShell } from "@/components/shared/UpdaterShell";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Login from "@/pages/auth/Login";
 import LoginEmail from "@/pages/auth/LoginEmail";
@@ -17,6 +18,7 @@ import MemberDetailPage from "@/pages/members/MemberDetailPage";
 import MemberImportPage from "@/pages/members/MemberImportPage";
 import ProfilePage from "@/pages/profile/ProfilePage";
 import SettingsIndex from "@/pages/settings/SettingsIndex";
+import AboutTintaPage from "@/pages/settings/AboutTintaPage";
 import SubscriptionPage from "@/pages/settings/SubscriptionPage";
 import MembershipTypesPage from "@/pages/settings/MembershipTypes";
 import PricingPage from "@/pages/public/PricingPage";
@@ -60,6 +62,13 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
+      // UpdaterShell envuelve TODO el árbol post-login. Móntea el ciclo
+      // de auto-update + el modal bloqueante de "schema upgrade required".
+      // Tiene que estar dentro de ProtectedRoute porque el check inicial
+      // exige tener sidecar y sesión activa.
+      {
+        element: <UpdaterShell />,
+        children: [
       // /auth/setup-required: pantalla terminal cuando el dueño se loguea
       // pero su gym todavía no completó el wizard del dashboard. Le
       // ofrece un botón para abrir el setup en el browser del sistema.
@@ -95,6 +104,7 @@ export const router = createBrowserRouter([
           { path: "reports", element: <ReportsPage /> },
           { path: "reports/cash-close", element: <CashClosePage /> },
           { path: "settings", element: <SettingsIndex /> },
+          { path: "settings/about", element: <AboutTintaPage /> },
           { path: "settings/gym", element: <GymProfilePage /> },
           { path: "settings/membership-types", element: <MembershipTypesPage /> },
           // Owner-only: páginas administrativas que un operador no debe abrir
@@ -120,6 +130,8 @@ export const router = createBrowserRouter([
           },
           { path: "retos", element: <ChallengesListPage /> },
           { path: "retos/:id", element: <ChallengeDetailPage /> },
+        ],
+      },
         ],
       },
     ],

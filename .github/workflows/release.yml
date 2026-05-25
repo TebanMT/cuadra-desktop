@@ -1,0 +1,376 @@
+# Release pipeline para auto-updates de Tinta Desktop (ADR-005 §4).
+#
+# Diferencias con build-desktop.yml:
+#   - Trigger: tag `v*.*.*` (SemVer) — no `desktop-v*`. El primero está
+#     reservado para el flujo de auto-update; el segundo sigue alimentando
+#     el descargador del landing (R2 + dl.entinta.app).
+#   - Firma del .msi/.exe con Authenticode (signtool) — condicional al
+#     secret WINDOWS_CERTIFICATE. Si no está configurado, el job loggea
+#     un warning y deja los binarios sin firmar (útil mientras el cert OV
+#     se está tramitando).
+#   - Firma ed25519 del bundle vía tauri-action — produce los .sig que el
+#     manifest del cloud distribuye y el plugin updater verifica.
+#   - Sube los artifacts a GitHub Releases (descarga directa, dura siempre).
+#   - POST automático a /api/v1/admin/releases del cloud para registrar la
+#     versión nueva con rollout_percent=5 (staged rollout día 0, ADR §2.4).
+#     Si el POST falla, el manifest queda igual subido a GH Releases y se
+#     puede registrar manualmente vía SQL (ver docs/release.md).
+#   - macOS DEFERIDO (ADR-005 §3.2): NO se sube DMG al manifest público.
+#     El job mac se mantiene para que Esteban consuma el DMG local sin
+#     pasar por el updater.
+#
+# Required GitHub secrets:
+#   TINTA_CORE_TOKEN              PAT con Contents:Read sobre cuadra-core
+#   TAURI_SIGNING_PRIVATE_KEY     ed25519 privada para firmar updates
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD   password del keystore
+#   WINDOWS_CERTIFICATE           (opcional, hasta tener OV cert) PFX base64
+#   WINDOWS_CERTIFICATE_PASSWORD  (opcional) password del PFX
+#   TINTA_CLOUD_URL               https://api.entinta.app
+#   RELEASES_ADMIN_TOKEN          shared secret del endpoint POST admin
+
+name: Release
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Versión a publicar (ej. 1.0.0). Vacío usa tauri.conf.json."
+        required: false
+
+env:
+  TINTA_CORE_REPO: TebanMT/cuadra-core
+  TINTA_CORE_REF: main
+  GO_VERSION: "1.25"
+  NODE_VERSION: "20"
+  RUST_TOOLCHAIN: "stable"
+  NBIS_VERSION: nbis-v1
+
+jobs:
+  # ─────────────────────────────────────────────────────────────────────
+  # Windows x86_64 — único target distribuible (ADR-005 §3).
+  # Firma Authenticode + firma ed25519 del bundle + manifest .json.
+  # ─────────────────────────────────────────────────────────────────────
+  release-windows:
+    name: Windows release (signed)
+    runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      msi_signature: ${{ steps.signature.outputs.msi_sig }}
+      nsis_signature: ${{ steps.signature.outputs.nsis_sig }}
+      msi_url: ${{ steps.signature.outputs.msi_url }}
+      nsis_url: ${{ steps.signature.outputs.nsis_url }}
+    steps:
+      - name: Checkout tinta-desktop
+        uses: actions/checkout@v4
+
+      - name: Checkout tinta-core
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TINTA_CORE_REPO }}
+          ref: ${{ env.TINTA_CORE_REF }}
+          path: tinta-core
+          token: ${{ secrets.TINTA_CORE_TOKEN }}
+
+      - name: Derive version from tag
+        id: version
+        shell: bash
+        run: |
+          # tag "v1.2.3" → "1.2.3"; workflow_dispatch sin input → leer tauri.conf.json
+          if [ -n "${{ inputs.tag }}" ]; then
+            VERSION="${{ inputs.tag }}"
+            VERSION="${VERSION#v}"
+          elif [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Releasing v${VERSION}"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: tinta-core/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: x86_64-pc-windows-msvc
+
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: x86_64-pc-windows-msvc-release
+
+      - name: Build Go sidecar
+        env:
+          CGO_ENABLED: 1
+          GOOS: windows
+          GOARCH: amd64
+        shell: bash
+        run: |
+          cd tinta-core
+          go build -tags sidecar \
+            -o ../src-tauri/tinta-sidecar-x86_64-pc-windows-msvc.exe \
+            ./cmd/sidecar
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Download NBIS binaries
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NBIS_VERSION: ${{ env.NBIS_VERSION }}
+        shell: bash
+        run: bash scripts/prepare-nbis-windows.sh
+
+      - name: Install signtool (if not present)
+        # signtool viene con el Windows SDK; los runners de Microsoft ya
+        # lo traen, pero si en algún momento eso cambia, este step es el
+        # hook para instalarlo. Hoy no-op.
+        shell: bash
+        run: |
+          if ! command -v signtool >/dev/null 2>&1; then
+            echo "signtool no presente — necesitamos Windows SDK preinstalado."
+            exit 1
+          fi
+
+      - name: Decode Authenticode certificate (opcional)
+        id: cert
+        if: ${{ env.WINDOWS_CERTIFICATE != '' }}
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+        shell: bash
+        run: |
+          echo "${WINDOWS_CERTIFICATE}" | base64 -d > /tmp/cert.pfx
+          echo "path=/tmp/cert.pfx" >> "$GITHUB_OUTPUT"
+
+      - name: Build + sign Tauri bundle
+        # tauri-action firma ed25519 el bundle entero (.msi, .exe NSIS, .sig)
+        # cuando TAURI_SIGNING_PRIVATE_KEY está en env. Esa firma es lo que
+        # el manifest del cloud distribuye y el plugin updater verifica al
+        # bajar el .msi — separado de Authenticode (que protege contra el
+        # SmartScreen del SO, ver §3.3 del ADR).
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          pnpm tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
+
+      - name: Sign installers (Authenticode, opcional)
+        # signtool firma el .msi y el NSIS .exe si tenemos cert. Sin cert,
+        # SmartScreen mostrará "Unknown publisher" — los binarios funcionan
+        # igual pero con friction. Toleramos no firmar para no bloquear el
+        # release MAJOR si el cert OV está aún en trámite.
+        if: ${{ steps.cert.outputs.path != '' }}
+        env:
+          CERT_PASS: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        shell: pwsh
+        run: |
+          $msi = Get-ChildItem -Path "src-tauri\target\x86_64-pc-windows-msvc\release\bundle\msi" -Filter "*.msi" | Select-Object -First 1
+          $exe = Get-ChildItem -Path "src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis" -Filter "*.exe" | Select-Object -First 1
+          if ($msi) {
+            & signtool sign /f /tmp/cert.pfx /p "$env:CERT_PASS" `
+              /tr http://timestamp.sectigo.com /td sha256 /fd sha256 `
+              $msi.FullName
+          }
+          if ($exe) {
+            & signtool sign /f /tmp/cert.pfx /p "$env:CERT_PASS" `
+              /tr http://timestamp.sectigo.com /td sha256 /fd sha256 `
+              $exe.FullName
+          }
+
+      - name: Read bundle signatures
+        # tauri-action escribe el .sig al lado de cada bundle. El contenido
+        # es el string base64 ed25519 que el manifest cloud va a embeber.
+        id: signature
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          BUNDLE_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
+          MSI_SIG=$(cat "$BUNDLE_DIR"/msi/*.msi.sig | tr -d '\n' || true)
+          NSIS_SIG=$(cat "$BUNDLE_DIR"/nsis/*.exe.sig | tr -d '\n' || true)
+          echo "msi_sig=${MSI_SIG}" >> "$GITHUB_OUTPUT"
+          echo "nsis_sig=${NSIS_SIG}" >> "$GITHUB_OUTPUT"
+          # URL final donde quedará el .msi tras gh-release upload. Lo
+          # calculamos acá para que el job de registro al cloud no tenga
+          # que adivinar el path.
+          echo "msi_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/Tinta_${VERSION}_x64_en-US.msi" >> "$GITHUB_OUTPUT"
+          echo "nsis_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/Tinta_${VERSION}_x64-setup.exe" >> "$GITHUB_OUTPUT"
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinta-windows-release
+          path: |
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi.sig
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe.sig
+          if-no-files-found: error
+
+  # ─────────────────────────────────────────────────────────────────────
+  # macOS (interno, no distribuible).
+  # Sigue armando el DMG para uso de Esteban; NO sube al manifest público
+  # ni dispara el registro contra el cloud (ADR-005 §3.2).
+  # ─────────────────────────────────────────────────────────────────────
+  build-macos-internal:
+    name: macOS (dev-only)
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - { arch: arm64,  rust: aarch64-apple-darwin, go: arm64 }
+          - { arch: x86_64, rust: x86_64-apple-darwin,  go: amd64 }
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.TINTA_CORE_REPO }}
+          ref: ${{ env.TINTA_CORE_REF }}
+          path: tinta-core
+          token: ${{ secrets.TINTA_CORE_TOKEN }}
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache-dependency-path: tinta-core/go.sum
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_TOOLCHAIN }}
+          targets: ${{ matrix.target.rust }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.target.rust }}-release
+
+      - name: Build Go sidecar
+        env:
+          CGO_ENABLED: 1
+          GOOS: darwin
+          GOARCH: ${{ matrix.target.go }}
+        run: |
+          cd tinta-core
+          export SDKROOT=$(xcrun -sdk macosx --show-sdk-path)
+          go build -tags sidecar \
+            -o ../src-tauri/tinta-sidecar-${{ matrix.target.rust }} \
+            ./cmd/sidecar
+          codesign --force --sign - --options runtime \
+            ../src-tauri/tinta-sidecar-${{ matrix.target.rust }}
+
+      - name: Install frontend deps
+        run: pnpm install --frozen-lockfile
+
+      - name: Build Tauri
+        run: pnpm tauri build --target ${{ matrix.target.rust }}
+
+      - name: Upload DMG (internal only — NOT in manifest)
+        uses: actions/upload-artifact@v4
+        with:
+          name: tinta-macos-${{ matrix.target.arch }}-internal
+          path: src-tauri/target/${{ matrix.target.rust }}/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
+  # ─────────────────────────────────────────────────────────────────────
+  # Publish GitHub Release + register al cloud (ADR-005 §4.1 + §4.2).
+  # ─────────────────────────────────────────────────────────────────────
+  publish:
+    name: Publish + register manifest
+    needs: [release-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tinta-windows-release
+          path: artifacts
+
+      - name: List artifacts
+        run: |
+          ls -la artifacts
+          find artifacts -type f
+
+      - name: Create GitHub Release
+        # gh release create es idempotente con --clobber: si el tag ya tiene
+        # un release (ej. reintento manual del job tras un fallo de network),
+        # reemplaza los assets sin duplicar.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release-windows.outputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          # find es robusto contra cambios de naming entre versiones de Tauri.
+          MSI=$(find artifacts -name '*.msi' -not -name '*.sig' | head -1)
+          NSIS=$(find artifacts -name '*setup*.exe' -o -name '*Setup*.exe' | head -1)
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Tinta ${TAG}" --notes "Release ${TAG}" \
+              "$MSI" "$NSIS"
+          else
+            gh release upload "$TAG" "$MSI" "$NSIS" --clobber
+          fi
+
+      - name: Register release with cloud manifest
+        # POST al endpoint admin del cloud (ADR-005 §4.2) para que la
+        # próxima consulta del updater devuelva esta versión a clientes
+        # dentro del bucket de rollout. Si falla (cloud caído, secret mal
+        # configurado), el job NO bloquea el release: los binarios ya
+        # están en GH Releases para fallback manual. Ver docs/release.md
+        # → "Registrar manualmente" si esto da error.
+        if: ${{ secrets.RELEASES_ADMIN_TOKEN != '' && secrets.TINTA_CLOUD_URL != '' }}
+        env:
+          ADMIN_TOKEN: ${{ secrets.RELEASES_ADMIN_TOKEN }}
+          CLOUD_URL: ${{ secrets.TINTA_CLOUD_URL }}
+          VERSION: ${{ needs.release-windows.outputs.version }}
+          MSI_SIG: ${{ needs.release-windows.outputs.msi_signature }}
+          MSI_URL: ${{ needs.release-windows.outputs.msi_url }}
+        run: |
+          # rollout_percent=5 (día 0). Bumpear vía SQL (ver docs/release.md)
+          # +1d → 25%, +3d → 100% según métricas. No automatizamos el
+          # ramp todavía — manual hasta tener dashboard de health.
+          curl -fSs -X POST "${CLOUD_URL}/api/v1/admin/releases" \
+            -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d @- <<EOF
+          {
+            "version": "${VERSION}",
+            "target_platform": "x86_64-pc-windows-msvc",
+            "channel": "stable",
+            "url": "${MSI_URL}",
+            "signature_ed25519": "${MSI_SIG}",
+            "notes": "Tinta ${VERSION}. Mejoras y correcciones.",
+            "rollout_percent": 5,
+            "force_immediate": false
+          }
+          EOF
+
+      - name: Warn if manifest registration was skipped
+        if: ${{ secrets.RELEASES_ADMIN_TOKEN == '' || secrets.TINTA_CLOUD_URL == '' }}
+        run: |
+          echo "::warning::Release subido a GitHub pero NO registrado en el cloud manifest."
+          echo "Causa: RELEASES_ADMIN_TOKEN o TINTA_CLOUD_URL no configurados."
+          echo "Registralo manualmente con el INSERT del docs/release.md."
