@@ -68,6 +68,22 @@
 !define TINTA_DP_DRIVER_TEMP_DIR "$TEMP\tinta-dp-driver"
 !define TINTA_DP_DRIVER_TEMP_PS1 "$TEMP\tinta-dp-driver.ps1"
 
+; ─── PowerShell 64-bit explicit ─────────────────────────────────────────────
+; NSIS es 32-bit. Si llamamos a "powershell.exe" sin path absoluto, Windows
+; resuelve via PATH y el redirector WOW64 nos manda a SysWOW64 (PowerShell
+; 32-bit). Dentro de 32-bit PS, pnputil.exe NO se encuentra (solo existe en
+; el System32 verdadero, no en SysWOW64). El alias mágico "Sysnative" lo
+; expone Windows EXCLUSIVAMENTE a procesos 32-bit para saltarse la
+; redirección y acceder al System32 real. Esta macro la usamos en TODOS
+; los nsExec con PowerShell para garantizar 64-bit consistente.
+;
+; En 64-bit Windows: Sysnative resuelve al System32 real → 64-bit
+;   powershell.exe → pnputil encuentra natural.
+; En 32-bit Windows: Sysnative no existe → falla la llamada → caemos al
+;   fallback (browser-open). No soportamos 32-bit Windows hoy (README
+;   lo dice explícito) — degradación aceptable.
+!define TINTA_PS64 "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
+
 !macro NSIS_HOOK_POSTINSTALL
   Push $0
   Push $1
@@ -127,7 +143,7 @@
     ; -ExecutionPolicy Bypass evita el bloqueo de scripts no firmados sin
     ;   modificar la policy del sistema.
     ; Los tres args van quoted para sobrevivir paths/URLs con espacios.
-    nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${TINTA_DP_TEMP_PS1}" "${TINTA_DP_URL}" "${TINTA_DP_TEMP_EXE}" "${TINTA_DP_SHA256}"'
+    nsExec::ExecToLog '"${TINTA_PS64}" -NoProfile -ExecutionPolicy Bypass -File "${TINTA_DP_TEMP_PS1}" "${TINTA_DP_URL}" "${TINTA_DP_TEMP_EXE}" "${TINTA_DP_SHA256}"'
     Pop $0
     Delete "${TINTA_DP_TEMP_PS1}"
 
@@ -192,7 +208,7 @@
     ; — chequeamos el driver store, no Device Manager.
     ; NSIS escape: '' NO es escape de apóstrofe; uso $\' para que PowerShell
     ; reciba el regex literal 'dPersona|U\.are\.U' en su Pattern parameter.
-    nsExec::ExecToStack 'powershell.exe -NoProfile -Command "if (pnputil /enum-drivers | Select-String -Pattern $\'dPersona|U\.are\.U$\' -Quiet) { exit 0 } else { exit 1 }"'
+    nsExec::ExecToStack '"${TINTA_PS64}" -NoProfile -Command "if (pnputil /enum-drivers | Select-String -Pattern $\'dPersona|U\.are\.U$\' -Quiet) { exit 0 } else { exit 1 }"'
     Pop $0
     Pop $1  ; output, descarted
     StrCmp $0 "0" tinta_drv_already tinta_drv_download
@@ -276,7 +292,7 @@
     FileWrite $2 'exit 0$\r$\n'
     FileClose $2
 
-    nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "${TINTA_DP_DRIVER_TEMP_PS1}" "${TINTA_DP_DRIVER_URL}" "${TINTA_DP_DRIVER_TEMP_ZIP}" "${TINTA_DP_DRIVER_TEMP_DIR}"'
+    nsExec::ExecToLog '"${TINTA_PS64}" -NoProfile -ExecutionPolicy Bypass -File "${TINTA_DP_DRIVER_TEMP_PS1}" "${TINTA_DP_DRIVER_URL}" "${TINTA_DP_DRIVER_TEMP_ZIP}" "${TINTA_DP_DRIVER_TEMP_DIR}"'
     Pop $0
     Delete "${TINTA_DP_DRIVER_TEMP_PS1}"
     Delete "${TINTA_DP_DRIVER_TEMP_ZIP}"
