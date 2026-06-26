@@ -349,7 +349,11 @@ jobs:
         # configurado), el job NO bloquea el release: los binarios ya
         # están en GH Releases para fallback manual. Ver docs/release.md
         # → "Registrar manualmente" si esto da error.
-        if: ${{ secrets.RELEASES_ADMIN_TOKEN != '' && secrets.TINTA_CLOUD_URL != '' }}
+        #
+        # El gateo por secrets va DENTRO del run, NO en `if:` — GitHub no
+        # permite el contexto `secrets` en expresiones `if:`. El step env sí
+        # puede leer secrets, así que chequeamos las vars en bash y salimos
+        # con warning (sin fallar) si faltan.
         env:
           ADMIN_TOKEN: ${{ secrets.RELEASES_ADMIN_TOKEN }}
           CLOUD_URL: ${{ secrets.TINTA_CLOUD_URL }}
@@ -357,6 +361,12 @@ jobs:
           MSI_SIG: ${{ needs.release-windows.outputs.msi_signature }}
           MSI_URL: ${{ needs.release-windows.outputs.msi_url }}
         run: |
+          if [ -z "${ADMIN_TOKEN}" ] || [ -z "${CLOUD_URL}" ]; then
+            echo "::warning::Release subido a GitHub pero NO registrado en el cloud manifest."
+            echo "Causa: RELEASES_ADMIN_TOKEN o TINTA_CLOUD_URL no configurados."
+            echo "Registralo manualmente con el INSERT del docs/release.md."
+            exit 0
+          fi
           # rollout_percent=5 (día 0). Bumpear vía SQL (ver docs/release.md)
           # +1d → 25%, +3d → 100% según métricas. No automatizamos el
           # ramp todavía — manual hasta tener dashboard de health.
@@ -375,10 +385,3 @@ jobs:
             "force_immediate": false
           }
           EOF
-
-      - name: Warn if manifest registration was skipped
-        if: ${{ secrets.RELEASES_ADMIN_TOKEN == '' || secrets.TINTA_CLOUD_URL == '' }}
-        run: |
-          echo "::warning::Release subido a GitHub pero NO registrado en el cloud manifest."
-          echo "Causa: RELEASES_ADMIN_TOKEN o TINTA_CLOUD_URL no configurados."
-          echo "Registralo manualmente con el INSERT del docs/release.md."
