@@ -87,9 +87,12 @@ export function PhoneInput({
         inputMode="tel"
         autoComplete="tel-national"
         value={number}
-        onChange={(e) => onNumberChange(e.target.value)}
+        // Sólo dígitos: filtramos en cada tecla para que nunca entren
+        // espacios/guiones/letras al estado (el usuario "únicamente puede
+        // teclear números"). formatE164 igual limpia al submit como red.
+        onChange={(e) => onNumberChange(e.target.value.replace(/\D/g, ""))}
         disabled={disabled}
-        placeholder={placeholder ?? "55 1234 5678"}
+        placeholder={placeholder ?? "5512345678"}
         className="flex-1"
       />
     </div>

@@ -85,7 +85,8 @@ export const members = {
       attendanceOperator: (name: string) => `Operador: ${name}`,
       attendanceMethod: {
         fingerprint: "Huella",
-        pin: "PIN",
+        // ADR-010: el método "number" en BD se muestra como "Número".
+        number: "Número",
         manual: "Manual",
       },
       attendanceResult: {
@@ -104,8 +105,8 @@ export const members = {
       edit: "Editar",
       markInactive: "Marcar inactivo",
       markActive: "Reactivar",
-      assignPin: "Asignar PIN",
-      changePin: "Cambiar PIN",
+      assignNumber: "Asignar número de socio",
+      changeNumber: "Cambiar número de socio",
     },
     shortcuts: {
       title: "Atajos",
@@ -243,26 +244,29 @@ export const members = {
     success: (date: string) => `Vigencia actualizada. Nueva fecha: ${date}.`,
     ownerOnly: "Solo el dueño del gym puede ajustar vigencias.",
   },
-  pin: {
-    title: "PIN del socio",
-    titleChange: "Cambiar PIN",
+  // ADR-010: el antiguo "PIN del socio" es ahora el NÚMERO DE SOCIO —
+  // identificador público, entero, único 1:1 por gym, que también sirve de
+  // credencial de check-in. Accesor t.memberNumber.*.
+  memberNumber: {
+    title: "Número de socio",
+    titleChange: "Cambiar número de socio",
     description:
-      "Tinta asignó un PIN de 4 dígitos cuando inscribiste al socio. Puedes generar uno nuevo si se compartió por error — se reenvía automáticamente por WhatsApp.",
-    generating: "Generando PIN…",
-    label: (name: string) => `PIN de ${name}`,
+      "Tinta le asignó un número de socio al inscribirlo. Puedes generar uno nuevo si se compartió por error — se reenvía automáticamente por WhatsApp.",
+    generating: "Generando número…",
+    label: (name: string) => `Número de ${name}`,
     copy: "Copiar",
-    copied: "PIN copiado al portapapeles.",
+    copied: "Número copiado al portapapeles.",
     done: "Listo",
-    regenerate: "Generar nuevo PIN",
+    regenerate: "Generar nuevo número",
     disclaimer:
-      "Siempre puedes consultar el PIN desde el perfil del socio.",
-    success: "PIN actualizado.",
-    triggerChange: "Cambiar PIN",
-    profileLabel: "PIN",
+      "Siempre puedes consultar el número desde el perfil del socio.",
+    success: "Número de socio actualizado.",
+    triggerChange: "Cambiar número",
+    profileLabel: "Número de socio",
     profileHint: "Compártelo cuando el socio lo olvide.",
     profileCopy: "Copiar",
-    profileNone: "Sin PIN asignado.",
-    profileAssign: "Asignar PIN",
+    profileNone: "Sin número asignado.",
+    profileAssign: "Asignar número de socio",
     // Copy del strip post-creación / modal de cambio. Cuando WhatsApp
     // está conectado y el socio tiene teléfono, mostramos a quién se
     // mandó; en cualquier otro caso, instrucción de copiarlo a mano.

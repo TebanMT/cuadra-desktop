@@ -1,5 +1,5 @@
 import { ExternalLink, Lock, MessageCircle } from "lucide-react";
-import { open as openExternal } from "@tauri-apps/plugin-shell";
+import { openExternalUrl } from "@/lib/openExternal";
 import { AuthShell } from "@/components/shared/AuthShell";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -31,12 +31,9 @@ export default function SubscriptionBlocked() {
   const user = useAuthStore((s) => s.user);
 
   async function openBilling() {
-    try {
-      await openExternal(BILLING_URL);
-    } catch {
-      // openExternal puede fallar en contextos no-Tauri (tests, dev web).
-      // No crítico — el botón muestra la URL como tooltip indirectamente.
-    }
+    // Tauri shell.open en el .app; window.open en el navegador (dev). Si ambos
+    // fallan no es crítico — el copy de abajo explica que el pago va en navegador.
+    await openExternalUrl(BILLING_URL);
   }
 
   // Si la grace period existe pero ya venció, mostramos la fecha — sirve de

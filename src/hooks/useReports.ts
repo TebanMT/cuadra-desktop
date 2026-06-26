@@ -28,6 +28,14 @@ export interface KpiTrend {
 export interface DashboardData {
   active_members: KpiTrend;
   income_month: KpiTrend;
+  // Ganancia realizada de productos del mes (Standard): revenue − COGS de
+  // ventas no reembolsadas. realized_profit_coverage es la cobertura
+  // honesta ("X de Y líneas con costo").
+  realized_profit_month: KpiTrend;
+  realized_profit_coverage: { items_with_cost: number; items_total: number };
+  // Margen de la utilidad del mes: utilidad / ingreso por productos × 100.
+  // null cuando no hubo ventas de productos en el rango.
+  realized_profit_margin_pct: number | null;
   // Egresos del mes: AGREGADO de mercancía (stock_movements restock con
   // costo) + gastos generales (BC expenses). El hint del StatCard
   // aclara "Mercancía + otros". El desglose por fuente vive (por ahora)

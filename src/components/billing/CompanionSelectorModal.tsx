@@ -35,7 +35,11 @@ export function CompanionSelectorModal({
 }: CompanionSelectorModalProps) {
   const [search, setSearch] = useState("");
   const dq = useDebounce(search, 250);
-  const list = useMembersList({ q: dq, status: "active", page: 1, page_size: 20 });
+  // Sin filtro de status: al acompañante del 2x1 se le REGALA una membresía,
+  // así que casi siempre es alguien sin membresía vigente (socio nuevo en
+  // pending_payment, o vencido). Limitar a "active" lo ocultaba. GiftMembership
+  // maneja los 3 estados (sin/pending/activo) en el backend.
+  const list = useMembersList({ q: dq, status: "", page: 1, page_size: 20 });
   const [selected, setSelected] = useState<MemberListItem[]>([]);
 
   useEffect(() => {

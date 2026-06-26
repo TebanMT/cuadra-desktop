@@ -141,3 +141,103 @@ export function StatCard({
     </div>
   );
 }
+
+// Fila de un StatListCard: etiqueta a la izquierda, valor (tabular) a la
+// derecha, con un chip opcional (ej. margen %) pegado al valor.
+export interface StatListRow {
+  label: string;
+  value: React.ReactNode;
+  chip?: React.ReactNode;
+}
+
+interface StatListCardProps {
+  title: string;
+  rows: StatListRow[];
+  hint?: React.ReactNode;
+  tone?: StatTone;
+  icon?: LucideIcon;
+  onClick?: () => void;
+  className?: string;
+}
+
+/**
+ * Variante de StatCard para mostrar DOS o más cifras relacionadas en un solo
+ * card (ej. "Stock crítico" = bajos + agotados, "Ganancia" = del mes +
+ * potencial) — para no multiplicar cards de una sola cifra. Comparte el shell
+ * y el sistema de tonos con StatCard.
+ */
+export function StatListCard({
+  title,
+  rows,
+  hint,
+  tone = "neutral",
+  icon: Icon,
+  onClick,
+  className,
+}: StatListCardProps) {
+  const interactive = !!onClick;
+  return (
+    <div
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (interactive && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onClick?.();
+        }
+      }}
+      className={cn(
+        "rounded-xl border border-paper-300 bg-card p-5 sm:p-6 shadow-app transition-all",
+        interactive &&
+          "cursor-pointer hover:border-ink-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        className
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-medium text-ink-400 dark:text-ink-300 uppercase tracking-wider leading-tight pt-1">
+          {title}
+        </p>
+        {Icon && (
+          <div
+            className={cn(
+              "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg",
+              TONE_ICON[tone]
+            )}
+            aria-hidden="true"
+          >
+            <Icon className="h-4 w-4" strokeWidth={2} />
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 space-y-1.5">
+        {rows.map((r, i) => (
+          <div key={i} className="flex items-baseline justify-between gap-2">
+            <span className="text-xs text-ink-400 dark:text-ink-300">
+              {r.label}
+            </span>
+            <span className="flex items-baseline gap-1.5 min-w-0">
+              <span
+                className="text-lg font-bold tabular text-ink-900 dark:text-paper-50 leading-none truncate"
+                style={{ letterSpacing: "-0.02em" }}
+                title={typeof r.value === "string" ? r.value : undefined}
+              >
+                {r.value}
+              </span>
+              {r.chip && (
+                <span className={cn("text-xs font-semibold tabular", TONE_DELTA[tone])}>
+                  {r.chip}
+                </span>
+              )}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {hint && (
+        <div className="mt-3 text-xs text-ink-400 dark:text-ink-300">{hint}</div>
+      )}
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ import { Sidebar } from "./Sidebar";
 import { SubscriptionBanner } from "./SubscriptionBanner";
 import { TopBar } from "./TopBar";
 import { openKioskWindow } from "@/lib/kioskWindow";
+import { GlobalCheckinScanner } from "@/components/checkin/GlobalCheckinScanner";
 
 export function DashboardLayout() {
   // Atajo global (in-app): Ctrl+Alt+K abre el kiosko desde cualquier
@@ -37,6 +38,11 @@ export function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+      {/* Scanner global de huella en background. Lee siempre en la main
+          window y muestra el resultado como toast. Se pausa
+          automáticamente cuando alguien claima el lector (alta de socio,
+          registro de huella) — no hay que detectar la ruta manualmente. */}
+      <GlobalCheckinScanner />
     </div>
   );
 }

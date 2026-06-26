@@ -6,7 +6,12 @@
 #   make build-mac TINTA_CORE=/ruta/a/tinta-core
 
 TINTA_CORE ?= ../tinta-core
-TAURI_BIN_DIR := src-tauri/binaries
+# El sidecar se compila a la RAÍZ de src-tauri, no a binaries/. Tauri busca
+# el external bin en `src-tauri/<externalBin>-<triple>` y la config usa
+# `externalBin: ["tinta-sidecar"]` (plano, sin prefijo binaries/ — ver el
+# comentario de src-tauri/src/sidecar.rs sobre el flattening de macOS). El CI
+# (release.yml / build-desktop.yml) compila a esta misma ruta.
+TAURI_BIN_DIR := src-tauri
 
 .PHONY: help icons sidecar-arm64 sidecar-x86_64 sidecar-windows \
         build-mac build-mac-arm64 build-mac-x86_64 \
@@ -119,4 +124,7 @@ dmg-mac-x86_64:
 
 clean:
 	rm -rf src-tauri/target dist
-	rm -f $(TAURI_BIN_DIR)/tinta-sidecar-*
+	# Outputs del sidecar en la ubicación actual (raíz) + restos del layout
+	# viejo (binaries/) y del nombre pre-rename (cuadra-sidecar-*).
+	rm -f src-tauri/tinta-sidecar-* src-tauri/cuadra-sidecar-*
+	rm -f src-tauri/binaries/tinta-sidecar-* src-tauri/binaries/cuadra-sidecar-*

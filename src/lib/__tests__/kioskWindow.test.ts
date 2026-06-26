@@ -71,7 +71,12 @@ describe("kioskWindow", () => {
     expect(state.constructorCalls[0].options).toMatchObject({
       url: "/kiosk",
       title: "Tinta · Kiosko",
-      resizable: false,
+      // El kiosko ya no corre fullscreen sin decoraciones; ahora es una
+      // ventana normal maximizada con X del OS y barra inferior visible.
+      fullscreen: false,
+      maximized: true,
+      decorations: true,
+      resizable: true,
     });
   });
 

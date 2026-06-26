@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, Pencil, RotateCcw } from "lucide-react";
+import { Loader2, Lock, Pencil, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,6 +30,7 @@ import {
   useResetTemplate,
   useTemplates,
   useUpdateTemplate,
+  useWhatsappState,
   type NotificationTemplate,
   type TemplateKey,
 } from "@/hooks/useNotifications";
@@ -76,6 +77,11 @@ const TEMPLATES_HIDDEN_KEYS = new Set<string>([
 export default function TemplatesPage() {
   const list = useTemplates();
   const gymName = useAuthStore((s) => s.gym?.name) ?? "Gym Bros";
+  // El TEXTO sólo se edita cuando el gym manda desde su propio número (ver
+  // gate del backend). Si no, el botón "Editar" se oculta — el switch on/off
+  // queda inline en la card, que es lo único modificable sin número propio.
+  const whatsapp = useWhatsappState();
+  const canEditText = whatsapp.data?.status === "connected";
   const [editing, setEditing] = useState<NotificationTemplate | null>(null);
 
   const sample = { ...SAMPLE_DATA, "{gym_name}": gymName };
@@ -110,7 +116,13 @@ export default function TemplatesPage() {
       {visibleItems && (
         <div className="space-y-3">
           {visibleItems.map((tpl) => (
-            <TemplateRow key={tpl.key} tpl={tpl} onEdit={() => setEditing(tpl)} sample={sample} />
+            <TemplateRow
+              key={tpl.key}
+              tpl={tpl}
+              onEdit={() => setEditing(tpl)}
+              sample={sample}
+              canEditText={canEditText}
+            />
           ))}
         </div>
       )}
@@ -143,11 +155,14 @@ function TemplateRow({
   tpl,
   onEdit,
   sample,
+  canEditText,
 }: {
   tpl: NotificationTemplate;
   onEdit(): void;
   sample: Record<string, string>;
+  canEditText: boolean;
 }) {
+  const update = useUpdateTemplate(tpl.key);
   const meta = t.templates.keys[tpl.key as keyof typeof t.templates.keys];
   const title = meta?.title ?? humanizeTemplateKey(tpl.key);
   const description = meta?.description ?? `Plantilla del sistema (clave: ${tpl.key}).`;
@@ -156,31 +171,59 @@ function TemplateRow({
   // el default body), el badge desaparece aunque el override row siga ahí.
   const customized = tpl.body.trim() !== tpl.default_body.trim();
 
+  // El switch on/off vive inline en la card (no en el modal): es lo único
+  // modificable sin número propio. Manda el body actual; el BE lo fuerza al
+  // default si el gym no usa su número.
+  async function toggle(checked: boolean) {
+    try {
+      await update.mutateAsync({ body: tpl.body, enabled: checked });
+      toast.success(t.templates.toggleSaved);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : t.templates.toggleError);
+    }
+  }
+
   return (
     <Card>
       <CardContent className="pt-5 pb-5 space-y-3">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <h3 className="font-semibold">{title}</h3>
             <p className="text-sm text-muted-foreground">{description}</p>
           </div>
-          <div className="flex items-center gap-2">
-            {tpl.enabled ? (
-              <Badge variant="success">{t.templates.enabled}</Badge>
-            ) : (
-              <Badge variant="secondary">{t.templates.disabled}</Badge>
+          <div className="flex items-center gap-2 shrink-0">
+            {customized && canEditText && (
+              <Badge variant="outline">{t.templates.customized}</Badge>
             )}
-            {customized && <Badge variant="outline">{t.templates.customized}</Badge>}
+            {update.isPending && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
+            <Switch
+              id={`tpl-on-${tpl.key}`}
+              checked={tpl.enabled}
+              onCheckedChange={toggle}
+              disabled={update.isPending}
+            />
+            <Label htmlFor={`tpl-on-${tpl.key}`} className="text-xs cursor-pointer">
+              {tpl.enabled ? t.templates.enabled : t.templates.disabled}
+            </Label>
           </div>
         </div>
         <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm whitespace-pre-wrap">
           {renderPreview(tpl.body || "—").replace(/\{gym_name\}/g, sample["{gym_name}"])}
         </p>
         <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={onEdit}>
-            <Pencil className="h-4 w-4" />
-            {t.templates.edit}
-          </Button>
+          {canEditText ? (
+            <Button variant="outline" size="sm" onClick={onEdit}>
+              <Pencil className="h-4 w-4" />
+              {t.templates.edit}
+            </Button>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Lock className="h-3.5 w-3.5" />
+              {t.templates.textFixed}
+            </span>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -205,6 +248,15 @@ function TemplateEditModal({
   const [error, setError] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
 
+  // El texto sólo se edita cuando el gym envía desde su PROPIO número de
+  // WhatsApp (Plus + número conectado). Si sale por el número maestro de Tinta,
+  // lo que llega es la plantilla aprobada por Meta —editar el body no cambia el
+  // mensaje—, así que lo dejamos read-only mostrando el default. El switch
+  // on/off SÍ se puede cambiar. Espeja el gate del backend (UsesOwnWhatsAppNumber).
+  const whatsapp = useWhatsappState();
+  const canEditText = whatsapp.data?.status === "connected";
+  const effectiveBody = canEditText ? body : template.default_body;
+
   useEffect(() => {
     if (open) {
       setBody(template.body);
@@ -223,22 +275,24 @@ function TemplateEditModal({
     : TEMPLATE_VARIABLES[template.key as TemplateKey] ?? [];
 
   function previewBody(): string {
-    return body.replace(/\{[a-z_]+\}/g, (m) => sample[m] ?? m);
+    return effectiveBody.replace(/\{[a-z_]+\}/g, (m) => sample[m] ?? m);
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (!body.trim()) {
+    // Sin Plus mandamos el default (el BE lo forzaría igual); el toggle sí viaja.
+    const outBody = canEditText ? body.trim() : template.default_body;
+    if (!outBody.trim()) {
       setError(t.templates.modal.empty);
       return;
     }
-    if (body.length > 1000) {
+    if (outBody.length > 1000) {
       setError(t.templates.modal.tooLong);
       return;
     }
     try {
-      await update.mutateAsync({ body: body.trim(), enabled });
+      await update.mutateAsync({ body: outBody, enabled });
       toast.success(t.templates.modal.success);
       onOpenChange(false);
     } catch (err) {
@@ -286,10 +340,20 @@ function TemplateEditModal({
               <Textarea
                 id="tpl-body"
                 rows={7}
-                value={body}
+                value={effectiveBody}
                 onChange={(e) => setBody(e.target.value)}
-                className="font-mono text-sm"
+                readOnly={!canEditText}
+                className={
+                  "font-mono text-sm" +
+                  (!canEditText ? " opacity-70 cursor-not-allowed bg-muted/40" : "")
+                }
               />
+              {!canEditText && (
+                <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>{t.templates.modal.plusOnlyBody}</span>
+                </p>
+              )}
               <div className="rounded-md border bg-muted/30 px-3 py-2">
                 <p className="text-xs text-muted-foreground mb-1">
                   {t.templates.modal.previewLabel}
@@ -300,19 +364,26 @@ function TemplateEditModal({
                 </p>
               </div>
               <div className="flex justify-between pt-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-muted-foreground"
-                  onClick={() => setConfirmReset(true)}
-                  disabled={
-                    template.body.trim() === template.default_body.trim() ||
-                    reset.isPending
-                  }
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  {t.templates.modal.reset}
-                </Button>
+                {/* Reset sólo aplica en Plus — en Standard el texto ya es el
+                    default, no hay nada que restablecer. El <span/> mantiene el
+                    justify-between para que los botones queden a la derecha. */}
+                {canEditText ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    onClick={() => setConfirmReset(true)}
+                    disabled={
+                      template.body.trim() === template.default_body.trim() ||
+                      reset.isPending
+                    }
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    {t.templates.modal.reset}
+                  </Button>
+                ) : (
+                  <span />
+                )}
                 <div className="flex gap-2">
                   <Button
                     type="button"

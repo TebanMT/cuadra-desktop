@@ -24,11 +24,15 @@ export const dashboard = {
   kpis: {
     activeMembers: "Socios activos",
     incomeMonth: "Ingresos del mes",
+    gananciaMes: "Utilidad de productos",
     expensesMonth: "Egresos del mes",
     expensesHint: "Mercancía + otros",
     expiringWeek: "Vencen esta semana",
     recoverable: "Por recuperar",
     vsLastPeriod: "vs período anterior",
+    marginLabel: "margen sobre ventas",
+    coverage: (withCost: number, total: number) =>
+      `${withCost} de ${total} con costo`,
   },
   income30d: {
     title: "Ingresos últimos 30 días",

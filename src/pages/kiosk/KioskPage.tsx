@@ -4,11 +4,10 @@ import { CheckCircle2, AlertTriangle, AlertCircle, LogOut } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CheckinFeedback, eventToFeedback, feedbackTone, useAutoFade, type FeedbackState } from "@/components/checkin/CheckinFeedback";
-import { PinPad } from "@/components/checkin/PinPad";
-import { KioskExitDialog } from "@/components/checkin/KioskExitDialog";
+import { NumberPad } from "@/components/checkin/NumberPad";
 import {
   checkinErrorMessage,
-  useCheckinByPin,
+  useCheckinByNumber,
   useCheckinCountToday,
   useCheckinMethods,
 } from "@/hooks/useCheckin";
@@ -57,10 +56,9 @@ export default function KioskPage() {
   const count = useCheckinCountToday();
 
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: "idle" });
-  const [pin, setPin] = useState("");
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [pinShake, setPinShake] = useState(false);
-  const [exitOpen, setExitOpen] = useState(false);
+  const [numberInput, setNumberInput] = useState("");
+  const [numberError, setNumberError] = useState<string | null>(null);
+  const [numberShake, setNumberShake] = useState(false);
   // Tick por minuto en lugar de por segundo — el reloj solo necesita
   // precisión al minuto. Reduce wakeups + repaints en el OS host.
   const [now, setNow] = useState(() => new Date());
@@ -70,7 +68,7 @@ export default function KioskPage() {
   // flow only checked the sidecar; now we need both.
   const fingerprintAvailable =
     !!bio.data?.available && readerConnected === true;
-  const pinAvailable = methods.data?.pin_available ?? false;
+  const numberAvailable = methods.data?.number_available ?? false;
 
   // Clock tick al cambio de minuto. El primer setTimeout calcula los ms
   // hasta el próximo minuto exacto (HH:MM:00) y desde ahí cada 60s.
@@ -121,8 +119,8 @@ export default function KioskPage() {
 
   const reset = useCallback(() => {
     setFeedback({ kind: "idle" });
-    setPin("");
-    setPinError(null);
+    setNumberInput("");
+    setNumberError(null);
   }, []);
 
   useAutoFade(feedback, { ttlMs: AUTOFADE_MS, onExpire: reset });
@@ -156,81 +154,84 @@ export default function KioskPage() {
     },
   });
 
-  const checkinPin = useCheckinByPin();
+  const checkinByNumber = useCheckinByNumber();
 
-  async function submitPin(value?: string) {
-    const candidate = value ?? pin;
+  async function submitNumber(value?: string) {
+    const candidate = value ?? numberInput;
     if (candidate.length !== 4) return;
     setFeedback({ kind: "processing" });
-    setPinError(null);
+    setNumberError(null);
     try {
-      const ev = await checkinPin.mutateAsync({ pin: candidate });
+      const ev = await checkinByNumber.mutateAsync({ member_number: parseInt(candidate, 10) });
       const fb = eventToFeedback(ev);
       setFeedback(fb);
       announceTone(fb);
-      setPin("");
+      setNumberInput("");
     } catch (err) {
-      const msg = checkinErrorMessage(err, t.pinPad.invalid);
-      setPinError(msg);
+      const msg = checkinErrorMessage(err, t.numberPad.invalid);
+      setNumberError(msg);
       setFeedback({ kind: "denied_not_found", detail: msg });
-      // Shake brief en el PinPad como feedback haptico-visual
+      // Shake brief en el teclado como feedback haptico-visual
       // de "intento incorrecto". 360ms total, sin acumular si
       // hay clics rápidos.
-      setPinShake(true);
-      window.setTimeout(() => setPinShake(false), 400);
+      setNumberShake(true);
+      window.setTimeout(() => setNumberShake(false), 400);
       playCheckinTone("denied");
-      setPin("");
+      setNumberInput("");
     }
   }
 
   // Auto-submit al llegar a 4 dígitos — saves el OK tap y baja ~0.5s
   // del roundtrip del kiosko. Solo en kiosk-mode.
   useEffect(() => {
-    if (pin.length === 4 && !checkinPin.isPending) {
-      submitPin(pin);
+    if (numberInput.length === 4 && !checkinByNumber.isPending) {
+      submitNumber(numberInput);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pin]);
+  }, [numberInput]);
 
-  // Salida del kiosko: tres affordances complementarios para no dejar al
-  // operador atrapado (el bug del piloto: la X de la ventana NO existe
-  // porque la WebviewWindow corre fullscreen sin decorations).
-  //
-  //   - Ctrl+Shift+K — atajo histórico, mantenido para no romper hábitos.
-  //   - Esc — combo de teclado más natural ("salir" universal).
-  //   - Tap-target visible (corner abajo-derecha, opacidad 30%) — el ÚNICO
-  //     que sirve si el operador clickeó otra ventana primero y la kiosko
-  //     perdió focus de teclado.
-  //
-  // Los tres abren el mismo KioskExitDialog (password gate intacto: un
-  // socio que toque la pantalla no debe poder salir, sólo affordance).
-  // Esc dentro del dialog cierra el dialog (handler default de Radix);
-  // sólo dispara open cuando NO hay dialog abierto.
+  // Salida del kiosko: ESC, Ctrl+Shift+K o el botón salen directo, sin
+  // password gate. Antes pedíamos contraseña porque la ventana corría
+  // fullscreen sin la X del OS — un socio podía tocar la pantalla y
+  // accidentalmente salir. Ahora la ventana tiene decoraciones nativas:
+  // si quieres bloquear la salida, el OS ya provee maximizar / cerrar
+  // con su propio chrome, y el password se vuelve fricción para el
+  // operador que SÍ quiere salir. Si en el futuro vuelve a hacer falta
+  // un modo "appliance bloqueado", se reintroduce con un toggle de
+  // settings explícito y no como default.
+  const exitKiosk = useCallback(async () => {
+    if (await isCurrentWindowKiosk()) {
+      await closeCurrentWindow();
+    } else {
+      navigate("/checkin");
+    }
+  }, [navigate]);
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setExitOpen(true);
+        void exitKiosk();
         return;
       }
-      if (e.key === "Escape" && !exitOpen) {
+      if (e.key === "Escape") {
         e.preventDefault();
-        setExitOpen(true);
+        void exitKiosk();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [exitOpen]);
+  }, [exitKiosk]);
 
   // Mensaje del idle priorizando el contexto: ambos métodos > solo huella
-  // > solo PIN > nada configurado (último caso es edge: gym sin operadores
-  // con PIN ni huella registrada — mejor un mensaje que un kiosko mudo).
+  // > solo número > nada configurado (último caso es edge: gym sin número
+  // ni huella registrada — mejor un mensaje que un kiosko mudo).
   const idleMessage =
-    fingerprintAvailable && pinAvailable
+    fingerprintAvailable && numberAvailable
       ? t.kiosk.waitingPin
       : fingerprintAvailable
       ? t.kiosk.waiting
-      : pinAvailable
+      : numberAvailable
       ? t.kiosk.waitingNoReader
       : t.kiosk.waitingNoReaderNoPin;
 
@@ -270,29 +271,29 @@ export default function KioskPage() {
         <div className="flex flex-col items-center gap-10 w-full max-w-3xl">
           <CheckinFeedback state={feedback} idleMessage={idleMessage} size="xl" />
 
-          {pinAvailable && feedback.kind === "idle" && (
+          {numberAvailable && feedback.kind === "idle" && (
             <div
               className={cn(
                 "w-full max-w-md space-y-3",
-                pinShake && "motion-safe:animate-kiosk-shake"
+                numberShake && "motion-safe:animate-kiosk-shake"
               )}
             >
-              <PinPad
-                value={pin}
+              <NumberPad
+                value={numberInput}
                 onChange={(v) => {
-                  setPin(v);
-                  if (pinError) setPinError(null);
+                  setNumberInput(v);
+                  if (numberError) setNumberError(null);
                 }}
-                onSubmit={submitPin}
-                disabled={checkinPin.isPending}
+                onSubmit={submitNumber}
+                disabled={checkinByNumber.isPending}
                 size="lg"
               />
-              {pinError && (
+              {numberError && (
                 <p
                   className="text-sm text-destructive text-center font-medium"
                   role="alert"
                 >
-                  {pinError}
+                  {numberError}
                 </p>
               )}
             </div>
@@ -329,7 +330,7 @@ export default function KioskPage() {
           <button
             type="button"
             aria-label={t.kiosk.exitButtonAriaLabel}
-            onClick={() => setExitOpen(true)}
+            onClick={() => void exitKiosk()}
             className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 opacity-30 transition-opacity hover:opacity-90 focus:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -337,22 +338,6 @@ export default function KioskPage() {
           </button>
         </div>
       </div>
-
-      <KioskExitDialog
-        open={exitOpen}
-        onOpenChange={setExitOpen}
-        onAuthorized={async () => {
-          // En producción, el kiosko vive en su propia WebviewWindow —
-          // cerrar la ventana lo saca del modo kiosko sin afectar la main.
-          // En el flujo legacy (navegación directa a /kiosk en la main),
-          // volvemos al checkin.
-          if (await isCurrentWindowKiosk()) {
-            await closeCurrentWindow();
-          } else {
-            navigate("/checkin");
-          }
-        }}
-      />
     </div>
   );
 }

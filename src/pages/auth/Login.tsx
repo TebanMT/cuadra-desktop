@@ -12,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PinPad } from "@/components/checkin/PinPad";
+import { NumberPad } from "@/components/checkin/NumberPad";
 import { useLoginPIN, useOperatorsForLogin, type OperatorForLogin } from "@/hooks/useAuth";
 import { ApiError, api } from "@/lib/api";
 import { auth } from "@/strings/auth";
@@ -241,12 +241,13 @@ export default function Login() {
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
-          <PinPad
+          <NumberPad
             value={pin}
             onChange={setPin}
             onSubmit={submitPin}
             disabled={loginPIN.isPending}
             size="lg"
+            ariaLabel="PIN"
           />
           <div className="text-center">
             <button

@@ -9,16 +9,21 @@ import BroadcastPage from "../messaging/BroadcastPage";
 
 // MensajesPage consolida tres surfaces de "comunicación con el socio":
 //   - WhatsApp del gym  (UC-037 — conectar número propio del gym)  [Plus]
-//   - Plantillas        (textos de comprobantes/recordatorios)     [Standard]
-//   - Envío al socio    (broadcast manual a grupos)                [Plus]
+//   - Plantillas        (recordatorios/comprobantes: on/off en Standard,
+//                         editar el TEXTO es Plus)
+//   - Envío al socio    (broadcast a grupos: Standard acotado, topes ↑ en Plus)
 //
-// Por qué Standard entra acá pese a que dos de los tres tabs son Plus:
-// los recordatorios automáticos + comprobantes se envían en Standard via
-// el sender maestro de Tinta (ADR-009 §2.1, notifications_controller.go
-// línea 53: "los recordatorios automáticos + comprobantes son Standard").
-// El dueño Standard tiene que poder editar esas plantillas — si no, lo
-// que sale firmado "Tinta: {gym}: ..." queda con el copy default sin
-// chance de personalizarlo.
+// Por qué la pestaña de Plantillas entra en Standard: los recordatorios +
+// comprobantes se envían en Standard via el sender maestro de Tinta, así que
+// el dueño debe poder ACTIVARLOS / DESACTIVARLOS.
+//
+// PERO el TEXTO no se edita en Standard: lo que sale por WhatsApp es la
+// plantilla que Meta aprobó (Twilio Content SID), no el body local — editarlo
+// no cambiaría el mensaje, sólo confundiría. Por eso el texto es read-only en
+// Standard y personalizarlo se desbloquea en Plus (número propio). Gate en
+// UpdateTemplate/UpdateOwnerAlert (BE) + readOnly en TemplatesPage/AlertsPage
+// (FE). Esto reemplaza el criterio viejo de ADR-009 §2.1, que asumía —cuando
+// no existían los Content SIDs— que el copy editado sí se enviaba.
 //
 // Mientras Plus no se vende ocultamos los tabs Plus enteros en lugar de
 // mostrarlos con badge "Próximamente". Cuando Plus se libere, revertir
@@ -32,7 +37,10 @@ import BroadcastPage from "../messaging/BroadcastPage";
 // los mismos componentes.
 type TabKey = "whatsapp" | "templates" | "broadcast";
 
-const PLUS_TABS = new Set<TabKey>(["whatsapp", "broadcast"]);
+// Sólo "whatsapp" (conectar número propio) es Plus. "broadcast" ahora entra en
+// Standard pero acotado (2 envíos/mes, 100 socios) — los topes los enforce el
+// backend por plan; ver BroadcastPage / broadcast.go.
+const PLUS_TABS = new Set<TabKey>(["whatsapp"]);
 
 function parseTab(raw: string | null, available: TabKey[]): TabKey {
   const requested = raw as TabKey;

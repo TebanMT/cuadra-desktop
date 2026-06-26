@@ -91,14 +91,15 @@ interface Props {
 }
 
 const MAX_PHOTO_BYTES = 2 * 1024 * 1024;
-const PHONE_DIGITS = /^\d{10}$/;
+// E.164 canónico (igual que el backend src/shared/phone): '+' + 10-15 dígitos.
+const PHONE_E164 = /^\+[1-9]\d{9,14}$/;
 
 const baseSchema = z.object({
   full_name: z.string().trim().min(3, t.form.errors.nameLength).max(100, t.form.errors.nameLength),
-  phone: z
-    .string()
-    .transform((s) => s.replace(/\D/g, "").slice(-10))
-    .refine((s) => PHONE_DIGITS.test(s), { message: t.form.errors.phoneInvalid }),
+  // `phone` ya llega en E.164 (formatE164 del PhoneInput, con código de país).
+  // Validamos ese formato directo en vez de recortar a 10 dígitos — recortar
+  // era MX-only y rechazaba números de otros países (nacional ≠ 10 dígitos).
+  phone: z.string().refine((s) => PHONE_E164.test(s), { message: t.form.errors.phoneInvalid }),
   email: z
     .string()
     .trim()

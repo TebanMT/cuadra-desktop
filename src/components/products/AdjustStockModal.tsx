@@ -213,6 +213,9 @@ export function AdjustStockModal({ product, open, onOpenChange }: Props) {
                     value={cost}
                     onChange={(e) => setCost(e.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    {t.adjustStock.costHint}
+                  </p>
                 </div>
               )}
             </div>

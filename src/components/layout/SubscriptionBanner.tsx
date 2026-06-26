@@ -1,21 +1,46 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, CreditCard, Hourglass } from "lucide-react";
+import {
+  AlertTriangle,
+  CreditCard,
+  Hourglass,
+  RefreshCw,
+  WifiOff,
+} from "lucide-react";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { bannerLevelFor, type SubscriptionBannerLevel } from "@/hooks/useSubscription";
+import {
+  bannerLevelFor,
+  calendarDaysUntil,
+  type SubscriptionBannerLevel,
+} from "@/hooks/useSubscription";
+import { useSyncStatus, useTriggerSync } from "@/hooks/useSyncStatus";
 import { cn } from "@/lib/utils";
 
 const TONE: Record<SubscriptionBannerLevel, { bg: string; text: string; icon: typeof AlertTriangle }> = {
   ok: { bg: "", text: "", icon: AlertTriangle },
+  // Aviso calmado durante el grueso de la prueba: informa sin alarmar, para
+  // que el operador no piense que Tinta es gratis.
+  trial_info: {
+    bg: "bg-muted/60 border-border",
+    text: "text-foreground",
+    icon: Hourglass,
+  },
   trial_soon: {
     bg: "bg-warning/10 border-warning/40",
     text: "text-warning-foreground",
     icon: Hourglass,
   },
+  // Prueba vencida confirmada: recordatorio suave permanente, no bloqueo.
   trial_over: {
-    bg: "bg-warning/15 border-warning/50",
+    bg: "bg-warning/10 border-warning/40",
     text: "text-warning-foreground",
-    icon: Hourglass,
+    icon: CreditCard,
+  },
+  // Prueba vencida sin sync reciente: neutro, no acusatorio. Pide sincronizar.
+  trial_unconfirmed: {
+    bg: "bg-muted/60 border-border",
+    text: "text-muted-foreground",
+    icon: WifiOff,
   },
   past_due: {
     bg: "bg-destructive/10 border-destructive/50",
@@ -29,26 +54,21 @@ const TONE: Record<SubscriptionBannerLevel, { bg: string; text: string; icon: ty
   },
 };
 
-function daysUntil(iso: string | null | undefined): number | null {
-  if (!iso) return null;
-  const end = new Date(iso);
-  if (Number.isNaN(end.getTime())) return null;
-  // Días calendario en TZ local — alineado con la fecha que muestra
-  // SubscriptionPage en la card "Tu prueba termina el ___".
-  const endMidnight = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
-  const now = new Date();
-  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-  return Math.round((endMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
-}
-
 function copyFor(level: SubscriptionBannerLevel, daysLeft: number | null): string {
   switch (level) {
+    case "trial_info":
+      if (daysLeft === null) return "Estás en la versión de prueba.";
+      return `Versión de prueba · te ${daysLeft === 1 ? "queda" : "quedan"} ${daysLeft} ${
+        daysLeft === 1 ? "día" : "días"
+      }. Activa tu plan cuando estés listo.`;
     case "trial_soon":
       if (daysLeft === null) return "Tu período de prueba está por terminar.";
       if (daysLeft <= 1) return "Tu período de prueba termina hoy.";
       return `Te quedan ${daysLeft} días de prueba. Activa tu plan para no perder acceso.`;
     case "trial_over":
-      return "Tu período de prueba terminó. Activa tu plan para seguir cobrando con Tinta.";
+      return "Tu período de prueba terminó. Activa tu plan para seguir con todo.";
+    case "trial_unconfirmed":
+      return "No pudimos confirmar tu plan. Conéctate a internet para sincronizar.";
     case "past_due":
       return "No pudimos cobrar tu mensualidad. Actualiza tu método de pago para evitar interrupciones.";
     case "cancelled":
@@ -60,14 +80,24 @@ function copyFor(level: SubscriptionBannerLevel, daysLeft: number | null): strin
 
 /**
  * Sticky banner at the very top of the dashboard. Shows nothing for
- * subscriptions in good standing; otherwise renders an actionable warning
- * that links to /settings/subscription.
+ * subscriptions in good standing; otherwise renders un aviso accionable.
  *
- * Source data is the cached gym from useAuthStore (no extra fetch). When the
- * settings page mutates the subscription, the gym is refreshed via /auth/me.
+ * NUNCA bloquea ni limita funcionalidad — eso lo decide el cloud
+ * (isSubscriptionBlocked). Este banner es puro aviso, alineado con el honor
+ * system: visibilidad, no candado.
+ *
+ * Fuentes de datos (ambas locales, funcionan offline):
+ *  - gym cacheado en useAuthStore (plan/status/trial_ends_at, refrescado por
+ *    /auth/me; se actualiza solo cuando el sync trae una suscripción nueva);
+ *  - last_synced_at de useSyncStatus, para decidir si una prueba vencida está
+ *    confirmada o si seguimos offline sin saber (caso "se suscribió en otra
+ *    laptop"). El estado se auto-corrige en cuanto sincroniza.
  */
 export function SubscriptionBanner() {
   const gym = useAuthStore((s) => s.gym);
+  const { data: sync } = useSyncStatus();
+  const trigger = useTriggerSync();
+
   const level = useMemo<SubscriptionBannerLevel>(
     () =>
       bannerLevelFor({
@@ -75,15 +105,16 @@ export function SubscriptionBanner() {
         subscription_status: gym?.subscription_status,
         trial_ends_at: gym?.trial_ends_at,
         period_ends_at: gym?.subscription_ends_at,
+        last_synced_at: sync?.last_synced_at,
       }),
-    [gym]
+    [gym, sync?.last_synced_at]
   );
 
   if (level === "ok" || !gym) return null;
 
   const daysLeft =
-    level === "trial_soon" || level === "trial_over"
-      ? daysUntil(gym.trial_ends_at)
+    level === "trial_info" || level === "trial_soon"
+      ? calendarDaysUntil(gym.trial_ends_at)
       : null;
   const copy = copyFor(level, daysLeft);
   const tone = TONE[level];
@@ -102,12 +133,25 @@ export function SubscriptionBanner() {
         <Icon className="h-4 w-4 shrink-0" />
         <span className="truncate">{copy}</span>
       </div>
-      <Link
-        to="/settings/subscription"
-        className="text-sm font-semibold underline underline-offset-2 hover:no-underline whitespace-nowrap"
-      >
-        Ver plan
-      </Link>
+      {level === "trial_unconfirmed" ? (
+        // La acción que de verdad resuelve la duda: sincronizar. Si ya pagó en
+        // otra laptop, el sync trae el plan nuevo y el banner desaparece.
+        <button
+          onClick={() => trigger.mutate()}
+          disabled={trigger.isPending}
+          className="flex items-center gap-1 text-sm font-semibold underline underline-offset-2 hover:no-underline whitespace-nowrap disabled:opacity-50"
+        >
+          <RefreshCw className={cn("h-3.5 w-3.5", trigger.isPending && "animate-spin")} />
+          Sincronizar
+        </button>
+      ) : (
+        <Link
+          to="/settings/subscription"
+          className="text-sm font-semibold underline underline-offset-2 hover:no-underline whitespace-nowrap"
+        >
+          Ver plan
+        </Link>
+      )}
     </div>
   );
 }

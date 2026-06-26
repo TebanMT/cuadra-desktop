@@ -522,7 +522,7 @@ function MemberRow({ item, onClick }: MemberRowProps) {
         >
           {m.phone && (
             <a
-              href={`https://wa.me/${m.phone.replace(/[^0-9+]/g, "")}`}
+              href={`https://wa.me/${m.phone.replace(/[^0-9]/g, "")}`}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-success/10 hover:text-success transition-colors"

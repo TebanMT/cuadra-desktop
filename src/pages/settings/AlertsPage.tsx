@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Loader2, RotateCcw } from "lucide-react";
+import { Loader2, Lock, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
@@ -18,7 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useAlerts, useUpdateAlert, type AlertConfig, type AlertKey } from "@/hooks/useNotifications";
+import { useAlerts, useUpdateAlert, useWhatsappState, type AlertConfig, type AlertKey } from "@/hooks/useNotifications";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { ApiError } from "@/lib/api";
 import { settings as t } from "@/strings/settings";
@@ -89,6 +89,14 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
   const [body, setBody] = useState(cfg.body);
   const [bodyError, setBodyError] = useState<string | null>(null);
   const [confirmReset, setConfirmReset] = useState(false);
+
+  // El texto sólo se edita cuando el gym usa su PROPIO número de WhatsApp
+  // (Plus + conectado). Si sale por el maestro de Tinta, llega la plantilla
+  // aprobada por Meta — read-only mostrando el default. El switch on/off SÍ
+  // funciona. Espeja el gate del BE (UsesOwnWhatsAppNumber).
+  const whatsapp = useWhatsappState();
+  const canEditText = whatsapp.data?.status === "connected";
+  const effectiveBody = canEditText ? body : cfg.default_body;
 
   // Sincroniza el textarea cuando el server devuelve un valor nuevo (e.g.
   // después de un Restaurar o un guardado optimista resuelto). Si no, el
@@ -204,43 +212,57 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
               <Textarea
                 id={`alert-body-${cfg.key}`}
                 rows={4}
-                value={body}
+                value={effectiveBody}
                 onChange={(e) => setBody(e.target.value)}
-                className="font-mono text-sm"
+                readOnly={!canEditText}
+                className={
+                  "font-mono text-sm" +
+                  (!canEditText ? " opacity-70 cursor-not-allowed bg-muted/40" : "")
+                }
               />
+              {!canEditText && (
+                <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                  <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                  <span>{editor.plusOnlyBody}</span>
+                </p>
+              )}
               <div className="rounded-md border bg-muted/30 px-3 py-2">
                 <p className="text-xs text-muted-foreground mb-1">
                   {editor.previewLabel}
                 </p>
                 <p className="text-sm whitespace-pre-wrap">
-                  {renderPreview(body, sample)}
+                  {renderPreview(effectiveBody, sample)}
                 </p>
                 <p className="text-[10px] text-muted-foreground mt-2">
                   {editor.previewHint}
                 </p>
               </div>
-              <div className="flex justify-between pt-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground"
-                  onClick={() => setConfirmReset(true)}
-                  disabled={!customized || update.isPending}
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  {editor.reset}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={saveBody}
-                  disabled={!dirty || update.isPending}
-                >
-                  {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {update.isPending ? editor.saving : editor.save}
-                </Button>
-              </div>
+              {/* Editar el texto es Plus — en Standard sólo el switch on/off
+                  (arriba, que autoguarda). Sin Plus no hay fila de guardar. */}
+              {canEditText && (
+                <div className="flex justify-between pt-1">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={() => setConfirmReset(true)}
+                    disabled={!customized || update.isPending}
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                    {editor.reset}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={saveBody}
+                    disabled={!dirty || update.isPending}
+                  >
+                    {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {update.isPending ? editor.saving : editor.save}
+                  </Button>
+                </div>
+              )}
             </div>
 
             <div className="rounded-md border bg-muted/30 px-3 py-3 self-start">
@@ -250,13 +272,17 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
               <ul className="space-y-1 text-sm font-mono">
                 {variables.map((v) => (
                   <li key={v}>
-                    <button
-                      type="button"
-                      className="text-primary hover:underline"
-                      onClick={() => insertVariable(v)}
-                    >
-                      {v}
-                    </button>
+                    {canEditText ? (
+                      <button
+                        type="button"
+                        className="text-primary hover:underline"
+                        onClick={() => insertVariable(v)}
+                      >
+                        {v}
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">{v}</span>
+                    )}
                   </li>
                 ))}
               </ul>

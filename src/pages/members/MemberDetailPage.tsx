@@ -59,7 +59,7 @@ import { checkin as ct } from "@/strings/checkin";
 import { MemberEditDialog } from "@/components/members/MemberEditDialog";
 import { MemberStatusModal } from "@/components/members/MemberStatusModal";
 import { LockExpiryModal } from "@/components/members/LockExpiryModal";
-import { AssignPinModal } from "@/components/members/AssignPinModal";
+import { AssignMemberNumberModal } from "@/components/members/AssignMemberNumberModal";
 import { RegisterFingerprintModal } from "@/components/members/RegisterFingerprintModal";
 import { PaymentModal } from "@/components/billing/PaymentModal";
 import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
@@ -86,7 +86,7 @@ export default function MemberDetailPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [lockOpen, setLockOpen] = useState(false);
-  const [pinOpen, setPinOpen] = useState(false);
+  const [numberOpen, setNumberOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
   const [fpOpen, setFpOpen] = useState(false);
@@ -160,7 +160,7 @@ export default function MemberDetailPage() {
   // Hotkeys: las desactivamos mientras algún sub-modal está abierto
   // para no interceptar teclas dentro de los inputs del modal.
   const anyModalOpen =
-    editOpen || statusOpen || lockOpen || pinOpen || payOpen || settleOpen || fpOpen;
+    editOpen || statusOpen || lockOpen || numberOpen || payOpen || settleOpen || fpOpen;
 
   const hotkeyHandlers = useMemo(
     () => ({
@@ -253,7 +253,7 @@ export default function MemberDetailPage() {
                 <span aria-hidden>·</span>
                 <span>{t.detail.createdAt(fmtDate(member.created_at))}</span>
                 <span aria-hidden>·</span>
-                <PinInline pin={member.pin} onChange={() => setPinOpen(true)} />
+                <NumberInline number={member.member_number} onChange={() => setNumberOpen(true)} />
               </div>
             </div>
           </div>
@@ -414,10 +414,10 @@ export default function MemberDetailPage() {
           </TabsContent>
         </Tabs>
 
-        {/* Acción secundaria de huella. El "Cambiar PIN" se gestiona
-            inline desde la metadata strip (junto al PIN), así esta fila
-            solo aparece cuando hay lector conectado — y desaparece por
-            completo en gyms sin huella. */}
+        {/* Acción secundaria de huella. El "Cambiar número de socio" se
+            gestiona inline desde la metadata strip (junto al número), así
+            esta fila solo aparece cuando hay lector conectado — y desaparece
+            por completo en gyms sin huella. */}
         {fingerprintAvailable && (
           <div className="border-t pt-4 flex flex-wrap gap-2">
             <Button
@@ -493,12 +493,12 @@ export default function MemberDetailPage() {
           onOpenChange={setLockOpen}
         />
       )}
-      <AssignPinModal
+      <AssignMemberNumberModal
         memberId={member.id}
         memberName={member.full_name}
-        initialPin={member.pin}
-        open={pinOpen}
-        onOpenChange={setPinOpen}
+        initialNumber={member.member_number}
+        open={numberOpen}
+        onOpenChange={setNumberOpen}
       />
       <RegisterFingerprintModal
         memberId={member.id}
@@ -525,24 +525,24 @@ export default function MemberDetailPage() {
   );
 }
 
-// PinInline — el PIN como una pieza más de metadata, junto al folio /
-// fecha de inscripción. Dos affordances inline para evitar competir con
-// las acciones principales del header:
-//   - Click en la "píldora" del PIN  → copia al portapapeles.
-//   - Click en "Cambiar"             → abre el modal de regeneración.
-// Si el socio no tiene PIN (caso histórico pre-auto-assign), la píldora
-// degenera en un link "Asignar PIN" que abre el mismo modal.
-function PinInline({ pin, onChange }: { pin?: string; onChange(): void }) {
+// NumberInline — el NÚMERO DE SOCIO (ADR-010) como una pieza más de metadata,
+// junto al folio / fecha de inscripción. Dos affordances inline para evitar
+// competir con las acciones principales del header:
+//   - Click en la "píldora" del número → copia al portapapeles.
+//   - Click en "Cambiar"               → abre el modal de regeneración.
+// Si el socio no tiene número (caso histórico pre-auto-assign), la píldora
+// degenera en un link "Asignar número de socio" que abre el mismo modal.
+function NumberInline({ number, onChange }: { number?: number; onChange(): void }) {
   async function copy() {
-    if (!pin) return;
+    if (number == null) return;
     try {
-      await navigator.clipboard.writeText(pin);
-      toast.success(t.pin.copied);
+      await navigator.clipboard.writeText(String(number));
+      toast.success(t.memberNumber.copied);
     } catch {
-      // silencioso — el operador puede leer el dígito y escribirlo.
+      // silencioso — el operador puede leer el número y escribirlo.
     }
   }
-  if (!pin) {
+  if (number == null) {
     return (
       <button
         type="button"
@@ -550,7 +550,7 @@ function PinInline({ pin, onChange }: { pin?: string; onChange(): void }) {
         className="inline-flex items-center gap-1 rounded px-1 -mx-1 hover:bg-muted/60 focus:outline-none focus:ring-1 focus:ring-ring underline-offset-2 hover:underline"
       >
         <KeyRound className="h-3 w-3" />
-        <span>{t.pin.profileAssign}</span>
+        <span>{t.memberNumber.profileAssign}</span>
       </button>
     );
   }
@@ -560,11 +560,11 @@ function PinInline({ pin, onChange }: { pin?: string; onChange(): void }) {
         type="button"
         onClick={copy}
         className="inline-flex items-center gap-1 rounded px-1 -mx-1 hover:bg-muted/60 focus:outline-none focus:ring-1 focus:ring-ring"
-        aria-label={`${t.pin.profileLabel} ${pin} · ${t.pin.profileCopy}`}
+        aria-label={`${t.memberNumber.profileLabel} ${number} · ${t.memberNumber.profileCopy}`}
       >
         <KeyRound className="h-3 w-3" />
-        <span>{t.pin.profileLabel}</span>{" "}
-        <span className="font-medium tabular-nums tracking-wider text-foreground">{pin}</span>
+        <span>{t.memberNumber.profileLabel}</span>{" "}
+        <span className="font-medium tabular-nums tracking-wider text-foreground">{number}</span>
         <Copy className="h-3 w-3 opacity-60" />
       </button>
       <button
@@ -572,7 +572,7 @@ function PinInline({ pin, onChange }: { pin?: string; onChange(): void }) {
         onClick={onChange}
         className="underline-offset-2 hover:underline hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring rounded"
       >
-        {t.pin.triggerChange}
+        {t.memberNumber.triggerChange}
       </button>
     </span>
   );
@@ -629,11 +629,11 @@ function AttendanceRow({ ev }: { ev: CheckinEvent }) {
   const methodLabel =
     ev.method === "fingerprint"
       ? t.detail.tabs.attendanceMethod.fingerprint
-      : ev.method === "pin"
-      ? t.detail.tabs.attendanceMethod.pin
+      : ev.method === "number"
+      ? t.detail.tabs.attendanceMethod.number
       : t.detail.tabs.attendanceMethod.manual;
   const MethodIcon =
-    ev.method === "fingerprint" ? Fingerprint : ev.method === "pin" ? KeyRound : SearchIcon;
+    ev.method === "fingerprint" ? Fingerprint : ev.method === "number" ? KeyRound : SearchIcon;
   const when = parseISO(ev.created_at);
   return (
     <li className="flex items-center gap-3 py-3">

@@ -38,10 +38,18 @@ on:
       tag:
         description: "Versión a publicar (ej. 1.0.0). Vacío usa tauri.conf.json."
         required: false
+      core_ref:
+        description: "Ref de cuadra-core a bundlear (tag/branch/SHA). Vacío usa TINTA_CORE_REF."
+        required: false
 
 env:
   TINTA_CORE_REPO: TebanMT/cuadra-core
-  TINTA_CORE_REF: main
+  # Ref de cuadra-core (sidecar) a bundlear por DEFAULT. Para un release de
+  # prod REPRODUCIBLE, fija acá un tag de core (ej. v1.0.0) antes de taggear
+  # el desktop, o pásalo en el input core_ref del workflow_dispatch. "main" =
+  # siempre el último commit (cómodo, pero NO reproducible). El SHA exacto
+  # que se bundlee queda registrado en el log del step "Checkout tinta-core".
+  TINTA_CORE_REF: v1.0.0
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
@@ -69,7 +77,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.TINTA_CORE_REPO }}
-          ref: ${{ env.TINTA_CORE_REF }}
+          ref: ${{ inputs.core_ref || env.TINTA_CORE_REF }}
           path: tinta-core
           token: ${{ secrets.TINTA_CORE_TOKEN }}
 
@@ -242,7 +250,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: ${{ env.TINTA_CORE_REPO }}
-          ref: ${{ env.TINTA_CORE_REF }}
+          ref: ${{ inputs.core_ref || env.TINTA_CORE_REF }}
           path: tinta-core
           token: ${{ secrets.TINTA_CORE_TOKEN }}
 

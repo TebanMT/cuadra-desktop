@@ -26,6 +26,11 @@ export interface Product {
   active: boolean;
   created_at: string;
   updated_at?: string;
+  // Costo unitario promedio ponderado (pesos), o ausente cuando el
+  // producto no tiene costo capturado. Lo usa la ficha para "Costo prom ·
+  // Precio · Margen". Opcional a propósito: el costo es opcional al
+  // crear/resurtir.
+  avg_unit_cost?: number | null;
 }
 
 export type ProductStatusFilter = "active" | "inactive" | "all";
@@ -58,6 +63,15 @@ export interface ProductListResponse {
     total_value: number;
     low_count: number;
     out_count: number;
+    // Ganancia potencial sobre el stock (Standard). Montos en pesos, solo
+    // activos con costo capturado. margin_pct es null cuando ninguno tiene
+    // costo (el FE oculta el chip). products_with_cost/products_total es la
+    // cobertura para el hint "X de Y con costo".
+    potential_profit: number;
+    cost_value: number;
+    margin_pct?: number | null;
+    products_total: number;
+    products_with_cost: number;
   };
 }
 
@@ -176,11 +190,42 @@ export function useReactivateProduct() {
   });
 }
 
+// El backend (adjustStockReq en product_controller.go) espera el enum
+// canónico de stock_movement {restock, shrinkage, count_correction} con los
+// campos `quantity` + `reason`. La UI usa su propio vocabulario (restock/
+// damage/count con `new_stock`/`notes`); traducimos aquí, en la frontera del
+// wire, para no romper la pantalla. Antes el FE mandaba `damage`/`count` +
+// `new_stock`/`notes` directo → el backend rechazaba con 400 (merma y conteo
+// quedaban rotos de extremo a extremo). Para count_correction, `quantity` es
+// el stock absoluto resultante (el backend hace SetStock, no suma).
+interface AdjustStockWire {
+  movement_type: "restock" | "shrinkage" | "count_correction";
+  quantity: number;
+  cost?: number;
+  reason?: string;
+}
+
+function toAdjustStockWire(input: AdjustStockInput): AdjustStockWire {
+  if (input.movement_type === "count") {
+    return {
+      movement_type: "count_correction",
+      quantity: input.new_stock ?? 0,
+      reason: input.notes,
+    };
+  }
+  return {
+    movement_type: input.movement_type === "damage" ? "shrinkage" : "restock",
+    quantity: input.quantity ?? 0,
+    cost: input.cost,
+    reason: input.notes,
+  };
+}
+
 export function useAdjustStock(productId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: AdjustStockInput) =>
-      api.post<Product>(`/api/v1/products/${productId}/adjust-stock`, input),
+      api.post<Product>(`/api/v1/products/${productId}/adjust-stock`, toAdjustStockWire(input)),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
   });
 }

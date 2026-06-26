@@ -179,9 +179,14 @@ export default function QuickSalePage() {
   const grouped = useMemo(() => {
     const map = new Map<string, Product[]>();
     for (const p of filtered) {
-      const arr = map.get(p.category) ?? [];
+      // El backend omite `category` cuando es null (omitempty), así que
+      // puede llegar undefined aunque el tipo diga string. Agrupamos esos
+      // bajo "Sin categoría" — sin el fallback, la key undefined rompía el
+      // .sort (undefined.localeCompare) y dejaba un encabezado vacío.
+      const category = p.category || t.page.uncategorized;
+      const arr = map.get(category) ?? [];
       arr.push(p);
-      map.set(p.category, arr);
+      map.set(category, arr);
     }
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b, "es"))

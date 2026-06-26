@@ -119,29 +119,74 @@ export function useExtendTrial() {
 // del desktop).
 
 /**
- * Effective access banner level — the FE uses this to decide whether to show
- * the orange "trial expirando" banner, the red "past_due" banner, or nothing.
+ * Effective access banner level — el FE lo usa para decidir qué banner pintar
+ * en el desktop. NUNCA implica bloqueo (eso lo decide el cloud, ver
+ * isSubscriptionBlocked en useAuthStore); es puro aviso.
  *
  * Returns one of:
- *  - "ok"           → no banner
- *  - "trial_soon"   → banner: "te quedan N días de prueba"
- *  - "trial_over"   → banner: "el período de prueba terminó"
- *  - "past_due"     → banner: "no pudimos cobrar tu mensualidad"
- *  - "cancelled"    → banner: "tu suscripción fue cancelada"
+ *  - "ok"                → sin banner (plan pagado, o trial sin fecha)
+ *  - "trial_info"        → en prueba con margen (>7 días): aviso calmado, para
+ *                          que el operador no piense que Tinta es gratis
+ *  - "trial_soon"        → en prueba, última semana (≤7 días): ámbar
+ *  - "trial_over"        → prueba vencida Y confirmada por un sync reciente:
+ *                          recordatorio suave permanente (sin bloqueo)
+ *  - "trial_unconfirmed" → prueba vencida pero sin sync reciente: NO afirmamos
+ *                          impago (el dueño pudo suscribirse en otra laptop
+ *                          mientras este sidecar estaba offline) — mensaje
+ *                          neutro que pide sincronizar y se auto-corrige
+ *  - "past_due"          → no pudimos cobrar la mensualidad
+ *  - "cancelled"         → suscripción cancelada
  */
 export type SubscriptionBannerLevel =
   | "ok"
+  | "trial_info"
   | "trial_soon"
   | "trial_over"
+  | "trial_unconfirmed"
   | "past_due"
   | "cancelled";
 
-export function bannerLevelFor(detail: {
-  subscription_plan?: string;
-  subscription_status?: SubscriptionStatus;
-  trial_ends_at?: string | null;
-  period_ends_at?: string | null;
-}): SubscriptionBannerLevel {
+// Ventana de confianza del sync para una prueba vencida. Si sincronizamos
+// dentro de este margen, el "sigue en trial" del cloud es de fiar — el cloud
+// es la única fuente de verdad entre todas las laptops del gym, así que un
+// sync reciente que aún ve trial significa que de verdad no han pagado. Si
+// llevamos más tiempo offline, el dueño pudo suscribirse en otro lado y este
+// sidecar no se ha enterado → no acusamos impago, pedimos sincronizar.
+export const TRIAL_SYNC_TRUST_MS = 48 * 60 * 60 * 1000; // 48h
+
+/** Días calendario (TZ local) hasta `iso`. Coherente con SubscriptionPage. */
+export function calendarDaysUntil(
+  iso: string | null | undefined,
+  nowMs: number = Date.now()
+): number | null {
+  if (!iso) return null;
+  const end = new Date(iso);
+  if (Number.isNaN(end.getTime())) return null;
+  const endMidnight = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
+  const now = new Date(nowMs);
+  const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return Math.round((endMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
+}
+
+function syncedRecently(iso: string | null | undefined, nowMs: number): boolean {
+  if (!iso) return false;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return false;
+  return nowMs - t <= TRIAL_SYNC_TRUST_MS;
+}
+
+export function bannerLevelFor(
+  detail: {
+    subscription_plan?: string;
+    subscription_status?: SubscriptionStatus;
+    trial_ends_at?: string | null;
+    period_ends_at?: string | null;
+    // Última sincronización exitosa (de useSyncStatus). Decide si una prueba
+    // vencida está confirmada o si seguimos offline sin saber.
+    last_synced_at?: string | null;
+  },
+  nowMs: number = Date.now()
+): SubscriptionBannerLevel {
   const status = detail.subscription_status ?? "active";
   if (status === "past_due") return "past_due";
   if (status === "cancelled") return "cancelled";
@@ -149,14 +194,18 @@ export function bannerLevelFor(detail: {
     if (!detail.trial_ends_at) return "ok";
     const end = new Date(detail.trial_ends_at);
     if (Number.isNaN(end.getTime())) return "ok";
-    if (end.getTime() < Date.now()) return "trial_over";
-    // Días calendario en TZ local, no diff de ms. Coherente con la fecha
-    // que pinta SubscriptionPage en la card "Tu prueba termina el ___".
-    const endMidnight = new Date(end.getFullYear(), end.getMonth(), end.getDate()).getTime();
-    const now = new Date();
-    const nowMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const days = Math.round((endMidnight - nowMidnight) / (1000 * 60 * 60 * 24));
-    if (days <= 7) return "trial_soon";
+    if (end.getTime() < nowMs) {
+      // Prueba vencida localmente. NUNCA bloqueamos (eso es decisión del
+      // cloud). Sólo afirmamos "terminó" si un sync reciente lo confirma; si
+      // llevamos rato offline, mensaje neutro que pide sincronizar.
+      return syncedRecently(detail.last_synced_at, nowMs)
+        ? "trial_over"
+        : "trial_unconfirmed";
+    }
+    // En prueba todavía: avisamos SIEMPRE (no sólo la última semana), calmado
+    // de inicio y escalando a ámbar en los últimos 7 días.
+    const days = calendarDaysUntil(detail.trial_ends_at, nowMs) ?? 0;
+    return days <= 7 ? "trial_soon" : "trial_info";
   }
   return "ok";
 }

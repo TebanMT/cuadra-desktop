@@ -349,6 +349,9 @@ export const settings = {
     disabled: "Desactivada",
     customized: "Personalizada",
     isDefault: "Texto por defecto",
+    textFixed: "Texto fijo · personalizar requiere tu propio número",
+    toggleSaved: "Listo.",
+    toggleError: "No pudimos guardar el cambio.",
     // Llaves exactas del BE (cuadra-core/.../template.go DefaultLibrary).
     // Cualquier llave nueva en BE necesita su entry acá o el row caerá al
     // fallback "humanizado" en TemplateRow. NO renombrar las keys — son el
@@ -406,6 +409,8 @@ export const settings = {
     modal: {
       title: (name: string) => name,
       bodyLabel: "Mensaje",
+      plusOnlyBody:
+        "Se envía la plantilla aprobada por WhatsApp, así que el texto no se puede cambiar. Para personalizarlo necesitas conectar tu propio número de WhatsApp (Plus).",
       previewLabel: "Vista previa",
       previewHint: "Las variables se reemplazan con datos de ejemplo.",
       variablesLabel: "Variables disponibles",
@@ -440,6 +445,8 @@ export const settings = {
     editor: {
       enabledLabel: "Recibir esta alerta",
       bodyLabel: "Mensaje que recibes",
+      plusOnlyBody:
+        "Se envía la plantilla aprobada por WhatsApp, así que el texto no se puede cambiar. Para personalizarlo necesitas conectar tu propio número de WhatsApp (Plus).",
       previewLabel: "Vista previa",
       previewHint: "Las variables se reemplazan con datos de ejemplo.",
       variablesLabel: "Variables disponibles",

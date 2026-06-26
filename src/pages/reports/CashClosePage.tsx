@@ -133,14 +133,16 @@ function ReportView({
   const empty =
     totalGross === 0 && refundsTotal === 0 && expensesTotal === 0;
 
-  // Efectivo que debería quedar en el cajón al cerrar: cash entrante del
-  // día menos gastos pagados en efectivo. Refunds en cash ya están fuera
-  // del by_method (el BE las excluye), pero los gastos sí salen físicamente
-  // del cajón, así que los restamos acá también para que la "calculated
-  // cash" del modal coincida con lo que el BE persistirá.
+  // Efectivo que debería quedar en el cajón al cerrar: cash entrante del día
+  // menos gastos en efectivo menos reembolsos en efectivo. Los refunds cash
+  // están fuera de by_method (el BE los excluye) pero SÍ sacan dinero físico
+  // del cajón — antes no se restaban y el corte marcaba un faltante fantasma
+  // (y disparaba falsa alerta al dueño). Debe coincidir con el calculated del
+  // BE. refund_by_method viene en magnitud positiva.
   const cashIncome = report.by_method?.cash ?? 0;
   const cashExpenses = report.expenses_by_method?.cash ?? 0;
-  const calculatedCash = cashIncome - cashExpenses;
+  const cashRefunds = report.refund_by_method?.cash ?? 0;
+  const calculatedCash = cashIncome - cashExpenses - cashRefunds;
 
   return (
     <div className="space-y-6">

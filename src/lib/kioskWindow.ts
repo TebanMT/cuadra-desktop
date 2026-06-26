@@ -29,17 +29,19 @@ export async function openKioskWindow(): Promise<void> {
     await existing.setFocus();
     return;
   }
-  // En dev queremos las decoraciones (la X) para cerrar la ventana sin
-  // tener que escribir password — facilita iterar. En producción el
-  // kiosko es fullscreen sin chrome.
-  const isDev = import.meta.env.DEV;
+  // Ventana del kiosko: maximizada pero NO fullscreen — así respeta la
+  // barra del OS (taskbar Windows / dock+menu macOS) y el operador puede
+  // minimizar/cerrar con la X estándar. Decoraciones ON siempre. Resizable
+  // ON para que el operador pueda moverla a un segundo monitor o ajustar
+  // tamaño según el espacio del mostrador. Nada de modo "appliance
+  // bloqueado" hasta que tengamos un caso de uso real que lo justifique.
   new WebviewWindow(KIOSK_WINDOW_LABEL, {
     url: "/kiosk",
     title: "Tinta · Kiosko",
-    fullscreen: !isDev,
-    maximized: isDev,
-    resizable: false,
-    decorations: isDev,
+    fullscreen: false,
+    maximized: true,
+    resizable: true,
+    decorations: true,
     skipTaskbar: false,
     alwaysOnTop: false,
     focus: true,

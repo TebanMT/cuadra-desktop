@@ -10,6 +10,7 @@ import {
   CircleDollarSign,
   Maximize2,
   TrendingDown,
+  TrendingUp,
   Users,
   X,
 } from "lucide-react";
@@ -214,10 +215,10 @@ function DashboardContent({
 
   return (
     <>
-      {/* KPI Grid — 5 tiles: en pantallas medianas wrappea a 2 filas (3+2);
-          en lg+ entran en una sola fila de 5. El de Egresos vive al lado
-          de Ingresos para que el dueño los lea en pareja. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+      {/* KPI Grid — 6 tiles: en pantallas medianas wrappea; en lg+ entran
+          en una sola fila de 6. El trío financiero (Ingresos · Egresos ·
+          Ganancia) va junto para que el dueño lea "entró / salió / gané". */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <StatCard
           title={t.kpis.activeMembers}
           value={data.active_members.value.toLocaleString("es-MX")}
@@ -248,6 +249,35 @@ function DashboardContent({
             !hideAmounts && data.expenses_month.delta_pct !== null
               ? t.kpis.vsLastPeriod
               : t.kpis.expensesHint
+          }
+        />
+        {/* Utilidad de productos del mes (revenue − COGS de ventas no
+            reembolsadas). El chip muestra el MARGEN sobre ventas
+            (utilidad/ingreso × 100, 2 decimales), no una tendencia. El hint
+            lleva la cobertura cuando faltan costos; respeta el ojo de
+            visibilidad de dinero. */}
+        <StatCard
+          title={t.kpis.gananciaMes}
+          value={maskMoney(fmtMoney(data.realized_profit_month.value))}
+          icon={TrendingUp}
+          tone="success"
+          delta={
+            hideAmounts || data.realized_profit_margin_pct == null
+              ? null
+              : `${data.realized_profit_margin_pct.toFixed(2)}%`
+          }
+          hint={
+            hideAmounts
+              ? undefined
+              : data.realized_profit_coverage.items_with_cost <
+                  data.realized_profit_coverage.items_total
+                ? t.kpis.coverage(
+                    data.realized_profit_coverage.items_with_cost,
+                    data.realized_profit_coverage.items_total
+                  )
+                : data.realized_profit_margin_pct != null
+                  ? t.kpis.marginLabel
+                  : undefined
           }
         />
         <StatCard

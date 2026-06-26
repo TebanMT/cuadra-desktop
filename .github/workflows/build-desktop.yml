@@ -36,6 +36,9 @@ on:
       version:
         description: "Version override (defaults to tauri.conf.json)"
         required: false
+      core_ref:
+        description: "Ref de cuadra-core a bundlear (tag/branch/SHA). Vacío usa TINTA_CORE_REF."
+        required: false
 
 # Si la repo está organizada como monorepo con tinta-core en otro repo,
 # hay que clonar ambos. Asumimos que tinta-desktop tiene los repos como
@@ -44,7 +47,11 @@ on:
 
 env:
   TINTA_CORE_REPO: TebanMT/cuadra-core
-  TINTA_CORE_REF: main
+  # Ref de cuadra-core (sidecar) por DEFAULT. Para un build reproducible fija
+  # acá un tag de core (ej. v1.0.0) antes de taggear, o pásalo en el input
+  # core_ref. "main" = último commit (no reproducible). El SHA bundleado queda
+  # en el log del step "Checkout tinta-core".
+  TINTA_CORE_REF: v1.0.0
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
@@ -79,7 +86,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.TINTA_CORE_REPO }}
-          ref: ${{ env.TINTA_CORE_REF }}
+          ref: ${{ inputs.core_ref || env.TINTA_CORE_REF }}
           path: tinta-core
           token: ${{ secrets.TINTA_CORE_TOKEN }}
 
@@ -198,7 +205,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: ${{ env.TINTA_CORE_REPO }}
-          ref: ${{ env.TINTA_CORE_REF }}
+          ref: ${{ inputs.core_ref || env.TINTA_CORE_REF }}
           path: tinta-core
           token: ${{ secrets.TINTA_CORE_TOKEN }}
 

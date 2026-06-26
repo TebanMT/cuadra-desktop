@@ -29,11 +29,11 @@ export interface Member {
   status: MemberStatus;
   enrollment_paid: boolean;
   last_maintenance_paid?: string;
-  has_pin: boolean;
+  has_member_number: boolean;
   has_fingerprint: boolean;
-  // PIN de 4 dígitos visible en el perfil. Vacío sólo en sócios viejos
-  // (pre-auto-assign) o cuando la generación falló al inscribir.
-  pin?: string;
+  // member_number: número de socio público (ADR-010), entero. Ausente sólo
+  // en socios viejos (pre-auto-assign) o si la generación falló.
+  member_number?: number;
   last_contact_attempt_at?: string;
   // gender es opcional. null = no se capturó (estado por default para
   // socios pre-feature); en otro caso un valor del enum. Se manda al BE
@@ -115,7 +115,7 @@ export interface CreateMemberInput {
   };
 }
 
-export interface PinDispatch {
+export interface Dispatch {
   dispatched: boolean;
   skipped_reason?: string;
   recipient_phone?: string;
@@ -129,13 +129,13 @@ export interface CreateMemberResponse {
   expiry_date?: string;
   membership_status: MembershipStatus;
   pending_first_payment: boolean;
-  // PIN de 4 dígitos auto-asignado al inscribir. Lo enseñamos al
+  // Número de socio auto-asignado al inscribir (ADR-010). Lo enseñamos al
   // operador en el éxito para que lo escriba en la credencial.
-  pin?: string;
+  member_number?: number;
   // Estado del envío automático por WhatsApp. Si dispatched=true el FE
   // muestra "enviado a {recipient_phone}"; si false, copia "escríbelo
   // en la credencial".
-  pin_dispatch?: PinDispatch;
+  dispatch?: Dispatch;
   // Datos del primer pago + promo aplicada (vacíos si no hubo cobro).
   payment_id?: string;
   payment_folio?: string;
@@ -178,10 +178,10 @@ export interface LockExpiryResponse {
   days_added: number;
 }
 
-export interface AssignPinResponse {
+export interface AssignMemberNumberResponse {
   member_id: string;
-  pin: string;
-  pin_dispatch?: PinDispatch;
+  member_number: number;
+  dispatch?: Dispatch;
 }
 
 const KEYS = {
@@ -296,10 +296,10 @@ export function useLockExpiry(membershipID: string) {
   });
 }
 
-export function useAssignPin(memberID: string) {
+export function useAssignMemberNumber(memberID: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api.post<AssignPinResponse>(`/api/v1/members/${memberID}/pin`, {}),
+    mutationFn: () => api.post<AssignMemberNumberResponse>(`/api/v1/members/${memberID}/number`, {}),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEYS.detail(memberID) });
     },

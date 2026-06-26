@@ -33,7 +33,7 @@ const { mockGet } = vi.hoisted(() => ({
             phone: "4421234567",
             status: "active",
             enrollment_paid: true,
-            has_pin: false,
+            has_member_number: false,
             created_at: "2026-03-01T00:00:00Z",
           },
           current_membership: {

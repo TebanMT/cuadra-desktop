@@ -1,4 +1,4 @@
-import { open as openExternal } from "@tauri-apps/plugin-shell";
+import { openExternalUrl } from "@/lib/openExternal";
 import { toast } from "sonner";
 import {
   AlertCircle,
@@ -120,22 +120,20 @@ function statusLabel(status: string | undefined): string {
 // URL para que el dueño la abra a mano. Históricamente esto fallaba en
 // silencio porque el catch comía el error y el botón parecía no responder.
 async function openInBrowser(url: string) {
+  // openExternalUrl prueba Tauri shell.open y luego window.open (cubre el
+  // navegador en `npm run dev`). Sólo si AMBOS fallan caemos a copiar el link.
+  if (await openExternalUrl(url)) return;
   try {
-    await openExternal(url);
-  } catch (err) {
-    console.error("[subscription] openExternal failed:", err);
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.error("No pudimos abrir el navegador. Copiamos el link, pégalo en tu navegador.", {
-        description: url,
-        duration: 8000,
-      });
-    } catch {
-      toast.error("Abre este link en tu navegador:", {
-        description: url,
-        duration: 12000,
-      });
-    }
+    await navigator.clipboard.writeText(url);
+    toast.error("No pudimos abrir el navegador. Copiamos el link, pégalo en tu navegador.", {
+      description: url,
+      duration: 8000,
+    });
+  } catch {
+    toast.error("Abre este link en tu navegador:", {
+      description: url,
+      duration: 12000,
+    });
   }
 }
 

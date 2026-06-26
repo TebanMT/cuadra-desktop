@@ -9,8 +9,8 @@ import {
   Search,
   BadgeMinus,
   BadgePlus,
+  Coins,
   Package,
-  PackageOpen,
   PackagePlus,
   PackageX,
   X as XIcon,
@@ -44,7 +44,7 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/shared/PagePrimitives";
-import { StatCard } from "@/components/shared/StatCard";
+import { StatCard, StatListCard } from "@/components/shared/StatCard";
 import {
   DEFAULT_CATEGORIES,
   stockLevel,
@@ -60,6 +60,7 @@ import {
   type SortDirection,
 } from "@/hooks/useProducts";
 import { useDebounce } from "@/hooks/useDebounce";
+import { useDashboard } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { ApiError } from "@/lib/api";
 import { cn, formatMoney } from "@/lib/utils";
@@ -156,6 +157,13 @@ export default function ProductsPage() {
   const [adjusting, setAdjusting] = useState<Product | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<Product | null>(null);
   const money = useMoneyVisibility();
+  // Ganancia realizada del mes — la calcula el backend de reportes
+  // (cross-context products × ventas) y la sirve el dashboard. La reusamos
+  // aquí para mostrarla junto a la potencial: la potencial baja al vender,
+  // la realizada sube. El endpoint está cacheado 60s, así que es barato.
+  const dashboard = useDashboard();
+  const realizedMonth = dashboard.data?.realized_profit_month.value ?? 0;
+  const realizedCoverage = dashboard.data?.realized_profit_coverage;
 
   useEffect(() => {
     setPage(1);
@@ -216,14 +224,27 @@ export default function ProductsPage() {
 
   const knownCategories = useMemo(() => {
     const set = new Set<string>(DEFAULT_CATEGORIES);
-    items.forEach((p) => set.add(p.category));
+    // `category` puede llegar undefined (el BE la omite cuando es null);
+    // no la metemos al set para no pintar una opción vacía en el dropdown.
+    items.forEach((p) => {
+      if (p.category) set.add(p.category);
+    });
     return Array.from(set);
   }, [items]);
 
   // Stats globales del backend (filtro completo, no la página). El BE
   // calcula low/out/total_value con SUM(CASE WHEN ...) sobre el set
   // filtrado — antes los counters reflejaban solo la página visible.
-  const totals = list.data?.totals ?? { total_value: 0, low_count: 0, out_count: 0 };
+  const totals = list.data?.totals ?? {
+    total_value: 0,
+    low_count: 0,
+    out_count: 0,
+    potential_profit: 0,
+    cost_value: 0,
+    margin_pct: null,
+    products_total: 0,
+    products_with_cost: 0,
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -243,7 +264,9 @@ export default function ProductsPage() {
       />
 
       {/* Stats — calculadas en backend sobre el filtro completo, no la
-          página visible. Los hints aclaran que cuentan todo el filtro. */}
+          página visible. 4 cards: dos de una cifra (Productos, Valor) y dos
+          combinadas (Stock crítico = bajos+agotados; Ganancia = del mes +
+          potencial) para no saturar con cards de una sola cifra. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Productos"
@@ -252,19 +275,27 @@ export default function ProductsPage() {
           tone="neutral"
           hint={hasActiveFilters ? "en el filtro" : "en el catálogo"}
         />
-        <StatCard
-          title="Stock bajo"
-          value={totals.low_count}
-          icon={PackageOpen}
-          tone={totals.low_count > 0 ? "warning" : "neutral"}
-          hint="por debajo del mínimo"
-        />
-        <StatCard
-          title="Agotados"
-          value={totals.out_count}
+        {/* Stock crítico — junta "stock bajo" y "agotados" (la salud de
+            inventario que le importa a recepción) en un solo card. */}
+        <StatListCard
+          title={t.page.stockHealth.title}
           icon={PackageX}
-          tone={totals.out_count > 0 ? "danger" : "neutral"}
-          hint="sin existencias"
+          tone={
+            totals.out_count > 0
+              ? "danger"
+              : totals.low_count > 0
+                ? "warning"
+                : "neutral"
+          }
+          rows={[
+            { label: t.page.stockHealth.low, value: totals.low_count },
+            { label: t.page.stockHealth.out, value: totals.out_count },
+          ]}
+          hint={
+            totals.low_count === 0 && totals.out_count === 0
+              ? t.page.stockHealth.allOk
+              : undefined
+          }
         />
         <StatCard
           title="Valor de stock"
@@ -272,6 +303,37 @@ export default function ProductsPage() {
           icon={PackagePlus}
           tone="success"
           hint="precio venta × existencias"
+        />
+        {/* Ganancia — del mes (realizada, sube al vender) + potencial sobre
+            el stock (baja al vender), sin un "total" que mezcle flujo con
+            inventario. El margen % va como chip en la potencial; el hint
+            muestra la cobertura honesta cuando faltan costos. */}
+        <StatListCard
+          title={t.page.margin.cardTitle}
+          icon={Coins}
+          tone="success"
+          rows={[
+            {
+              label: t.page.margin.monthRow,
+              value: money.fmt(realizedMonth),
+            },
+            {
+              label: t.page.margin.potentialRow,
+              value: money.fmt(totals.potential_profit),
+              chip:
+                !money.hidden && totals.margin_pct != null
+                  ? `${totals.margin_pct >= 0 ? "+" : ""}${totals.margin_pct.toFixed(0)}%`
+                  : undefined,
+            },
+          ]}
+          hint={
+            totals.products_with_cost < totals.products_total
+              ? t.page.margin.coverage(
+                  totals.products_with_cost,
+                  totals.products_total
+                )
+              : undefined
+          }
         />
       </div>
 
@@ -576,6 +638,10 @@ export default function ProductsPage() {
           setConfirmDeactivate(p);
         }}
         onAskReactivate={() => setEditing(null)}
+        onCaptureCost={(p) => {
+          setEditing(null);
+          setAdjusting(p);
+        }}
       />
       <AdjustStockModal
         product={adjusting}
@@ -662,12 +728,14 @@ function EditDialog({
   onClose,
   onAskDeactivate,
   onAskReactivate,
+  onCaptureCost,
 }: {
   product: Product | null;
   knownCategories: string[];
   onClose(): void;
   onAskDeactivate(p: Product): void;
   onAskReactivate(p: Product): void;
+  onCaptureCost(p: Product): void;
 }) {
   const update = useUpdateProduct(product?.id ?? "");
   const reactivate = useReactivateProduct();
@@ -740,6 +808,10 @@ function EditDialog({
               onCancel={onClose}
               serverError={serverError}
             />
+            <ProductMarginLine
+              product={product}
+              onCaptureCost={() => onCaptureCost(product)}
+            />
             <div className="flex justify-between border-t pt-4 mt-2">
               {product.active ? (
                 <Button
@@ -767,6 +839,70 @@ function EditDialog({
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ProductMarginLine — "Costo prom · Precio · Margen (d%)" en la ficha.
+// Cuando el producto no tiene costo capturado muestra un enlace para
+// capturarlo al resurtir (abre AdjustStockModal vía onCaptureCost). Respeta
+// el ojo de visibilidad de dinero. El % se calcula client-side a partir del
+// costo y precio; el monto del margen sí se enmascara.
+function ProductMarginLine({
+  product,
+  onCaptureCost,
+}: {
+  product: Product;
+  onCaptureCost(): void;
+}) {
+  const money = useMoneyVisibility();
+  const cost = product.avg_unit_cost;
+  const hasCost = typeof cost === "number";
+  if (!hasCost) {
+    return (
+      <div className="rounded-lg border border-paper-300 bg-paper-50/60 dark:bg-ink-800/40 p-3 text-sm">
+        <p className="text-xs font-medium uppercase tracking-wider text-ink-400 dark:text-ink-300 mb-1">
+          {t.form.margin.heading}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-ink-400 dark:text-ink-300">
+            {t.form.margin.noCost}
+          </span>
+          <button
+            type="button"
+            onClick={onCaptureCost}
+            className="font-medium text-brick-600 dark:text-brick-300 hover:underline"
+          >
+            {t.form.margin.captureCost}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  const unitCost = cost as number;
+  const margin = product.price - unitCost;
+  const marginPct = product.price > 0 ? (margin / product.price) * 100 : null;
+  return (
+    <div className="rounded-lg border border-paper-300 bg-paper-50/60 dark:bg-ink-800/40 p-3 text-sm">
+      <p className="text-xs font-medium uppercase tracking-wider text-ink-400 dark:text-ink-300 mb-1">
+        {t.form.margin.heading}
+      </p>
+      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 tabular">
+        <span className="text-ink-500 dark:text-ink-300">
+          {t.form.margin.cost} {money.fmt(unitCost)}
+        </span>
+        <span className="text-ink-300">·</span>
+        <span className="text-ink-500 dark:text-ink-300">
+          {t.form.margin.price} {money.fmt(product.price)}
+        </span>
+        <span className="text-ink-300">·</span>
+        <span className="font-semibold text-moss-700 dark:text-moss-100">
+          {t.form.margin.marginLabel} {money.fmt(margin)}
+          {marginPct != null && !money.hidden
+            ? ` (${marginPct.toFixed(0)}%)`
+            : ""}
+        </span>
+      </div>
+    </div>
   );
 }
 

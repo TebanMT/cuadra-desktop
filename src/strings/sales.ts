@@ -10,6 +10,7 @@ export const sales = {
     backToDashboard: "Cerrar",
     empty: "Aún no hay productos para vender.",
     emptyHint: "Agrega productos en la sección de Productos.",
+    uncategorized: "Sin categoría",
     cart: {
       title: "Carrito",
       clear: "Limpiar",

@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CheckinFeedback, eventToFeedback, feedbackTone, useAutoFade, type FeedbackState } from "@/components/checkin/CheckinFeedback";
 import { MemberSearchInput } from "@/components/checkin/MemberSearchInput";
-import { PinPad } from "@/components/checkin/PinPad";
+import { NumberPad } from "@/components/checkin/NumberPad";
 import { OverrideDialog } from "@/components/checkin/OverrideDialog";
 import {
   checkinErrorMessage,
-  useCheckinByPin,
+  useCheckinByNumber,
   useCheckinManual,
   useCheckinMethods,
   useRecentCheckins,
@@ -27,7 +27,7 @@ import { openKioskWindow } from "@/lib/kioskWindow";
 import { useKioskWindowOpen } from "@/hooks/useKioskWindow";
 import { checkin as t } from "@/strings/checkin";
 
-type Method = "fingerprint" | "pin" | "manual";
+type Method = "fingerprint" | "number" | "manual";
 
 const AUTOFADE_MS = 5000;
 
@@ -42,15 +42,15 @@ export default function CheckinPage() {
   // Sidecar matcher ready + physical scanner plugged in. Mirror del kiosk.
   const fingerprintAvailable =
     !!bio.data?.available && readerConnected === true;
-  const pinAvailable = methods.data?.pin_available ?? false;
+  const numberAvailable = methods.data?.number_available ?? false;
 
-  const initialMethod: Method = fingerprintAvailable ? "fingerprint" : pinAvailable ? "pin" : "manual";
+  const initialMethod: Method = fingerprintAvailable ? "fingerprint" : numberAvailable ? "number" : "manual";
   const [method, setMethod] = useState<Method>(initialMethod);
   const [feedback, setFeedback] = useState<FeedbackState>({ kind: "idle" });
   const [lastEvent, setLastEvent] = useState<CheckinEvent | null>(null);
   const [overrideOpen, setOverrideOpen] = useState(false);
-  const [pin, setPin] = useState("");
-  const [pinError, setPinError] = useState<string | null>(null);
+  const [numberInput, setNumberInput] = useState("");
+  const [numberError, setNumberError] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
 
   // keep tab/clock fresh
@@ -62,12 +62,12 @@ export default function CheckinPage() {
   // sync method to availability changes (auto-adapt)
   useEffect(() => {
     if (method === "fingerprint" && !fingerprintAvailable) {
-      setMethod(pinAvailable ? "pin" : "manual");
+      setMethod(numberAvailable ? "number" : "manual");
     }
-    if (method === "pin" && !pinAvailable) {
+    if (method === "number" && !numberAvailable) {
       setMethod(fingerprintAvailable ? "fingerprint" : "manual");
     }
-  }, [fingerprintAvailable, pinAvailable, method]);
+  }, [fingerprintAvailable, numberAvailable, method]);
 
   const idleMessage = fingerprintAvailable ? t.feedback.idle : t.feedback.idleNoReader;
 
@@ -90,7 +90,7 @@ export default function CheckinPage() {
   }
 
   const checkinManual = useCheckinManual();
-  const checkinPin = useCheckinByPin();
+  const checkinByNumber = useCheckinByNumber();
 
   // Fingerprint capture vive en el frontend (ADR-004-bis). El JS SDK fire
   // un sample por dedazo; el hook lo POST-ea a /biometric/checkin y
@@ -118,20 +118,20 @@ export default function CheckinPage() {
     }
   }
 
-  async function submitPin() {
-    if (pin.length !== 4) return;
-    setPinError(null);
+  async function submitNumber() {
+    if (numberInput.length !== 4) return;
+    setNumberError(null);
     setFeedback({ kind: "processing" });
     try {
-      const ev = await checkinPin.mutateAsync({ pin });
+      const ev = await checkinByNumber.mutateAsync({ member_number: parseInt(numberInput, 10) });
       announce(ev);
-      setPin("");
+      setNumberInput("");
     } catch (err) {
-      const msg = checkinErrorMessage(err, t.pinPad.invalid);
-      setPinError(msg);
+      const msg = checkinErrorMessage(err, t.numberPad.invalid);
+      setNumberError(msg);
       setFeedback({ kind: "denied_not_found", detail: msg });
       playCheckinTone("denied");
-      setPin("");
+      setNumberInput("");
     }
   }
 
@@ -189,7 +189,7 @@ export default function CheckinPage() {
             method={method}
             onChange={setMethod}
             fingerprintAvailable={fingerprintAvailable}
-            pinAvailable={pinAvailable}
+            numberAvailable={numberAvailable}
           />
 
           {method === "manual" && (
@@ -202,19 +202,19 @@ export default function CheckinPage() {
             </div>
           )}
 
-          {method === "pin" && (
+          {method === "number" && (
             <div className="max-w-md mx-auto w-full space-y-3">
-              <h2 className="text-center font-medium text-lg">{t.pinPad.title}</h2>
-              <PinPad
-                value={pin}
+              <h2 className="text-center font-medium text-lg">{t.numberPad.title}</h2>
+              <NumberPad
+                value={numberInput}
                 onChange={(v) => {
-                  setPin(v);
-                  if (pinError) setPinError(null);
+                  setNumberInput(v);
+                  if (numberError) setNumberError(null);
                 }}
-                onSubmit={submitPin}
-                disabled={checkinPin.isPending}
+                onSubmit={submitNumber}
+                disabled={checkinByNumber.isPending}
               />
-              {pinError && <p className="text-sm text-destructive text-center">{pinError}</p>}
+              {numberError && <p className="text-sm text-destructive text-center">{numberError}</p>}
             </div>
           )}
 
@@ -262,13 +262,13 @@ interface MethodTabsProps {
   method: Method;
   onChange(m: Method): void;
   fingerprintAvailable: boolean;
-  pinAvailable: boolean;
+  numberAvailable: boolean;
 }
 
-function MethodTabs({ method, onChange, fingerprintAvailable, pinAvailable }: MethodTabsProps) {
+function MethodTabs({ method, onChange, fingerprintAvailable, numberAvailable }: MethodTabsProps) {
   const tabs: Array<{ key: Method; icon: typeof Fingerprint; label: string; show: boolean }> = [
     { key: "fingerprint", icon: Fingerprint, label: t.page.methods.fingerprint, show: fingerprintAvailable },
-    { key: "pin", icon: KeyRound, label: t.page.methods.pin, show: pinAvailable },
+    { key: "number", icon: KeyRound, label: t.page.methods.number, show: numberAvailable },
     { key: "manual", icon: SearchIcon, label: t.page.methods.manual, show: true },
   ].filter((tab) => tab.show);
 

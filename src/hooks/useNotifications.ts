@@ -95,28 +95,29 @@ export interface UpdateAlertInput {
   body?: string;
 }
 
+// Espeja BroadcastFilter del BE (broadcast.go). VIP (top pagadores) es trabajo
+// futuro — requiere agregación de pagos, no un StatusFilter del member repo.
 export type BroadcastAudience =
   | "all_active"
-  | "expiring_this_week"
-  | "expired_recoverable"
-  | "inactive_21d"
-  | "vip";
+  | "expiring_soon"
+  | "expired"
+  | "inactive";
 
-export interface BroadcastPreviewResponse {
-  audience: BroadcastAudience;
-  recipients_count: number;
-  sample_phones: string[];
-}
-
-export interface SendBroadcastInput {
-  audience: BroadcastAudience;
-  body: string;
-}
-
-export interface SendBroadcastResponse {
+// Respuesta única de POST /broadcasts (preview y envío comparten shape).
+// confirmed:false devuelve el conteo + límites sin encolar; confirmed:true
+// encola. monthly_limit === 0 = ilimitado (Plus).
+export interface BroadcastResponse {
+  preview: boolean;
+  audience_count: number;
+  enqueued_count: number;
   broadcast_id: string;
-  recipients_count: number;
-  enqueued_at: string;
+  is_plus: boolean;
+  audience_cap: number;
+  monthly_limit: number;
+  monthly_used: number;
+  // Sólo en preview: id+nombre de la audiencia del filtro, para sembrar la
+  // selección manual de socios (opción C).
+  audience_preview?: { id: string; name: string }[];
 }
 
 const KEYS = {
@@ -212,22 +213,38 @@ export function useUpdateAlert(key: AlertKey) {
   });
 }
 
-export function useBroadcastPreview(audience: BroadcastAudience | null) {
-  return useQuery<BroadcastPreviewResponse>({
-    queryKey: KEYS.broadcastPreview(audience as BroadcastAudience),
+// Preview = POST /broadcasts con confirmed:false (no hay endpoint GET aparte).
+// El mensaje no se exige en preview, así que mandamos "" — el BE sólo lo valida
+// al confirmar. Devuelve audience_count + límites del plan.
+export function useBroadcastPreview(filter: BroadcastAudience | null) {
+  return useQuery<BroadcastResponse>({
+    queryKey: KEYS.broadcastPreview(filter as BroadcastAudience),
     queryFn: () =>
-      api.get<BroadcastPreviewResponse>("/api/v1/broadcasts/preview", {
-        query: { audience: audience as string },
+      api.post<BroadcastResponse>("/api/v1/broadcasts", {
+        filter,
+        message: "",
+        confirmed: false,
       }),
-    enabled: !!audience,
+    enabled: !!filter,
     staleTime: 15_000,
   });
 }
 
+// Envío: por filtro (simple) o por selección manual de socios (memberIds gana
+// en el BE). El FE manda uno u otro según si el dueño ajustó la audiencia.
 export function useSendBroadcast() {
   return useMutation({
-    mutationFn: (input: SendBroadcastInput) =>
-      api.post<SendBroadcastResponse>("/api/v1/broadcasts", input),
+    mutationFn: (input: {
+      filter?: BroadcastAudience;
+      memberIds?: string[];
+      message: string;
+    }) =>
+      api.post<BroadcastResponse>("/api/v1/broadcasts", {
+        filter: input.filter,
+        member_ids: input.memberIds,
+        message: input.message,
+        confirmed: true,
+      }),
   });
 }
 

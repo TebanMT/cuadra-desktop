@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
 
-export type CheckinMethod = "fingerprint" | "pin" | "manual";
+export type CheckinMethod = "fingerprint" | "number" | "manual";
 export type CheckinResult =
   | "allowed_active"
   | "allowed_expiring_soon"
@@ -28,8 +28,8 @@ export interface CheckinEvent {
 export interface ManualCheckinInput {
   member_id: string;
 }
-export interface PinCheckinInput {
-  pin: string;
+export interface NumberCheckinInput {
+  member_number: number;
 }
 export interface OverrideCheckinInput {
   member_id: string;
@@ -56,11 +56,11 @@ export function useCheckinManual() {
   });
 }
 
-export function useCheckinByPin() {
+export function useCheckinByNumber() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: PinCheckinInput) =>
-      api.post<CheckinEvent>("/api/v1/checkins/pin", input, { retry: 0 }),
+    mutationFn: (input: NumberCheckinInput) =>
+      api.post<CheckinEvent>("/api/v1/checkins/number", input, { retry: 0 }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["checkins"] });
     },
@@ -94,7 +94,7 @@ export function useCheckinCountToday(enabled = true) {
 
 interface CheckinMethodsResponse {
   fingerprint_available: boolean;
-  pin_available: boolean;
+  number_available: boolean;
   manual_available: boolean;
 }
 

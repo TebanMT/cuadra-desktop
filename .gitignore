@@ -10,7 +10,12 @@ dist-ssr
 
 # Tauri
 src-tauri/target
-src-tauri/binaries/tinta-sidecar*
+# Binario del sidecar (compilado en build, NUNCA committeado). Se genera en
+# la raíz de src-tauri; cubrimos también el layout viejo binaries/ y el
+# nombre pre-rename cuadra-sidecar-* por si quedan restos locales.
+src-tauri/tinta-sidecar-*
+src-tauri/cuadra-sidecar-*
+src-tauri/binaries/*sidecar*
 src-tauri/binaries/nbis/
 src-tauri/Cargo.lock
 

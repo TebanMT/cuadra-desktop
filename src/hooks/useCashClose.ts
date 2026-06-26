@@ -25,7 +25,12 @@ export interface CashCloseReport {
   date: string;
   by_method: Record<PaymentMethod, number>;
   by_concept: Record<PaymentConcept, { total: number; count: number }>;
+  // refunds_total y refund_by_method vienen en MAGNITUD POSITIVA (el BE los
+  // negocia desde el dominio, que los guarda negativos). Los refunds en
+  // efectivo (refund_by_method.cash) salen físicamente del cajón, así que se
+  // restan del "efectivo calculado" al cerrar.
   refunds_total: number;
+  refund_by_method: Record<string, number>;
   refunds_count: number;
   total: number;
   // Gastos generales (BC expenses) capturados ese día. Cuando hay gastos

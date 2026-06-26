@@ -14,7 +14,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { useAssignSelfPIN, useClearSelfPIN, useUpdateMe } from "@/hooks/useAuth";
 import { ApiError } from "@/lib/api";
 import { SectionCard } from "@/components/shared/PagePrimitives";
-import { PinPad } from "@/components/checkin/PinPad";
+import { NumberPad } from "@/components/checkin/NumberPad";
 import {
   Dialog,
   DialogContent,
@@ -284,20 +284,22 @@ export default function ProfilePage() {
             </Alert>
           )}
           {pinStep === "enter" ? (
-            <PinPad
+            <NumberPad
               value={pinFirst}
               onChange={setPinFirst}
               onSubmit={submitPinFirst}
               disabled={assignPIN.isPending}
               size="lg"
+              ariaLabel="PIN"
             />
           ) : (
-            <PinPad
+            <NumberPad
               value={pinSecond}
               onChange={setPinSecond}
               onSubmit={submitPinSecond}
               disabled={assignPIN.isPending}
               size="lg"
+              ariaLabel="PIN"
             />
           )}
         </DialogContent>

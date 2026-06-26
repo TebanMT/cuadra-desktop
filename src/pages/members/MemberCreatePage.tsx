@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { PageHeader, SectionCard } from "@/components/shared/PagePrimitives";
 import { MemberForm, type MemberFormSubmitPayload } from "@/components/members/MemberForm";
-import { useCreateMember, type CreateMemberInput, type PinDispatch } from "@/hooks/useMembers";
+import { useCreateMember, type CreateMemberInput, type Dispatch } from "@/hooks/useMembers";
 import { useBiometricStatus, useRegisterFingerprint } from "@/hooks/useBiometric";
 import { ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/dates";
@@ -45,8 +45,8 @@ export default function MemberCreatePage() {
   const [newMember, setNewMember] = useState<{
     id: string;
     name: string;
-    pin?: string;
-    pinDispatch?: PinDispatch;
+    number?: number;
+    dispatch?: Dispatch;
   } | null>(null);
 
   function buildPayload(p: MemberFormSubmitPayload, allowDup: boolean): CreateMemberInput {
@@ -96,12 +96,12 @@ export default function MemberCreatePage() {
       setServerError(null);
       const res = await create.mutateAsync(payload);
       // Toast resumido: si la notificación de WhatsApp se encoló,
-      // anunciamos que el PIN ya va en camino al socio. Si no, sólo el
+      // anunciamos que el número de socio ya va en camino. Si no, sólo el
       // mensaje genérico — el strip del stage de huella explica qué pasó.
       const baseMsg = t.form.success.created(name, fmtDate(res.expiry_date));
-      const pinSent = res.pin_dispatch?.dispatched && res.pin && res.pin_dispatch.recipient_phone;
-      toast.success(pinSent ? `${baseMsg} ${t.pin.sentToWhatsApp(res.pin_dispatch!.recipient_phone!)}` : baseMsg);
-      setNewMember({ id: res.member_id, name, pin: res.pin, pinDispatch: res.pin_dispatch });
+      const numberSent = res.dispatch?.dispatched && res.member_number && res.dispatch.recipient_phone;
+      toast.success(numberSent ? `${baseMsg} ${t.memberNumber.sentToWhatsApp(res.dispatch!.recipient_phone!)}` : baseMsg);
+      setNewMember({ id: res.member_id, name, number: res.member_number, dispatch: res.dispatch });
       setStage("fingerprint");
     } catch (e) {
       if (e instanceof ApiError && e.status === 422) {
@@ -162,8 +162,8 @@ export default function MemberCreatePage() {
             <FingerprintStage
               memberId={newMember.id}
               memberName={newMember.name}
-              pin={newMember.pin}
-              pinDispatch={newMember.pinDispatch}
+              number={newMember.number}
+              dispatch={newMember.dispatch}
               onDone={() => navigate(`/members/${newMember.id}`)}
             />
           ) : duplicate ? (
@@ -224,15 +224,15 @@ export default function MemberCreatePage() {
 interface FingerprintStageProps {
   memberId: string;
   memberName: string;
-  /** PIN auto-asignado al inscribir. Se muestra en un strip compacto
-   * arriba del stage de huella. */
-  pin?: string;
-  /** Estado del envío automático del PIN por WhatsApp. */
-  pinDispatch?: PinDispatch;
+  /** Número de socio auto-asignado al inscribir. Se muestra en un strip
+   * compacto arriba del stage de huella. */
+  number?: number;
+  /** Estado del envío automático del número por WhatsApp. */
+  dispatch?: Dispatch;
   onDone(): void;
 }
 
-function FingerprintStage({ memberId, memberName, pin, pinDispatch, onDone }: FingerprintStageProps) {
+function FingerprintStage({ memberId, memberName, number, dispatch, onDone }: FingerprintStageProps) {
   const navigate = useNavigate();
   const bio = useBiometricStatus();
   const fp = useRegisterFingerprint(memberId, {
@@ -278,7 +278,7 @@ function FingerprintStage({ memberId, memberName, pin, pinDispatch, onDone }: Fi
           <CircleCheck className="h-5 w-5 text-success shrink-0 mt-0.5" />
           <p className="text-foreground">{ct.fingerprint.enrolledBanner(memberName)}</p>
         </div>
-        {pin && <PinStrip pin={pin} dispatch={pinDispatch} />}
+        {number != null && <NumberStrip number={number} dispatch={dispatch} />}
         <div className="mx-auto flex h-44 w-44 items-center justify-center rounded-full ring-8 bg-warning/10 text-warning ring-warning/30">
           <AlertTriangle className="h-20 w-20" strokeWidth={1.4} />
         </div>
@@ -305,7 +305,7 @@ function FingerprintStage({ memberId, memberName, pin, pinDispatch, onDone }: Fi
         <p className="text-foreground">{ct.fingerprint.enrolledBanner(memberName)}</p>
       </div>
 
-      {pin && <PinStrip pin={pin} dispatch={pinDispatch} />}
+      {number != null && <NumberStrip number={number} dispatch={dispatch} />}
 
       {failed && (
         <Alert variant="destructive">
@@ -411,42 +411,42 @@ function FingerprintStage({ memberId, memberName, pin, pinDispatch, onDone }: Fi
   );
 }
 
-// PinStrip — versión compacta del banner anterior. Una sola línea con
-// el PIN + estado del envío por WhatsApp. Intencionalmente discreto: el
-// PIN ya va camino al socio por WhatsApp en el caso happy-path, así que
-// el operador raramente necesita escribirlo a mano. Cuando WhatsApp no
+// NumberStrip — versión compacta del banner anterior. Una sola línea con
+// el número de socio + estado del envío por WhatsApp. Intencionalmente
+// discreto: el número ya va camino al socio por WhatsApp en el happy-path, así
+// que el operador raramente necesita escribirlo a mano. Cuando WhatsApp no
 // está conectado o el socio no tiene teléfono, el strip cambia su copy
 // para empujar al operador a copiarlo o escribirlo en la credencial.
-function PinStrip({ pin, dispatch }: { pin: string; dispatch?: PinDispatch }) {
+function NumberStrip({ number, dispatch }: { number: number; dispatch?: Dispatch }) {
   async function copy() {
     try {
-      await navigator.clipboard.writeText(pin);
-      toast.success(t.pin.copied);
+      await navigator.clipboard.writeText(String(number));
+      toast.success(t.memberNumber.copied);
     } catch {
-      // silencioso — el operador siempre puede leer y teclear el PIN.
+      // silencioso — el operador siempre puede leer y teclear el número.
     }
   }
 
-  let hint: string = t.pin.notSent;
+  let hint: string = t.memberNumber.notSent;
   if (dispatch?.dispatched && dispatch.recipient_phone) {
-    hint = t.pin.sentToWhatsApp(dispatch.recipient_phone);
+    hint = t.memberNumber.sentToWhatsApp(dispatch.recipient_phone);
   } else if (dispatch?.skipped_reason === "whatsapp_not_connected") {
-    hint = t.pin.notSentNoWhatsApp;
+    hint = t.memberNumber.notSentNoWhatsApp;
   } else if (dispatch?.skipped_reason === "no_member_phone") {
-    hint = t.pin.notSentNoPhone;
+    hint = t.memberNumber.notSentNoPhone;
   }
 
   return (
     <div className="flex items-center justify-between gap-3 flex-wrap rounded-md border bg-muted/30 px-3 py-2 text-sm">
       <div className="flex items-center gap-2 min-w-0">
         <KeyRound className="h-4 w-4 text-muted-foreground shrink-0" />
-        <span className="text-muted-foreground">{t.pin.profileLabel}</span>
-        <span className="font-semibold tabular-nums tracking-wider text-foreground">{pin}</span>
+        <span className="text-muted-foreground">{t.memberNumber.profileLabel}</span>
+        <span className="font-semibold tabular-nums tracking-wider text-foreground">{number}</span>
         <span className="text-xs text-muted-foreground truncate">· {hint}</span>
       </div>
       <Button variant="ghost" size="sm" onClick={copy} type="button" className="h-7 px-2">
         <Copy className="h-3.5 w-3.5 mr-1" />
-        {t.pin.profileCopy}
+        {t.memberNumber.profileCopy}
       </Button>
     </div>
   );

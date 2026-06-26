@@ -13,14 +13,15 @@ export const checkin = {
     recentEmpty: "Aún no hay ingresos hoy.",
     methods: {
       fingerprint: "Huella",
-      pin: "PIN",
+      // ADR-010: el método de respaldo es el número de socio (antes "PIN").
+      number: "Número",
       manual: "Buscar",
     },
     overridePrompt: "Presiona O para permitir entrada de todos modos.",
   },
   feedback: {
     idle: "Coloca tu huella en el lector para ingresar.",
-    idleNoReader: "Busca al socio o pídele su PIN.",
+    idleNoReader: "Busca al socio o pídele su número de socio.",
     processing: "Identificando…",
     successActive: (days: number) =>
       days === 1 ? "Mensualidad vigente — vence mañana" : `Mensualidad vigente — vence en ${days} días`,
@@ -40,12 +41,13 @@ export const checkin = {
     overrideBadge: "Permitido por operador",
     expiryPill: (date: string) => `Vence: ${date}`,
   },
-  pinPad: {
-    title: "Pon tu PIN para entrar",
+  numberPad: {
+    title: "Pon tu número de socio para entrar",
+    ariaLabel: "Número de socio",
     backspace: "Borrar",
     submit: "Entrar",
     locked: (seconds: number) => `Demasiados intentos. Espera ${seconds} segundos.`,
-    invalid: "PIN incorrecto. Vuelve a intentar.",
+    invalid: "Número de socio incorrecto. Vuelve a intentar.",
   },
   override: {
     triggerHint: "O — permitir de todos modos",
@@ -61,8 +63,8 @@ export const checkin = {
   kiosk: {
     title: "Tinta — Kiosko",
     waiting: "Coloca tu huella en el lector",
-    waitingPin: "Coloca tu huella o pon tu PIN",
-    waitingNoReader: "Pon tu PIN para entrar",
+    waitingPin: "Coloca tu huella o pon tu número de socio",
+    waitingNoReader: "Pon tu número de socio para entrar",
     waitingNoReaderNoPin: "El kiosko no está configurado todavía. Avísale a recepción.",
     sync: "Sincronizado",
     syncOffline: "Sin conexión — operando offline",
@@ -84,7 +86,7 @@ export const checkin = {
     title: (name: string) => `Registrar huella de ${name}`,
     consentTitle: "Antes de registrar tu huella",
     consentBody: [
-      "Tu huella se usa solo para que entres al gym sin tener que dar tu nombre o tu PIN.",
+      "Tu huella se usa solo para que entres al gym sin tener que dar tu nombre o tu número de socio.",
       "Se guarda encriptada en la computadora del gym.",
       "También se respalda encriptada en la nube de Tinta.",
       "Nadie puede ver la imagen de tu huella — solo un código matemático que sirve para identificarte.",
@@ -100,7 +102,7 @@ export const checkin = {
     skip: "Saltar por ahora",
     success: "Huella registrada.",
     enrolledBanner: (name: string) =>
-      `${name} inscrito. Ahora registra su huella para que entre sin PIN ni nombre.`,
+      `${name} inscrito. Ahora registra su huella para que entre sin número ni nombre.`,
     autoStartHint: "Empezará automáticamente cuando conectes el lector.",
     errorReader: "No detecto el lector de huella. Conéctalo y vuelve a intentar.",
     errorCapture: "No pude leer bien tu huella. Intenta otra vez.",
@@ -117,7 +119,7 @@ export const checkin = {
     capturing: (n: number) => `Captura ${n} en proceso…`,
   },
   reader: {
-    disconnectedBanner: "Lector de huella desconectado. Usa búsqueda manual o PIN.",
+    disconnectedBanner: "Lector de huella desconectado. Usa búsqueda manual o número de socio.",
   },
   audio: {
     success: "/audio/checkin-success.mp3",

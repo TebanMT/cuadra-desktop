@@ -28,6 +28,22 @@ export const products = {
       active: "Activo",
       inactive: "Desactivado",
     },
+    // Card combinada "Stock crítico" — junta stock bajo + agotados.
+    stockHealth: {
+      title: "Stock crítico",
+      low: "Bajos",
+      out: "Agotados",
+      allOk: "todo en orden",
+    },
+    // Card combinada "Ganancia" — del mes (realizada) + potencial sobre el
+    // stock. El margen % va como chip en la fila de potencial.
+    margin: {
+      cardTitle: "Ganancia",
+      monthRow: "Del mes",
+      potentialRow: "Potencial",
+      coverage: (withCost: number, total: number) =>
+        `${withCost} de ${total} con costo`,
+    },
     empty: "Aún no tienes productos. Crea el primero.",
     noResults: "No encontramos productos con esos filtros.",
     rowEdit: "Editar",
@@ -55,6 +71,14 @@ export const products = {
     photoHint: "Opcional. JPG, PNG o WEBP, máx. 2 MB.",
     minStockHint: "Te avisamos cuando llegue a este nivel.",
     initialCostHint: "Opcional. Lo que pagaste por unidad. Queda en el historial de egresos.",
+    margin: {
+      heading: "Margen por unidad",
+      cost: "Costo prom",
+      price: "Precio",
+      marginLabel: "Margen",
+      noCost: "Sin costo capturado.",
+      captureCost: "Capturar costo al resurtir",
+    },
     customCategory: "Otra (escribir)",
     customCategoryPlaceholder: "Nombre de categoría",
     addAnother: "Agregar otro al guardar este",
@@ -95,7 +119,8 @@ export const products = {
     },
     quantityLabel: "Cantidad",
     countLabel: "Stock real",
-    costLabel: "Costo total (opcional)",
+    costLabel: "Costo unitario (opcional)",
+    costHint: "Lo que pagaste por unidad en esta llegada.",
     notesLabel: "Nota (opcional)",
     notesPlaceholder: "Ej. Proveedor Coca, factura #1234",
     submit: "Aplicar ajuste",
