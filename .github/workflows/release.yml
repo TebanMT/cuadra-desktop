@@ -311,6 +311,12 @@ jobs:
     name: Publish + register manifest
     needs: [release-windows]
     runs-on: ubuntu-latest
+    permissions:
+      # gh release create/upload escribe en Releases → necesita contents:write.
+      # Sin esto, el GITHUB_TOKEN cae al default del repo (read-only) y da
+      # "HTTP 403: Resource not accessible by integration". `write` incluye el
+      # `read` que necesita el checkout.
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
