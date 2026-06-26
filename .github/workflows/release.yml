@@ -145,15 +145,17 @@ jobs:
         shell: bash
         run: bash scripts/prepare-nbis-windows.sh
 
-      - name: Install signtool (if not present)
-        # signtool viene con el Windows SDK; los runners de Microsoft ya
-        # lo traen, pero si en algún momento eso cambia, este step es el
-        # hook para instalarlo. Hoy no-op.
+      - name: Check signtool (informativo, no bloqueante)
+        # signtool (Windows SDK) SÓLO se usa para la firma Authenticode, que es
+        # OPCIONAL: los steps de cert/firma de abajo están gated al secret
+        # WINDOWS_CERTIFICATE. Sin cert no se firma Authenticode → no hace falta
+        # signtool. Antes este check hacía `exit 1` y tumbaba el release aunque
+        # no hubiera cert. Ahora sólo AVISA: la firma ed25519 del updater
+        # (TAURI_SIGNING_PRIVATE_KEY) es independiente y no se afecta.
         shell: bash
         run: |
           if ! command -v signtool >/dev/null 2>&1; then
-            echo "signtool no presente — necesitamos Windows SDK preinstalado."
-            exit 1
+            echo "::warning::signtool no está en PATH — la firma Authenticode se saltará (sin cert configurado). El bundle ed25519 del updater no se afecta."
           fi
 
       - name: Decode Authenticode certificate (opcional)
