@@ -25,7 +25,7 @@ env:
   # Ref de cuadra-core (sidecar) por DEFAULT. Fija un tag (ej. v1.0.0) o
   # pásalo en el input core_ref para un build reproducible. "main" = último
   # commit. El SHA bundleado queda en el log de "Checkout tinta-core".
-  TINTA_CORE_REF: v1.0.0
+  TINTA_CORE_REF: v1.0.1
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
