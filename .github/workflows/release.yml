@@ -1,32 +1,59 @@
-# Release pipeline para auto-updates de Tinta Desktop (ADR-005 §4).
+# Release pipeline consolidado de Tinta Desktop (ADR-005).
 #
-# Diferencias con build-desktop.yml:
-#   - Trigger: tag `v*.*.*` (SemVer) — no `desktop-v*`. El primero está
-#     reservado para el flujo de auto-update; el segundo sigue alimentando
-#     el descargador del landing (R2 + dl.entinta.app).
-#   - Firma del .msi/.exe con Authenticode (signtool) — condicional al
-#     secret WINDOWS_CERTIFICATE. Si no está configurado, el job loggea
-#     un warning y deja los binarios sin firmar (útil mientras el cert OV
-#     se está tramitando).
-#   - Firma ed25519 del bundle vía tauri-action — produce los .sig que el
-#     manifest del cloud distribuye y el plugin updater verifica.
-#   - Sube los artifacts a GitHub Releases (descarga directa, dura siempre).
-#   - POST automático a /api/v1/admin/releases del cloud para registrar la
-#     versión nueva con rollout_percent=5 (staged rollout día 0, ADR §2.4).
-#     Si el POST falla, el manifest queda igual subido a GH Releases y se
-#     puede registrar manualmente vía SQL (ver docs/release.md).
-#   - macOS DEFERIDO (ADR-005 §3.2): NO se sube DMG al manifest público.
-#     El job mac se mantiene para que Esteban consuma el DMG local sin
-#     pasar por el updater.
+# UN SOLO workflow disparado por el tag `v*.*.*`. Reemplaza el doble-build /
+# doble-tag que existía antes (release.yml + build-desktop.yml + el dispatch
+# build-windows-only.yml): buildea Windows UNA vez, sube los installers a R2,
+# y registra el manifest del auto-updater apuntando a R2.
+#
+# Flujo (un tag `v1.2.3` dispara todo):
+#   1. release-windows  → build firmado ed25519 (sidecar de core pineado +
+#                         NBIS) → .sig de los bundles → artifacts.
+#   2. build-macos      → DMG arm64 + x86_64 (SOLO para descarga; NO entra al
+#                         manifest del updater — mac deferido, ADR-005 §3.2).
+#   3. publish          → sube TODO a R2 (dl.entinta.app) + registra el manifest
+#                         (POST admin) apuntando al .exe NSIS en R2 + crea un
+#                         GitHub Release como backup interno.
+#
+# Por qué el manifest apunta a R2 y NO al GitHub Release:
+#   cuadra-desktop es PRIVADO → la URL de descarga del GitHub Release exige
+#   auth. El updater de Tauri descarga ANÓNIMO, así que sólo puede bajar de un
+#   origen público. El bucket R2 está publicado en dl.entinta.app (público).
+#   Registrar la URL de GitHub = el updater falla la descarga (era el bug).
+#
+# Por qué NSIS .exe (y no MSI) en el manifest:
+#   El config tiene `plugins.updater.windows.installMode: "passive"`, que es un
+#   modo de instalación NSIS. El updater de Tauri v2 corre el .exe NSIS en modo
+#   passive (barra de progreso, sin prompts). El .sig DEBE ser el del MISMO
+#   archivo (nsis/*.exe.sig). El MSI también se sube a R2 para descarga directa
+#   (GPO-friendly) pero NO es el artifact del updater.
+#
+# Por qué rollout 100 (no staged):
+#   El updater de Tauri NO manda el header X-Tinta-Gym-ID, y el cloud
+#   (releases get_latest.inRolloutBucket) NO ofrece releases con rollout<100 a
+#   clientes sin gym_id. Con rollout<100 → 204 a todos → nadie actualiza.
+#   Hasta cablear el gym_id en el request del updater, rollout SIEMPRE 100.
+#
+# IMPORTANTE — firma del updater:
+#   El `.sig` sólo se genera si `bundle.createUpdaterArtifacts: true` está en
+#   tauri.conf.json (default de Tauri v2 = false). Si falta, el build NO produce
+#   los .sig y el step "Read bundle signatures" falla con un error explícito.
 #
 # Required GitHub secrets:
 #   TINTA_CORE_TOKEN              PAT con Contents:Read sobre cuadra-core
 #   TAURI_SIGNING_PRIVATE_KEY     ed25519 privada para firmar updates
 #   TAURI_SIGNING_PRIVATE_KEY_PASSWORD   password del keystore
-#   WINDOWS_CERTIFICATE           (opcional, hasta tener OV cert) PFX base64
-#   WINDOWS_CERTIFICATE_PASSWORD  (opcional) password del PFX
-#   TINTA_CLOUD_URL               https://api.entinta.app
-#   RELEASES_ADMIN_TOKEN          shared secret del endpoint POST admin
+#   TINTA_CLOUD_URL              https://api.entinta.app
+#   RELEASES_ADMIN_TOKEN        shared secret del POST admin (== el del cloud)
+#   R2_ACCESS_KEY_ID            R2 API token (Object Read & Write)
+#   R2_SECRET_ACCESS_KEY        idem
+#   R2_ENDPOINT                 https://<account-id>.r2.cloudflarestorage.com
+#   R2_BUCKET                   tinta-installers
+#
+# Authenticode (firma del SO) está DEFERIDO y NO se hace en este workflow:
+# firmar con signtool después del build invalidaría el .sig del updater. Cuando
+# haya cert OV, se cablea vía la config nativa de Tauri (bundle.windows en
+# tauri.conf.json) para que firme ANTES de generar el .sig. Ver el bloque de
+# comentario en el job release-windows.
 
 name: Release
 
@@ -41,39 +68,66 @@ on:
       core_ref:
         description: "Ref de cuadra-core a bundlear (tag/branch/SHA). Vacío usa TINTA_CORE_REF."
         required: false
+      rollout:
+        description: "rollout_percent del manifest (0-100). Default 100."
+        required: false
+        default: "100"
+      skip_manifest:
+        description: "No registrar el manifest en el cloud (sólo buildea/sube a R2)."
+        type: boolean
+        default: false
+      skip_r2:
+        description: "No subir a R2 (sólo deja los artifacts en la corrida)."
+        type: boolean
+        default: false
+      skip_macos:
+        description: "No buildear macOS (iteración Windows-only barata)."
+        type: boolean
+        default: false
+
+# Un solo release por tag a la vez. Evita que un re-run accidental (o dos
+# pushes del mismo tag) corran en paralelo y disparen dos POST concurrentes al
+# manifest (chocarían contra el UNIQUE version+target+channel del cloud).
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   TINTA_CORE_REPO: TebanMT/cuadra-core
   # Ref de cuadra-core (sidecar) a bundlear por DEFAULT. Para un release de
   # prod REPRODUCIBLE, fija acá un tag de core (ej. v1.0.0) antes de taggear
   # el desktop, o pásalo en el input core_ref del workflow_dispatch. "main" =
-  # siempre el último commit (cómodo, pero NO reproducible). El SHA exacto
-  # que se bundlee queda registrado en el log del step "Checkout tinta-core".
+  # siempre el último commit (cómodo, pero NO reproducible). El SHA exacto que
+  # se bundlee queda en el log del step "Checkout tinta-core".
   TINTA_CORE_REF: v1.0.1
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
+  # Release tag de cuadra-core con los binarios NBIS Windows (mindtct.exe +
+  # bozorth3.exe) que el sidecar invoca como subprocess. Bumpear sólo cuando se
+  # publique un release NBIS nuevo — cambian rara vez.
   NBIS_VERSION: nbis-v1
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
-  # Windows x86_64 — único target distribuible (ADR-005 §3).
-  # Firma Authenticode + firma ed25519 del bundle + manifest .json.
+  # Windows x86_64 — único target del updater (ADR-005 §3).
+  # Build firmado ed25519 (+ Authenticode opcional). Produce los .sig que el
+  # manifest del cloud distribuye y el plugin updater verifica.
   # ─────────────────────────────────────────────────────────────────────
   release-windows:
     name: Windows release (signed)
     runs-on: windows-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      msi_signature: ${{ steps.signature.outputs.msi_sig }}
       nsis_signature: ${{ steps.signature.outputs.nsis_sig }}
-      msi_url: ${{ steps.signature.outputs.msi_url }}
-      nsis_url: ${{ steps.signature.outputs.nsis_url }}
+      msi_signature: ${{ steps.signature.outputs.msi_sig }}
     steps:
       - name: Checkout tinta-desktop
         uses: actions/checkout@v4
 
       - name: Checkout tinta-core
+        # cuadra-core es privado → el GITHUB_TOKEN del runner no lo lee. PAT
+        # fine-grained con Contents:Read en el secret TINTA_CORE_TOKEN.
         uses: actions/checkout@v4
         with:
           repository: ${{ env.TINTA_CORE_REPO }}
@@ -85,7 +139,8 @@ jobs:
         id: version
         shell: bash
         run: |
-          # tag "v1.2.3" → "1.2.3"; workflow_dispatch sin input → leer tauri.conf.json
+          # tag "v1.2.3" → "1.2.3"; dispatch con input tag → ese; sin nada →
+          # leer tauri.conf.json.
           if [ -n "${{ inputs.tag }}" ]; then
             VERSION="${{ inputs.tag }}"
             VERSION="${VERSION#v}"
@@ -109,6 +164,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Setup pnpm
+        # action-setup lee la versión de `packageManager` en package.json.
         uses: pnpm/action-setup@v4
 
       - name: Setup Rust
@@ -134,6 +190,7 @@ jobs:
           go build -tags sidecar \
             -o ../src-tauri/tinta-sidecar-x86_64-pc-windows-msvc.exe \
             ./cmd/sidecar
+          ls -la ../src-tauri/tinta-sidecar-*.exe
 
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
@@ -145,81 +202,57 @@ jobs:
         shell: bash
         run: bash scripts/prepare-nbis-windows.sh
 
-      - name: Check signtool (informativo, no bloqueante)
-        # signtool (Windows SDK) SÓLO se usa para la firma Authenticode, que es
-        # OPCIONAL: los steps de cert/firma de abajo están gated al secret
-        # WINDOWS_CERTIFICATE. Sin cert no se firma Authenticode → no hace falta
-        # signtool. Antes este check hacía `exit 1` y tumbaba el release aunque
-        # no hubiera cert. Ahora sólo AVISA: la firma ed25519 del updater
-        # (TAURI_SIGNING_PRIVATE_KEY) es independiente y no se afecta.
-        shell: bash
-        run: |
-          if ! command -v signtool >/dev/null 2>&1; then
-            echo "::warning::signtool no está en PATH — la firma Authenticode se saltará (sin cert configurado). El bundle ed25519 del updater no se afecta."
-          fi
-
-      - name: Decode Authenticode certificate (opcional)
-        id: cert
-        if: ${{ env.WINDOWS_CERTIFICATE != '' }}
-        env:
-          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
-        shell: bash
-        run: |
-          echo "${WINDOWS_CERTIFICATE}" | base64 -d > /tmp/cert.pfx
-          echo "path=/tmp/cert.pfx" >> "$GITHUB_OUTPUT"
-
+      # ───────────────────────────────────────────────────────────────────
+      # Authenticode (firma del SO, anti-SmartScreen) — OPCIONAL y deferido.
+      #
+      # NO se firma con signtool acá. Firmar el .exe/.msi con signtool DESPUÉS
+      # de `tauri build` invalidaría el .sig ed25519 del updater (la firma se
+      # calcula sobre los bytes del bundle; signtool los modifica → el .sig deja
+      # de matchear el archivo que sube a R2 → el updater rechaza el update).
+      #
+      # Para habilitar Authenticode SIN romper el updater hay que firmar ANTES
+      # de que Tauri genere el .sig, vía la config NATIVA de Tauri
+      # (tauri.conf.json → bundle.windows.certificateThumbprint / signCommand):
+      # así `tauri build` firma el installer y RECIÉN DESPUÉS calcula el .sig
+      # sobre el binario ya firmado. Hasta tener el cert OV, se deja sin firmar
+      # (SmartScreen muestra "Unknown publisher" — funcional, con friction).
+      # ───────────────────────────────────────────────────────────────────
       - name: Build + sign Tauri bundle
-        # tauri-action firma ed25519 el bundle entero (.msi, .exe NSIS, .sig)
-        # cuando TAURI_SIGNING_PRIVATE_KEY está en env. Esa firma es lo que
-        # el manifest del cloud distribuye y el plugin updater verifica al
-        # bajar el .msi — separado de Authenticode (que protege contra el
-        # SmartScreen del SO, ver §3.3 del ADR).
+        # tauri-cli firma ed25519 los updater-artifacts (.msi.sig, .exe.sig)
+        # cuando TAURI_SIGNING_PRIVATE_KEY está en env Y
+        # bundle.createUpdaterArtifacts=true en tauri.conf.json. Esa firma es lo
+        # que el manifest del cloud distribuye y el plugin updater verifica.
+        # El overlay tauri.windows.conf.json agrega los externalBin de NBIS.
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
           pnpm tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
 
-      - name: Sign installers (Authenticode, opcional)
-        # signtool firma el .msi y el NSIS .exe si tenemos cert. Sin cert,
-        # SmartScreen mostrará "Unknown publisher" — los binarios funcionan
-        # igual pero con friction. Toleramos no firmar para no bloquear el
-        # release MAJOR si el cert OV está aún en trámite.
-        if: ${{ steps.cert.outputs.path != '' }}
-        env:
-          CERT_PASS: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        shell: pwsh
-        run: |
-          $msi = Get-ChildItem -Path "src-tauri\target\x86_64-pc-windows-msvc\release\bundle\msi" -Filter "*.msi" | Select-Object -First 1
-          $exe = Get-ChildItem -Path "src-tauri\target\x86_64-pc-windows-msvc\release\bundle\nsis" -Filter "*.exe" | Select-Object -First 1
-          if ($msi) {
-            & signtool sign /f /tmp/cert.pfx /p "$env:CERT_PASS" `
-              /tr http://timestamp.sectigo.com /td sha256 /fd sha256 `
-              $msi.FullName
-          }
-          if ($exe) {
-            & signtool sign /f /tmp/cert.pfx /p "$env:CERT_PASS" `
-              /tr http://timestamp.sectigo.com /td sha256 /fd sha256 `
-              $exe.FullName
-          }
-
       - name: Read bundle signatures
-        # tauri-action escribe el .sig al lado de cada bundle. El contenido
-        # es el string base64 ed25519 que el manifest cloud va a embeber.
+        # tauri escribe el .sig al lado de cada updater-artifact. El contenido es
+        # el string base64 ed25519 que el manifest cloud embebe. Falla DURO si no
+        # existen: significa que createUpdaterArtifacts no está en true (sin .sig
+        # → el manifest quedaría con firma vacía → el updater rechaza el update).
         id: signature
         shell: bash
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
           BUNDLE_DIR="src-tauri/target/x86_64-pc-windows-msvc/release/bundle"
-          MSI_SIG=$(cat "$BUNDLE_DIR"/msi/*.msi.sig | tr -d '\n' || true)
-          NSIS_SIG=$(cat "$BUNDLE_DIR"/nsis/*.exe.sig | tr -d '\n' || true)
-          echo "msi_sig=${MSI_SIG}" >> "$GITHUB_OUTPUT"
+          shopt -s nullglob
+          NSIS_SIG_FILE=( "$BUNDLE_DIR"/nsis/*.exe.sig )
+          MSI_SIG_FILE=( "$BUNDLE_DIR"/msi/*.msi.sig )
+          if [ ${#NSIS_SIG_FILE[@]} -eq 0 ]; then
+            echo "::error::No se encontró nsis/*.exe.sig. ¿bundle.createUpdaterArtifacts=true en tauri.conf.json? Sin .sig el updater no puede verificar el update."
+            find "$BUNDLE_DIR" -type f | sort
+            exit 1
+          fi
+          NSIS_SIG=$(tr -d '\n' < "${NSIS_SIG_FILE[0]}")
           echo "nsis_sig=${NSIS_SIG}" >> "$GITHUB_OUTPUT"
-          # URL final donde quedará el .msi tras gh-release upload. Lo
-          # calculamos acá para que el job de registro al cloud no tenga
-          # que adivinar el path.
-          echo "msi_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/Tinta_${VERSION}_x64_en-US.msi" >> "$GITHUB_OUTPUT"
-          echo "nsis_url=https://github.com/${GITHUB_REPOSITORY}/releases/download/v${VERSION}/Tinta_${VERSION}_x64-setup.exe" >> "$GITHUB_OUTPUT"
+          if [ ${#MSI_SIG_FILE[@]} -gt 0 ]; then
+            MSI_SIG=$(tr -d '\n' < "${MSI_SIG_FILE[0]}")
+            echo "msi_sig=${MSI_SIG}" >> "$GITHUB_OUTPUT"
+          fi
+          echo "✓ NSIS .sig leído (${#NSIS_SIG} chars)"
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -233,13 +266,13 @@ jobs:
           if-no-files-found: error
 
   # ─────────────────────────────────────────────────────────────────────
-  # macOS (interno, no distribuible).
-  # Sigue armando el DMG para uso de Esteban; NO sube al manifest público
-  # ni dispara el registro contra el cloud (ADR-005 §3.2).
+  # macOS (interno, descarga sólo). Sube DMG a R2 pero NO entra al manifest
+  # del updater (ADR-005 §3.2 — mac deferido). Se salta con skip_macos.
   # ─────────────────────────────────────────────────────────────────────
-  build-macos-internal:
-    name: macOS (dev-only)
+  build-macos:
+    name: macOS ${{ matrix.target.arch }}
     runs-on: macos-latest
+    if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_macos) }}
     strategy:
       fail-fast: false
       matrix:
@@ -277,7 +310,7 @@ jobs:
           workspaces: src-tauri
           key: ${{ matrix.target.rust }}-release
 
-      - name: Build Go sidecar
+      - name: Build Go sidecar (${{ matrix.target.arch }})
         env:
           CGO_ENABLED: 1
           GOOS: darwin
@@ -288,6 +321,8 @@ jobs:
           go build -tags sidecar \
             -o ../src-tauri/tinta-sidecar-${{ matrix.target.rust }} \
             ./cmd/sidecar
+          # Ad-hoc signing del sidecar — Apple Silicon exige al menos firma
+          # ad-hoc para ejecutar el binario external.
           codesign --force --sign - --options runtime \
             ../src-tauri/tinta-sidecar-${{ matrix.target.rust }}
 
@@ -305,91 +340,215 @@ jobs:
           if-no-files-found: warn
 
   # ─────────────────────────────────────────────────────────────────────
-  # Publish GitHub Release + register al cloud (ADR-005 §4.1 + §4.2).
+  # Publish — sube a R2 + registra el manifest + GitHub Release (backup).
+  # Corre aunque macOS falle o se salte: el manifest de Windows es la ruta
+  # crítica del updater y no debe quedar gateada por mac.
   # ─────────────────────────────────────────────────────────────────────
   publish:
-    name: Publish + register manifest
-    needs: [release-windows]
+    name: Publish to R2 + register manifest
+    needs: [release-windows, build-macos]
+    if: ${{ always() && needs.release-windows.result == 'success' }}
     runs-on: ubuntu-latest
     permissions:
       # gh release create/upload escribe en Releases → necesita contents:write.
-      # Sin esto, el GITHUB_TOKEN cae al default del repo (read-only) y da
-      # "HTTP 403: Resource not accessible by integration". `write` incluye el
-      # `read` que necesita el checkout.
       contents: write
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Windows artifacts
+      - name: Download all artifacts
+        # Sin `name` baja TODOS los artifacts de la corrida (windows + mac si
+        # corrió) a artifacts/<artifact-name>/...
         uses: actions/download-artifact@v4
         with:
-          name: tinta-windows-release
           path: artifacts
 
       - name: List artifacts
-        run: |
-          ls -la artifacts
-          find artifacts -type f
+        run: find artifacts -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.sig' \) | sort
 
-      - name: Create GitHub Release
-        # gh release create es idempotente con --clobber: si el tag ya tiene
-        # un release (ej. reintento manual del job tras un fallo de network),
-        # reemplaza los assets sin duplicar.
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.release-windows.outputs.version }}
+      - name: Locate Windows installers
+        id: win
         run: |
-          TAG="v${VERSION}"
-          # find es robusto contra cambios de naming entre versiones de Tauri.
-          MSI=$(find artifacts -name '*.msi' -not -name '*.sig' | head -1)
-          NSIS=$(find artifacts -name '*setup*.exe' -o -name '*Setup*.exe' | head -1)
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" --title "Tinta ${TAG}" --notes "Release ${TAG}" \
-              "$MSI" "$NSIS"
-          else
-            gh release upload "$TAG" "$MSI" "$NSIS" --clobber
+          set -euo pipefail
+          # `|| true`: con pipefail, find recibe SIGPIPE cuando head cierra el
+          # pipe → exit 141 abortaría el step. No nos importa: queremos la 1ra.
+          NSIS=$(find artifacts \( -name '*setup*.exe' -o -name '*Setup*.exe' \) | head -1 || true)
+          MSI=$(find artifacts -name '*.msi' -not -name '*.sig' | head -1 || true)
+          if [ -z "${NSIS}" ]; then
+            echo "::error::No se encontró el instalador NSIS (.exe) en los artifacts."
+            exit 1
+          fi
+          echo "nsis=${NSIS}" >> "$GITHUB_OUTPUT"
+          echo "msi=${MSI}" >> "$GITHUB_OUTPUT"
+          echo "NSIS=${NSIS}"
+          echo "MSI=${MSI}"
+
+      - name: Upload installers to R2
+        # Sube los installers a dl.entinta.app con keys predecibles. El manifest
+        # del updater apunta al NSIS .exe versionado; /latest/ es para los CTAs
+        # de descarga del landing/dashboard. Renombrar el archivo NO cambia los
+        # bytes → el .sig del manifest sigue siendo válido.
+        # Se salta con skip_r2 (gating en bash; en push siempre corre).
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_r2) }}
+        env:
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+          R2_BUCKET: ${{ secrets.R2_BUCKET }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          VERSION: ${{ needs.release-windows.outputs.version }}
+          NSIS: ${{ steps.win.outputs.nsis }}
+          MSI: ${{ steps.win.outputs.msi }}
+        run: |
+          set -euo pipefail
+          if [ -z "${R2_ENDPOINT}" ] || [ -z "${R2_BUCKET}" ] || [ -z "${R2_ACCESS_KEY_ID}" ]; then
+            echo "::error::Faltan secrets R2_* — no se puede subir a R2. Configuralos o corré con skip_r2."
+            exit 1
+          fi
+          mkdir -p ~/.aws
+          cat > ~/.aws/credentials <<EOF
+          [r2]
+          aws_access_key_id = ${R2_ACCESS_KEY_ID}
+          aws_secret_access_key = ${R2_SECRET_ACCESS_KEY}
+          EOF
+          chmod 600 ~/.aws/credentials
+
+          upload() {
+            local file="$1" key="$2" cache="$3" content_type="$4"
+            [ -f "$file" ] || { echo "  ⊘ skip (no existe): $file"; return 0; }
+            echo "  → s3://${R2_BUCKET}/${key}"
+            aws s3 cp "${file}" "s3://${R2_BUCKET}/${key}" \
+              --endpoint-url "${R2_ENDPOINT}" --profile r2 \
+              --cache-control "${cache}" --content-type "${content_type}" \
+              --only-show-errors
+          }
+
+          IMMUT="public, max-age=31536000, immutable"
+          SHORT="public, max-age=300"
+
+          # Windows NSIS (artifact del updater) + MSI (descarga directa).
+          upload "${NSIS}" "desktop/v${VERSION}/Tinta-Setup.exe" "${IMMUT}" "application/octet-stream"
+          upload "${NSIS}" "desktop/latest/Tinta-Setup.exe"      "${SHORT}" "application/octet-stream"
+          if [ -n "${MSI}" ]; then
+            upload "${MSI}" "desktop/v${VERSION}/Tinta.msi" "${IMMUT}" "application/x-msi"
+            upload "${MSI}" "desktop/latest/Tinta.msi"      "${SHORT}" "application/x-msi"
           fi
 
+          # macOS DMG (descarga sólo — NO entra al manifest del updater).
+          DMG_ARM64=$(find artifacts \( -name '*aarch64*.dmg' -o -name '*arm64*.dmg' \) 2>/dev/null | head -1 || true)
+          DMG_X64=$(find artifacts \( -name '*x86_64*.dmg' -o -name '*x64*.dmg' \) 2>/dev/null | head -1 || true)
+          if [ -n "${DMG_ARM64}" ]; then
+            upload "${DMG_ARM64}" "desktop/v${VERSION}/Tinta-arm64.dmg" "${IMMUT}" "application/x-apple-diskimage"
+            upload "${DMG_ARM64}" "desktop/latest/Tinta-arm64.dmg"      "${SHORT}" "application/x-apple-diskimage"
+          fi
+          if [ -n "${DMG_X64}" ]; then
+            upload "${DMG_X64}" "desktop/v${VERSION}/Tinta-x64.dmg" "${IMMUT}" "application/x-apple-diskimage"
+            upload "${DMG_X64}" "desktop/latest/Tinta-x64.dmg"      "${SHORT}" "application/x-apple-diskimage"
+          fi
+
+          # Si build-macos NO se saltó pero igual no hay DMGs, algo falló en
+          # silencio (build/upload de mac). El manifest de Windows no se bloquea
+          # por mac, pero lo hacemos visible.
+          if [ -z "${DMG_ARM64}" ] && [ -z "${DMG_X64}" ]; then
+            echo "::warning::No se encontraron DMGs de macOS — revisá el job build-macos si no usaste skip_macos."
+          fi
+
+          echo ""
+          echo "✓ Subido a R2 v${VERSION}:"
+          echo "  https://dl.entinta.app/desktop/v${VERSION}/Tinta-Setup.exe   ← manifest del updater"
+          echo "  https://dl.entinta.app/desktop/latest/Tinta-Setup.exe"
+
       - name: Register release with cloud manifest
-        # POST al endpoint admin del cloud (ADR-005 §4.2) para que la
-        # próxima consulta del updater devuelva esta versión a clientes
-        # dentro del bucket de rollout. Si falla (cloud caído, secret mal
-        # configurado), el job NO bloquea el release: los binarios ya
-        # están en GH Releases para fallback manual. Ver docs/release.md
-        # → "Registrar manualmente" si esto da error.
-        #
-        # El gateo por secrets va DENTRO del run, NO en `if:` — GitHub no
-        # permite el contexto `secrets` en expresiones `if:`. El step env sí
-        # puede leer secrets, así que chequeamos las vars en bash y salimos
-        # con warning (sin fallar) si faltan.
+        # POST al endpoint admin del cloud para que el updater devuelva esta
+        # versión. La URL es la pública de R2 (el desktop es privado → la URL de
+        # GitHub Release fallaría la descarga anónima). El .sig es el del MISMO
+        # archivo NSIS. rollout 100 (el updater no manda gym_id; <100 = nadie
+        # actualiza). Si falla, los binarios YA están en R2 + GH Release para
+        # fallback manual. Se salta con skip_manifest.
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.skip_manifest) }}
         env:
           ADMIN_TOKEN: ${{ secrets.RELEASES_ADMIN_TOKEN }}
           CLOUD_URL: ${{ secrets.TINTA_CLOUD_URL }}
           VERSION: ${{ needs.release-windows.outputs.version }}
-          MSI_SIG: ${{ needs.release-windows.outputs.msi_signature }}
-          MSI_URL: ${{ needs.release-windows.outputs.msi_url }}
+          NSIS_SIG: ${{ needs.release-windows.outputs.nsis_signature }}
+          ROLLOUT: ${{ inputs.rollout }}
         run: |
+          # -uo pipefail pero NO -e: manejamos el rc del curl a mano para no
+          # tumbar el job si el cloud rechaza (los binarios ya están en R2).
+          set -uo pipefail
           if [ -z "${ADMIN_TOKEN}" ] || [ -z "${CLOUD_URL}" ]; then
-            echo "::warning::Release subido a GitHub pero NO registrado en el cloud manifest."
-            echo "Causa: RELEASES_ADMIN_TOKEN o TINTA_CLOUD_URL no configurados."
-            echo "Registralo manualmente con el INSERT del docs/release.md."
+            echo "::warning::Binarios en R2 pero manifest NO registrado: faltan RELEASES_ADMIN_TOKEN o TINTA_CLOUD_URL. Registralo manualmente (ver docs/release.md)."
             exit 0
           fi
-          # rollout_percent=5 (día 0). Bumpear vía SQL (ver docs/release.md)
-          # +1d → 25%, +3d → 100% según métricas. No automatizamos el
-          # ramp todavía — manual hasta tener dashboard de health.
-          curl -fSs -X POST "${CLOUD_URL}/api/v1/admin/releases" \
+          if [ -z "${NSIS_SIG}" ]; then
+            echo "::error::nsis_signature vacío — el build no produjo el .sig (¿createUpdaterArtifacts?). Abortando el registro."
+            exit 1
+          fi
+          ROLLOUT="${ROLLOUT:-100}"
+          URL="https://dl.entinta.app/desktop/v${VERSION}/Tinta-Setup.exe"
+          echo "Registrando v${VERSION} → ${URL} (rollout ${ROLLOUT})"
+          # jq arma el JSON de forma segura (escapa el .sig). --argjson para el
+          # int de rollout.
+          PAYLOAD=$(jq -n \
+            --arg version "${VERSION}" \
+            --arg url "${URL}" \
+            --arg sig "${NSIS_SIG}" \
+            --argjson rollout "${ROLLOUT}" \
+            '{
+              version: $version,
+              target_platform: "windows",
+              channel: "stable",
+              url: $url,
+              signature_ed25519: $sig,
+              notes: ("Tinta " + $version + ". Mejoras y correcciones."),
+              rollout_percent: $rollout,
+              force_immediate: false
+            }')
+          # Capturamos el status HTTP en vez de -f para distinguir
+          # "ya-registrado" (re-run idempotente) de un error de config real.
+          HTTP=$(curl -sS -o /tmp/reg_body.json -w '%{http_code}' \
+            -X POST "${CLOUD_URL}/api/v1/admin/releases" \
             -H "Authorization: Bearer ${ADMIN_TOKEN}" \
             -H "Content-Type: application/json" \
-            -d @- <<EOF
-          {
-            "version": "${VERSION}",
-            "target_platform": "x86_64-pc-windows-msvc",
-            "channel": "stable",
-            "url": "${MSI_URL}",
-            "signature_ed25519": "${MSI_SIG}",
-            "notes": "Tinta ${VERSION}. Mejoras y correcciones.",
-            "rollout_percent": 5,
-            "force_immediate": false
-          }
-          EOF
+            -d "${PAYLOAD}") || HTTP="000"
+          BODY=$(cat /tmp/reg_body.json 2>/dev/null || true)
+          case "${HTTP}" in
+            201)
+              echo "✓ Manifest registrado (201)." ;;
+            409)
+              # El cloud devuelve 409 si ya existe (version+target+channel es
+              # UNIQUE). Re-run idempotente → ok. (Requiere que el cloud mapee el
+              # UNIQUE a 409; hoy devuelve 500 → cae al caso 5xx de abajo.)
+              echo "::notice::v${VERSION} ya estaba registrado (409). Idempotente, ok." ;;
+            400|401|503)
+              # Errores de configuración reales: hay que arreglarlos.
+              echo "::error::Registro rechazado (HTTP ${HTTP}): ${BODY}"
+              echo "  400=payload inválido · 401=RELEASES_ADMIN_TOKEN no matchea el del cloud · 503=token vacío en el cloud."
+              exit 1 ;;
+            000)
+              echo "::warning::No se pudo contactar al cloud (red/timeout). Binarios en R2; registrá el manifest manualmente (docs/release.md)." ;;
+            *)
+              # 5xx — incluye el 500 que HOY devuelve el cloud ante el UNIQUE en
+              # un re-run del MISMO version. No bloquea: los binarios ya están en
+              # R2. Si NO es un re-run, revisá el cloud manualmente.
+              echo "::warning::Registro devolvió HTTP ${HTTP}: ${BODY}"
+              echo "  (Re-run del mismo version → el cloud choca contra el UNIQUE y devuelve 500. Binarios ya en R2.)" ;;
+          esac
+
+      - name: Create GitHub Release (backup interno)
+        # Backup interno: el GitHub Release guarda los binarios "para siempre",
+        # pero NO es la fuente del manifest (repo privado → descarga con auth).
+        # Idempotente con --clobber para reintentos.
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.release-windows.outputs.version }}
+          NSIS: ${{ steps.win.outputs.nsis }}
+          MSI: ${{ steps.win.outputs.msi }}
+        run: |
+          set -euo pipefail
+          TAG="v${VERSION}"
+          ASSETS=("${NSIS}")
+          [ -n "${MSI}" ] && ASSETS+=("${MSI}")
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" --title "Tinta ${TAG}" --notes "Release ${TAG}" "${ASSETS[@]}"
+          else
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          fi

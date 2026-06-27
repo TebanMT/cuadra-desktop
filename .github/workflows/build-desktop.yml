@@ -1,12 +1,20 @@
+# ⚠️ DEPRECADO — reemplazado por release.yml (tag `v*.*.*`).
+#
+# El flujo de release se consolidó en UN solo workflow (release.yml) que
+# buildea Windows una vez, sube a R2 (dl.entinta.app) Y registra el manifest
+# del auto-updater. El tag `desktop-v*` ya NO se usa: el R2 publish ahora vive
+# en release.yml (disparado por `v*`). Este archivo quedó SOLO-dispatch como
+# builder multi-plataforma manual de respaldo durante la transición. Borralo
+# tras verificar el flujo consolidado con un release `v*` exitoso.
+#
 # Build Tinta Desktop para macOS (arm64 + x86_64) y Windows (x86_64).
 #
 # La app Tauri necesita el sidecar Go (tinta-core/cmd/sidecar) bundleado
 # como binary externo. El sidecar usa CGO (mattn/go-sqlite3) así que cada
 # plataforma se cross-compila en su runner nativo (no desde Mac).
 #
-# Triggers:
-#   - push de tag `desktop-v*` → release artifacts
-#   - workflow_dispatch → builds ad-hoc para testing
+# Trigger:
+#   - workflow_dispatch → builds ad-hoc (NO publica a R2 — eso es release.yml).
 #
 # Artefactos producidos (configurado en tauri.conf.json bundle.targets):
 #   macOS arm64  → Tinta_x.y.z_aarch64.dmg     (DMG contiene Tinta.app adentro)
@@ -26,11 +34,12 @@
 # Mientras esos secrets no existan, los .app/.exe salen sin firma → el
 # usuario verá "autor desconocido" al abrir. Funcional pero con friction.
 
-name: Build desktop
+name: Build desktop (DEPRECADO)
 
 on:
-  push:
-    tags: ["desktop-v*"]
+  # DEPRECADO: el trigger por tag `desktop-v*` se eliminó. El release real
+  # (build + R2 + manifest) vive en release.yml (tag `v*`). Esto queda
+  # dispatch-only como builder manual de respaldo.
   workflow_dispatch:
     inputs:
       version:
@@ -295,117 +304,3 @@ jobs:
           path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/msi/*.msi
           if-no-files-found: warn
 
-  # ─────────────────────────────────────────────────────────────────────
-  # Publish to R2 — solo en push de tag `desktop-v*`, no en workflow_dispatch.
-  # Sube los installers a dl.entinta.app con paths predecibles para que
-  # el dashboard pueda linkearlos directamente sin URL signing.
-  #
-  # Required GitHub secrets:
-  #   R2_ACCESS_KEY_ID       Access Key del API token R2 con permisos write
-  #   R2_SECRET_ACCESS_KEY   Secret correspondiente
-  #   R2_ENDPOINT            https://<account-id>.r2.cloudflarestorage.com
-  #   R2_BUCKET              tinta-installers (o el nombre que elegiste)
-  #
-  # Estructura final en R2:
-  #   tinta-installers/desktop/<version>/Tinta-arm64.dmg
-  #   tinta-installers/desktop/<version>/Tinta-x64.dmg
-  #   tinta-installers/desktop/<version>/Tinta-Setup.exe
-  #   tinta-installers/desktop/<version>/Tinta.msi
-  #   tinta-installers/desktop/latest/...   ← copia, link estable para CTAs
-  # ─────────────────────────────────────────────────────────────────────
-  publish-to-r2:
-    name: Publish installers to R2
-    needs: [build-macos, build-windows]
-    if: startsWith(github.ref, 'refs/tags/desktop-v')
-    runs-on: ubuntu-latest
-    steps:
-      - name: Determine version
-        id: version
-        run: |
-          # tag "desktop-v0.6.1" → version "0.6.1"
-          VERSION="${GITHUB_REF_NAME#desktop-v}"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Publishing version: ${VERSION}"
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Show what we got
-        run: |
-          find artifacts -type f \( -name '*.dmg' -o -name '*.exe' -o -name '*.msi' \) -exec ls -lh {} +
-
-      - name: Configure AWS CLI for R2
-        run: |
-          mkdir -p ~/.aws
-          cat > ~/.aws/credentials <<EOF
-          [r2]
-          aws_access_key_id = ${{ secrets.R2_ACCESS_KEY_ID }}
-          aws_secret_access_key = ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          EOF
-          chmod 600 ~/.aws/credentials
-
-      - name: Upload to R2 (versioned path + latest alias)
-        env:
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-
-          # Helper para subir + setear content-type apropiado
-          # cache-control corto en /latest/ (5 min) para que cuando
-          # publiques nueva versión los users la agarren rápido.
-          # Largo en /vX/ (1 año, immutable) porque esos paths nunca cambian.
-          upload() {
-            local file="$1"
-            local key="$2"
-            local cache="$3"
-            local content_type="$4"
-
-            echo "→ s3://${R2_BUCKET}/${key}"
-            aws s3 cp "${file}" "s3://${R2_BUCKET}/${key}" \
-              --endpoint-url "${R2_ENDPOINT}" \
-              --profile r2 \
-              --cache-control "${cache}" \
-              --content-type "${content_type}" \
-              --only-show-errors
-          }
-
-          # Mapeo: archivo encontrado → key destino
-          # macOS arm64
-          DMG_ARM64=$(find artifacts -name '*aarch64*.dmg' -o -name '*arm64*.dmg' 2>/dev/null | head -1)
-          if [ -n "$DMG_ARM64" ]; then
-            upload "$DMG_ARM64" "desktop/v${VERSION}/Tinta-arm64.dmg" "public, max-age=31536000, immutable" "application/x-apple-diskimage"
-            upload "$DMG_ARM64" "desktop/latest/Tinta-arm64.dmg" "public, max-age=300" "application/x-apple-diskimage"
-          fi
-
-          # macOS x86_64
-          DMG_X64=$(find artifacts -name '*x86_64*.dmg' -o -name '*x64*.dmg' 2>/dev/null | head -1)
-          if [ -n "$DMG_X64" ]; then
-            upload "$DMG_X64" "desktop/v${VERSION}/Tinta-x64.dmg" "public, max-age=31536000, immutable" "application/x-apple-diskimage"
-            upload "$DMG_X64" "desktop/latest/Tinta-x64.dmg" "public, max-age=300" "application/x-apple-diskimage"
-          fi
-
-          # Windows NSIS .exe (instalador estándar)
-          EXE=$(find artifacts -name '*setup*.exe' -o -name '*Setup*.exe' 2>/dev/null | head -1)
-          if [ -n "$EXE" ]; then
-            upload "$EXE" "desktop/v${VERSION}/Tinta-Setup.exe" "public, max-age=31536000, immutable" "application/octet-stream"
-            upload "$EXE" "desktop/latest/Tinta-Setup.exe" "public, max-age=300" "application/octet-stream"
-          fi
-
-          # Windows MSI (alternativa, GPO friendly)
-          MSI=$(find artifacts -name '*.msi' 2>/dev/null | head -1)
-          if [ -n "$MSI" ]; then
-            upload "$MSI" "desktop/v${VERSION}/Tinta.msi" "public, max-age=31536000, immutable" "application/x-msi"
-            upload "$MSI" "desktop/latest/Tinta.msi" "public, max-age=300" "application/x-msi"
-          fi
-
-          echo ""
-          echo "✓ Published v${VERSION}"
-          echo "  Direct links:"
-          echo "    https://dl.entinta.app/desktop/latest/Tinta-arm64.dmg"
-          echo "    https://dl.entinta.app/desktop/latest/Tinta-x64.dmg"
-          echo "    https://dl.entinta.app/desktop/latest/Tinta-Setup.exe"
-          echo "    https://dl.entinta.app/desktop/latest/Tinta.msi"
