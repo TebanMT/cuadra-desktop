@@ -7,7 +7,12 @@ export type DurationUnit = "days" | "weeks" | "months" | "years";
 export interface DraftMembershipType {
   name: string;
   price: number;
+  // duration_days SIEMPRE acompaña (aproximado legacy, el BE lo exige
+  // >= 1). duration_months no-null = período de calendario (mensual=1,
+  // anual=12); null = días literales. La unidad es intención explícita
+  // del operador — nunca se infiere del número de días.
   duration_days: number;
+  duration_months: number | null;
   enrollment_fee: number;
   maintenance_fee: number;
   maintenance_frequency: number | null;

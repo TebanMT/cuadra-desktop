@@ -32,9 +32,29 @@ export function daysFromToday(value: string | null | undefined): number | null {
   return differenceInCalendarDays(d, today);
 }
 
-export function previewExpiry(startDateIso: string, durationDays: number): string {
+// addMonthsClamped: espejo FE de addMonthsNatural en el dominio
+// (cuadra-core membership.go). 31-ene + 1 mes = 28/29-feb (clamp al
+// último día del mes target), NO 3-mar como haría el overflow nativo.
+// El backend es la autoridad del expiry real; esto es sólo para que el
+// preview en UI coincida con lo que el backend va a calcular.
+export function addMonthsClamped(start: Date, months: number): Date {
+  const targetMonth = start.getMonth() + months;
+  const day = start.getDate();
+  // Día 0 del mes siguiente al target = último día del mes target.
+  const lastDay = new Date(start.getFullYear(), targetMonth + 1, 0).getDate();
+  return new Date(start.getFullYear(), targetMonth, Math.min(day, lastDay));
+}
+
+export function previewExpiry(
+  startDateIso: string,
+  durationDays: number,
+  durationMonths?: number | null,
+): string {
   const start = parseDate(startDateIso);
   if (!start) return "—";
+  if (durationMonths && durationMonths > 0) {
+    return fmtDate(addMonthsClamped(start, durationMonths));
+  }
   return fmtDate(addDays(start, durationDays));
 }
 

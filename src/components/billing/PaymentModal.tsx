@@ -36,7 +36,7 @@ import { useGymChargeSettings } from "@/hooks/useGymChargeSettings";
 import { useSyncStatus, levelOf } from "@/hooks/useSyncStatus";
 import type { Member, MembershipSummary } from "@/hooks/useMembers";
 import { ApiError } from "@/lib/api";
-import { fmtDate, parseDate, todayIso } from "@/lib/dates";
+import { addMonthsClamped, fmtDate, parseDate, todayIso } from "@/lib/dates";
 import { printPdf } from "@/lib/tauri-bridge";
 import { api } from "@/lib/api";
 import { billing as t } from "@/strings/billing";
@@ -105,13 +105,20 @@ function effectiveFee(planFee: number | undefined, gymDefault: number): number {
 function previewNewExpiry(
   paymentDateIso: string,
   currentExpiry: string | null | undefined,
-  durationDays: number
+  durationDays: number,
+  durationMonths?: number | null
 ): string | null {
   const payDate = parseDate(paymentDateIso);
   if (!payDate) return null;
   const cur = currentExpiry ? parseDate(currentExpiry) : null;
   const base = cur && cur >= payDate ? cur : payDate;
-  return fmtDate(addDays(dateMax([base, payDate]), durationDays));
+  const from = dateMax([base, payDate]);
+  // Espeja computeExpiry del dominio: meses de calendario cuando el plan
+  // los declara (con clamp de fin de mes), días corridos si no.
+  if (durationMonths && durationMonths > 0) {
+    return fmtDate(addMonthsClamped(from, durationMonths));
+  }
+  return fmtDate(addDays(from, durationDays));
 }
 
 export function PaymentModal({ member, currentMembership, open, onOpenChange }: Props) {
@@ -300,7 +307,12 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
   const newExpiry = useMemo(
     () =>
       selectedType
-        ? previewNewExpiry(paymentDate, currentMembership?.expiry_date, selectedType.duration_days)
+        ? previewNewExpiry(
+            paymentDate,
+            currentMembership?.expiry_date,
+            selectedType.duration_days,
+            selectedType.duration_months,
+          )
         : null,
     [selectedType, paymentDate, currentMembership?.expiry_date]
   );

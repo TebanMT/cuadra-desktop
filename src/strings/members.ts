@@ -334,19 +334,34 @@ export const members = {
       // Opciones predefinidas para el select de duración. Cubren el
       // 99% de los planes de gimnasios mexicanos (paso, semanal,
       // quincenal, mensual, bimestral, trimestral, semestral, anual).
-      // "Personalizada" abre un input numérico para casos exóticos.
+      // "Personalizada" abre cantidad + unidad para casos exóticos.
+      //
+      // `months` es la INTENCIÓN explícita del preset: no-null = período
+      // de calendario (el backend calcula expiry como N meses naturales);
+      // null = días literales. `days` acompaña siempre como aproximado
+      // legacy (el dominio lo exige >= 1, reportes viejos lo leen).
       durationOptions: [
-        { days: 1, label: "1 día (paso)" },
-        { days: 7, label: "1 semana" },
-        { days: 15, label: "15 días (quincenal)" },
-        { days: 30, label: "30 días (mensual)" },
-        { days: 60, label: "60 días (bimestral)" },
-        { days: 90, label: "90 días (trimestral)" },
-        { days: 180, label: "180 días (semestral)" },
-        { days: 365, label: "365 días (anual)" },
+        { days: 1, months: null, label: "1 día (paso)" },
+        { days: 7, months: null, label: "1 semana" },
+        { days: 15, months: null, label: "15 días (quincenal)" },
+        { days: 30, months: 1, label: "1 mes (mensual)" },
+        { days: 60, months: 2, label: "2 meses (bimestral)" },
+        { days: 90, months: 3, label: "3 meses (trimestral)" },
+        { days: 180, months: 6, label: "6 meses (semestral)" },
+        { days: 365, months: 12, label: "1 año (anual)" },
       ] as const,
       durationCustom: "Personalizada…",
-      durationCustomLabel: "Cantidad de días",
+      durationCustomCount: "Cantidad",
+      durationCustomUnit: "Unidad",
+      durationUnitDays: "Días",
+      durationUnitMonths: "Meses",
+      durationUnitYears: "Años",
+      // Nota para el dueño en modo personalizado: días = literales,
+      // meses/años = calendario.
+      durationCustomHint: (unit: "days" | "months" | "years") =>
+        unit === "days"
+          ? "Días exactos de calendario (ej. 45 días corridos)."
+          : "Períodos de calendario: vence el mismo día del mes correspondiente.",
       // Fields reintroducidos como condicionales — visibles sólo cuando
       // el dueño habilita la feature desde el toggle a nivel página
       // (ver MembershipTypes.tsx). La decisión de cobrar inscripción/
@@ -364,7 +379,8 @@ export const members = {
         nameLength: "El nombre debe tener entre 3 y 100 caracteres.",
         priceRequired: "El precio debe ser mayor a cero.",
         durationRequired: "Elige una duración.",
-        durationCustomInvalid: "La duración personalizada debe ser al menos 1 día.",
+        durationCustomInvalid: "La duración personalizada debe ser al menos 1.",
+        durationCustomTooLong: "La duración máxima es 5 años (60 meses).",
         generic: "No pudimos guardar. Vuelve a intentar.",
       },
       success: {

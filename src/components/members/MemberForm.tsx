@@ -329,7 +329,11 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
   const total = Math.max(0, subtotal - promoDiscount);
   const expiryStr = useMemo(() => {
     if (!selectedPlan || !values.start_date) return null;
-    return previewExpiry(values.start_date, selectedPlan.duration_days);
+    return previewExpiry(
+      values.start_date,
+      selectedPlan.duration_days,
+      selectedPlan.duration_months,
+    );
   }, [selectedPlan, values.start_date]);
 
   function update<K extends keyof MemberFormValues>(key: K, val: MemberFormValues[K]) {

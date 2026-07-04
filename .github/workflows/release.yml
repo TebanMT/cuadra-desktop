@@ -99,7 +99,7 @@ env:
   # el desktop, o pásalo en el input core_ref del workflow_dispatch. "main" =
   # siempre el último commit (cómodo, pero NO reproducible). El SHA exacto que
   # se bundlee queda en el log del step "Checkout tinta-core".
-  TINTA_CORE_REF: v1.0.1
+  TINTA_CORE_REF: v1.0.3
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
