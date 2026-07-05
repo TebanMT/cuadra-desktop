@@ -65,6 +65,7 @@ impl SidecarManager {
     }
 
     pub async fn start(&self, app: AppHandle) {
+        kill_stale_sidecars();
         loop {
             let should_continue = self.spawn_once(&app).await;
             if !should_continue {
@@ -196,6 +197,51 @@ impl SidecarManager {
             log::info!("sending shutdown to sidecar pid={pid}");
             let _ = child.kill();
             tokio::time::sleep(SHUTDOWN_GRACE).await;
+        }
+    }
+}
+
+// Mata sidecars huérfanos de sesiones anteriores ANTES del primer spawn.
+// Origen típico: el updater de Tauri termina la app con process::exit —
+// RunEvent::Exit nunca corre, el shutdown() no se ejecuta — o un crash
+// duro del desktop. Un huérfano retiene el puerto 9090: el hijo nuevo
+// muere al bindear, el manager agota MAX_RESTARTS y el FE queda clavado
+// en "sidecar not ready" hasta un reboot. Matar por nombre de imagen
+// asume UNA instancia de Tinta por máquina — supuesto que el puerto
+// fijo ya impone de todos modos.
+fn kill_stale_sidecars() {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        // CREATE_NO_WINDOW: sin flash de consola al correr taskkill.
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        match std::process::Command::new("taskkill")
+            .args(["/F", "/IM", "tinta-sidecar.exe"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+        {
+            Ok(o) if o.status.success() => {
+                log::warn!("killed stale tinta-sidecar.exe orphan(s) from a previous session");
+            }
+            // taskkill sale no-cero cuando el proceso no existe — el caso
+            // normal y silencioso. Errores de lanzamiento sí se loggean.
+            Ok(_) => {}
+            Err(e) => log::warn!("could not run taskkill for stale sidecars: {e}"),
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        // -x: match exacto del nombre de proceso (no queremos matar, p.ej.,
+        // un editor con "tinta-sidecar" en sus argumentos).
+        match std::process::Command::new("pkill")
+            .args(["-x", "tinta-sidecar"])
+            .output()
+        {
+            Ok(o) if o.status.success() => {
+                log::warn!("killed stale tinta-sidecar orphan(s) from a previous session");
+            }
+            Ok(_) => {}
+            Err(e) => log::warn!("could not run pkill for stale sidecars: {e}"),
         }
     }
 }

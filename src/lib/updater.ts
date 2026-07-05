@@ -143,9 +143,22 @@ export async function downloadAndInstall(
 
   void reportTelemetry({ kind: "update_download_started", newVersion });
   try {
-    await update.downloadAndInstall();
+    await update.download();
     void reportTelemetry({ kind: "update_download_completed", newVersion });
     void reportTelemetry({ kind: "update_apply_started", newVersion });
+    // El sidecar es un proceso hijo aparte: el updater termina la app con
+    // process::exit (sin RunEvent::Exit) y un sidecar huérfano bloquea su
+    // propio .exe durante el install ("error opening file for writing:
+    // tinta-sidecar.exe"). Apagarlo ANTES de lanzar el instalador.
+    // Best-effort: si falla, seguimos — el hook PREINSTALL del NSIS hace
+    // taskkill como red de seguridad.
+    try {
+      const { invoke } = await import("@tauri-apps/api/core");
+      await invoke("shutdown_sidecar");
+    } catch {
+      // Sin sidecar vivo (o fuera de Tauri): nada que soltar.
+    }
+    await update.install();
     void reportTelemetry({ kind: "update_apply_succeeded", newVersion });
   } catch (e: unknown) {
     const reason = e instanceof Error ? e.message : String(e);

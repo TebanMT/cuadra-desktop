@@ -113,6 +113,36 @@
 ;   lo dice explícito) — degradación aceptable.
 !define TINTA_PS64 "$WINDIR\Sysnative\WindowsPowerShell\v1.0\powershell.exe"
 
+; ─── PREINSTALL: soltar tinta-sidecar.exe antes de copiar archivos ─────────
+; El template de Tauri cierra Tinta.exe antes de instalar, pero el sidecar
+; es un proceso hijo APARTE que puede seguir vivo — típico en updates: el
+; updater termina la app con process::exit (sin RunEvent::Exit, o sea sin
+; el shutdown del sidecar) y el huérfano bloquea su propio .exe →
+; "error opening file for writing: tinta-sidecar.exe". El watcher de
+; parent-PID del Go no detecta padre muerto en Windows (no hay reparenting;
+; Getppid devuelve el PID viejo congelado). taskkill por nombre de imagen
+; mata también huérfanos de crashes que no son hijos de este proceso.
+; Fallo del taskkill = no estaba corriendo → ignorar. El sleep da margen a
+; que Windows suelte los handles del proceso muerto antes del primer File.
+!macro NSIS_HOOK_PREINSTALL
+  Push $0
+  DetailPrint "Cerrando procesos de Tinta..."
+  nsExec::ExecToLog 'taskkill /F /IM tinta-sidecar.exe'
+  Pop $0
+  Sleep 500
+  Pop $0
+!macroend
+
+; Mismo problema al DESINSTALAR: el uninstaller no puede borrar un
+; tinta-sidecar.exe en ejecución.
+!macro NSIS_HOOK_PREUNINSTALL
+  Push $0
+  nsExec::ExecToLog 'taskkill /F /IM tinta-sidecar.exe'
+  Pop $0
+  Sleep 500
+  Pop $0
+!macroend
+
 !macro NSIS_HOOK_POSTINSTALL
   Push $0
   Push $1
