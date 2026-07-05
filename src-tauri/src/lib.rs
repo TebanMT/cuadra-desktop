@@ -99,6 +99,7 @@ pub fn run() {
             commands::secure_storage_delete,
             commands::print_pdf,
             commands::quit_app,
+            commands::shutdown_sidecar,
             commands::read_auto_rollback_marker,
             commands::clear_auto_rollback_marker,
         ])

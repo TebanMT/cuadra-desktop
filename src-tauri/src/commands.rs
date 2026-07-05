@@ -82,6 +82,20 @@ pub fn quit_app(app: AppHandle) {
     app.exit(0);
 }
 
+// El updater de Tauri (Windows/NSIS) termina el proceso con
+// std::process::exit al aplicar el update — RunEvent::Exit nunca corre,
+// el sidecar queda huérfano y bloquea tinta-sidecar.exe justo cuando el
+// instalador intenta sobreescribirlo ("error opening file for writing").
+// El FE lo invoca entre download() e install() para soltar el binario y
+// el puerto ANTES de lanzar el NSIS. El hook PREINSTALL del instalador
+// es la red para los huérfanos que este camino limpio no cubre (crash
+// de la app, updates desde versiones sin este comando).
+#[tauri::command]
+pub async fn shutdown_sidecar(state: State<'_, AppState>) -> Result<(), String> {
+    state.sidecar.shutdown().await;
+    Ok(())
+}
+
 // Lee el marker de auto-rollback (ADR-005 §2.5). El FE lo consulta al
 // boot para mostrar un banner si la corrida anterior crasheó dos veces y
 // disparamos rollback. Sin marker → None.
