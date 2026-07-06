@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import {
   useBiometricCheckinLoop,
@@ -11,7 +12,10 @@ import {
   feedbackTone,
 } from "@/components/checkin/CheckinFeedback";
 import { useWindowPresence } from "@/hooks/useWindowPresence";
-import { useKioskCheckinRelay } from "@/hooks/useKioskCheckinRelay";
+import {
+  emitCheckinResult,
+  useCheckinResultRelay,
+} from "@/hooks/useCheckinResultRelay";
 import {
   CHECKIN_FLOAT_WINDOW_LABEL,
   KIOSK_WINDOW_LABEL,
@@ -19,9 +23,9 @@ import {
 import type { CheckinEvent } from "@/hooks/useCheckin";
 import { playCheckinTone } from "@/lib/audio";
 
-// GlobalCheckinScanner — mantiene el biometric loop SIEMPRE activo en
-// la main window. Cuando el operador apoya la huella, el resultado del
-// checkin sale como toast, sin importar en qué pantalla esté.
+// GlobalCheckinScanner — mantiene el biometric loop activo en la main
+// window. Cuando el operador apoya la huella, el resultado del checkin
+// sale como toast, sin importar en qué pantalla esté.
 //
 // Cómo evita conflictos con enrollment: el flujo de registro de huella
 // usa useBiometricClaim() del BiometricStreamProvider, que pausa el
@@ -29,37 +33,38 @@ import { playCheckinTone } from "@/lib/audio";
 // este scanner vuelve a recibir samples automáticamente. No hay que
 // detectar la ruta — la coordinación vive en el provider.
 //
-// Cómo convive con las ventanas de check-in dedicadas (kiosk y
-// checkin-float): mientras exista cualquiera de las dos, este scanner se
-// SILENCIA (suppressed) sin desuscribirse — la ventana dedicada postea el
-// check-in y muestra el resultado; si la main también posteara, cada
-// huella registraría DOS check-ins cuando el Lite Client multiplexa el
-// sample a ambas ventanas (el BE no dedupea re-checkins inmediatos). Al
-// cerrarse la ventana dedicada, la presencia cae y este scanner retoma
-// solo. Ver el porqué completo en useBiometricCheckinLoop.suppressed.
+// Cómo convive con las otras ventanas (verificado en gym piloto,
+// 6-jul-2026): el Lite Client entrega cada sample a la ventana cuyo
+// documento tiene EL FOCO — no multiplexa. Con la flotante o el kiosko
+// abiertos, la main sigue procesando los check-ins mientras el operador
+// trabaje en ella (que es casi siempre), y EMITE cada resultado vía
+// useCheckinResultRelay para que la superficie del socio (flotante /
+// kiosko) lo pinte y suene. A la inversa, cuando otra ventana procesa
+// (porque tuvo el foco), aquí pintamos su relay como toast SIN tono (la
+// otra ventana ya sonó en las mismas bocinas) y sin tocar el BE.
 //
-// Matiz del kiosko: suele vivir en un segundo monitor viendo al socio,
-// así que sin toast el operador queda ciego de quién entró (o de quién
-// fue rechazado y hay que intervenir). Por eso el kiosko emite cada
-// resultado vía evento Tauri (useKioskCheckinRelay) y aquí lo pintamos
-// como toast SIN tono (el kiosko ya sonó en las mismas bocinas) y sin
-// tocar el BE. La flotante NO relaya: vive en la pantalla del operador
-// y su resultado ya es visible.
+// Dentro de la MISMA ventana main, /checkin es dueña del loop: CheckinPage
+// monta su propio useBiometricCheckinLoop, y el provider multiplexa
+// samples a TODOS los subscribers de la ventana — si este scanner no se
+// apagara ahí, cada huella en /checkin registraría dos check-ins (el BE
+// no dedupea re-checkins inmediatos).
 //
 // Montado una sola vez en DashboardLayout (encima del <Outlet>), así
 // sobrevive a la navegación entre pantallas.
 export function GlobalCheckinScanner() {
   const bio = useBiometricStatus();
   const readerConnected = useReaderConnected();
+  const location = useLocation();
   const floatOpen = useWindowPresence(CHECKIN_FLOAT_WINDOW_LABEL);
   const kioskOpen = useWindowPresence(KIOSK_WINDOW_LABEL);
 
   const available = !!bio.data?.available && readerConnected === true;
+  const onCheckinRoute = location.pathname === "/checkin";
+  // Con una superficie dedicada al socio abierta, el tono lo pone ella
+  // (vía relay) — la main sólo toastea. Sin flotante ni kiosko, la main es
+  // el único feedback y conserva su tono.
+  const dedicatedSurfaceOpen = floatOpen || kioskOpen;
 
-  // withTone=false para resultados relayados desde el kiosko: la main
-  // sólo pinta el toast; el tono ya sonó allá (mismas bocinas). El texto
-  // del detalle es el canónico de feedbackDetail — el operador debe leer
-  // lo mismo que el socio ve en el kiosko.
   const toastCheckinResult = useCallback(
     (ev: CheckinEvent, withTone: boolean) => {
       const fb = eventToFeedback(ev);
@@ -100,28 +105,35 @@ export function GlobalCheckinScanner() {
   // Memoizamos los handlers para no re-suscribir el loop en cada render
   // (caro: el provider trata cada cambio de subscriber como vida nueva).
   const onCheckin = useCallback(
-    (ev: CheckinEvent) => toastCheckinResult(ev, true),
-    [toastCheckinResult],
+    (ev: CheckinEvent) => {
+      toastCheckinResult(ev, !dedicatedSurfaceOpen);
+      void emitCheckinResult({ kind: "checkin", event: ev });
+    },
+    [toastCheckinResult, dedicatedSurfaceOpen],
   );
-  const onNoMatch = useCallback(() => toastNoMatch(true), [toastNoMatch]);
+  const onNoMatch = useCallback(() => {
+    toastNoMatch(!dedicatedSurfaceOpen);
+    void emitCheckinResult({ kind: "no_match" });
+  }, [toastNoMatch, dedicatedSurfaceOpen]);
 
   useBiometricCheckinLoop({
-    enabled: available,
-    suppressed: floatOpen || kioskOpen,
+    enabled: available && !onCheckinRoute,
     onCheckin,
     onNoMatch,
     // Sin onAttempt / onError visibles — un toast por cada lectura sería
     // ruidoso; sólo los resultados terminales (allowed/denied/no-match).
   });
 
-  // Toast espejo de lo que el kiosko registró — sin POST y sin tono.
+  // Toast espejo de lo que otra ventana procesó — sin POST y sin tono. El
+  // relay filtra los eventos emitidos por esta misma ventana (echo), así
+  // que lo que CheckinPage emite en /checkin no se duplica aquí.
   const onRelayedCheckin = useCallback(
     (ev: CheckinEvent) => toastCheckinResult(ev, false),
     [toastCheckinResult],
   );
   const onRelayedNoMatch = useCallback(() => toastNoMatch(false), [toastNoMatch]);
 
-  useKioskCheckinRelay({
+  useCheckinResultRelay({
     onCheckin: onRelayedCheckin,
     onNoMatch: onRelayedNoMatch,
   });

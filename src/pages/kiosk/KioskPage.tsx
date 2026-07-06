@@ -17,7 +17,10 @@ import {
   useReaderConnected,
 } from "@/hooks/useBiometric";
 import { useSyncStatus, levelOf } from "@/hooks/useSyncStatus";
-import { emitKioskCheckinResult } from "@/hooks/useKioskCheckinRelay";
+import {
+  emitCheckinResult,
+  useCheckinResultRelay,
+} from "@/hooks/useCheckinResultRelay";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { closeCurrentWindow, isCurrentWindowKiosk } from "@/lib/kioskWindow";
@@ -137,10 +140,12 @@ export default function KioskPage() {
   // Lite Client local; cada huella detectada POST-ea a /biometric/checkin
   // y el backend ejecuta UC-029 contra la galería del gym activo.
   //
-  // Cada resultado se relaya a la main vía evento Tauri: mientras este
-  // kiosko exista, el GlobalCheckinScanner está suprimido (anti
-  // doble-POST) y sin el relay el operador se quedaría sin su toast de
-  // quién entró. Ver useKioskCheckinRelay.
+  // Ojo: el Lite Client entrega los samples a la ventana CON FOCO, así que
+  // este loop sólo recibe cuando el kiosko está enfocado. Cada resultado
+  // propio se relaya a la main (toast del operador); y a la inversa, el
+  // listener de abajo pinta aquí los check-ins que la main procesó
+  // mientras tenía el foco — sin eso el socio frente al kiosko no vería
+  // nada. Ver useCheckinResultRelay.
   useBiometricCheckinLoop({
     enabled: fingerprintAvailable,
     onAttempt: () => setFeedback({ kind: "processing" }),
@@ -148,17 +153,34 @@ export default function KioskPage() {
       const fb = eventToFeedback(ev);
       setFeedback(fb);
       announceTone(fb);
-      void emitKioskCheckinResult({ kind: "checkin", event: ev });
+      void emitCheckinResult({ kind: "checkin", event: ev });
     },
     onNoMatch: () => {
       const fb: FeedbackState = { kind: "denied_not_found" };
       setFeedback(fb);
       announceTone(fb);
-      void emitKioskCheckinResult({ kind: "no_match" });
+      void emitCheckinResult({ kind: "no_match" });
     },
     onError: () => {
       // SDK / matcher failure mid-stream. El banner ya refleja el estado
       // del lector vía useReaderConnected; no duplicamos aquí.
+    },
+  });
+
+  // Resultados procesados por OTRA ventana (la main con el foco): se
+  // pintan igual que los propios, con tono — esta es la superficie del
+  // socio y la main toastea sin tono cuando el kiosko existe. El relay
+  // descarta el echo de los emits propios.
+  useCheckinResultRelay({
+    onCheckin: (ev) => {
+      const fb = eventToFeedback(ev);
+      setFeedback(fb);
+      announceTone(fb);
+    },
+    onNoMatch: () => {
+      const fb: FeedbackState = { kind: "denied_not_found" };
+      setFeedback(fb);
+      announceTone(fb);
     },
   });
 

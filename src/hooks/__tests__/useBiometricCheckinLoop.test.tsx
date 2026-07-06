@@ -36,19 +36,22 @@ vi.mock("@/lib/biometric", () => {
 });
 
 const postFormData = vi.fn();
-vi.mock("@/lib/api", () => ({
-  api: {
-    postFormData: (...args: unknown[]) => postFormData(...args),
-    get: vi.fn(),
-    post: vi.fn(),
-  },
-  ApiError: class ApiError extends Error {
-    status = 500;
-    code = "";
-  },
-}));
+vi.mock("@/lib/api", async () => {
+  // ApiError real (clase pura, sin I/O) + api mockeada. Así el instanceof
+  // del hook y los constructores de los tests usan la misma clase.
+  const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
+  return {
+    ApiError: actual.ApiError,
+    api: {
+      postFormData: (...args: unknown[]) => postFormData(...args),
+      get: vi.fn(),
+      post: vi.fn(),
+    },
+  };
+});
 
 import { useBiometricCheckinLoop } from "../useBiometric";
+import { ApiError } from "@/lib/api";
 
 const CHECKIN_EVENT = {
   id: "chk-1",
@@ -68,67 +71,70 @@ function fireSample() {
   });
 }
 
-describe("useBiometricCheckinLoop — suppressed", () => {
+describe("useBiometricCheckinLoop", () => {
   beforeEach(() => {
     capturedSub = null;
     postFormData.mockReset();
     postFormData.mockResolvedValue(CHECKIN_EVENT);
   });
 
-  it("con suppressed=true ignora el sample: ni POST al BE ni onCheckin", async () => {
+  it("cada sample POST-ea a /biometric/checkin y entrega el evento a onCheckin", async () => {
     const onCheckin = vi.fn();
-    renderHook(() =>
-      useBiometricCheckinLoop({ enabled: true, suppressed: true, onCheckin }),
-    );
-    expect(capturedSub).not.toBeNull();
-
-    fireSample();
-    await act(async () => {});
-
-    expect(postFormData).not.toHaveBeenCalled();
-    expect(onCheckin).not.toHaveBeenCalled();
-    // La suscripción sigue viva — suprimir NO es desuscribirse.
+    renderHook(() => useBiometricCheckinLoop({ enabled: true, onCheckin }));
     expect(capturedSub?.enabled).toBe(true);
-  });
 
-  it("al quitar suppressed retoma el POST y el callback sin re-suscribir", async () => {
-    const onCheckin = vi.fn();
-    const { rerender } = renderHook(
-      ({ suppressed }: { suppressed: boolean }) =>
-        useBiometricCheckinLoop({ enabled: true, suppressed, onCheckin }),
-      { initialProps: { suppressed: true } },
-    );
-
-    fireSample();
-    await act(async () => {});
-    expect(postFormData).not.toHaveBeenCalled();
-
-    rerender({ suppressed: false });
     fireSample();
     await act(async () => {});
 
     expect(postFormData).toHaveBeenCalledTimes(1);
+    expect(postFormData.mock.calls[0][0]).toBe("/api/v1/biometric/checkin");
     expect(onCheckin).toHaveBeenCalledWith(CHECKIN_EVENT);
   });
 
-  it("un sample suprimido no bloquea al siguiente (no toca el flag inflight)", async () => {
+  it("serializa POSTs inflight: un dedazo doble no genera dos check-ins", async () => {
+    // El POST queda colgado hasta que lo resolvamos a mano.
+    let resolvePost: ((v: unknown) => void) | undefined;
+    postFormData.mockImplementation(
+      () => new Promise((r) => (resolvePost = r)),
+    );
     const onCheckin = vi.fn();
-    const { rerender } = renderHook(
-      ({ suppressed }: { suppressed: boolean }) =>
-        useBiometricCheckinLoop({ enabled: true, suppressed, onCheckin }),
-      { initialProps: { suppressed: true } },
+    renderHook(() => useBiometricCheckinLoop({ enabled: true, onCheckin }));
+
+    fireSample();
+    fireSample(); // segundo dedazo con el primero aún en vuelo
+    expect(postFormData).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      resolvePost!(CHECKIN_EVENT);
+    });
+    expect(onCheckin).toHaveBeenCalledTimes(1);
+
+    // Con el inflight liberado, el siguiente sample sí procesa.
+    postFormData.mockResolvedValue(CHECKIN_EVENT);
+    fireSample();
+    await act(async () => {});
+    expect(postFormData).toHaveBeenCalledTimes(2);
+  });
+
+  it("un ApiError no-503 se reporta como no-match (el BE no identificó a nadie)", async () => {
+    postFormData.mockRejectedValue(new ApiError(404, "no_match", "no match"));
+    const onCheckin = vi.fn();
+    const onNoMatch = vi.fn();
+    renderHook(() =>
+      useBiometricCheckinLoop({ enabled: true, onCheckin, onNoMatch }),
     );
 
-    // Varios dedazos durante la supresión…
-    fireSample();
     fireSample();
     await act(async () => {});
 
-    // …y el primero real después de la supresión pasa completo.
-    rerender({ suppressed: false });
-    fireSample();
-    await act(async () => {});
-    expect(postFormData).toHaveBeenCalledTimes(1);
-    expect(onCheckin).toHaveBeenCalledTimes(1);
+    expect(onNoMatch).toHaveBeenCalledTimes(1);
+    expect(onCheckin).not.toHaveBeenCalled();
+  });
+
+  it("enabled=false apaga la suscripción (el provider decide si el stream sigue)", () => {
+    renderHook(() =>
+      useBiometricCheckinLoop({ enabled: false, onCheckin: vi.fn() }),
+    );
+    expect(capturedSub?.enabled).toBe(false);
   });
 });
