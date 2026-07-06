@@ -70,7 +70,6 @@
 !define TINTA_DP_SVC "SYSTEM\CurrentControlSet\Services\DpHost"
 !define TINTA_DP_UNINST "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{AFB5AC65-F772-4AA8-ADA1-630480C03438}"
 !define TINTA_DP_AGENT_BIN "$PROGRAMFILES64\HID Global\Authentication Device Client\Bin\DpHostW.exe"
-!define TINTA_DP_REG_LEGACY "SOFTWARE\DigitalPersona\Bin"
 !define TINTA_DP_TEMP_EXE "$TEMP\tinta-hid-adc.exe"
 !define TINTA_DP_TEMP_PS1 "$TEMP\tinta-dp-fetch.ps1"
 !define TINTA_DP_CHECK_PS1 "$TEMP\tinta-dp-check.ps1"
@@ -169,20 +168,27 @@
   SetRegView 64
 
   ; Detección en cascada contra el footprint REAL (ver defines arriba):
-  ; 4 chequeos, cualquiera positivo gatilla skip.
+  ; 3 chequeos, cualquiera positivo gatilla skip.
   ;   1. Servicio DpHost — la señal más robusta: la hive SYSTEM no tiene
   ;      split WOW64 y el servicio ES lo que el FE necesita corriendo.
-  ;      El nombre viene de la era DigitalPersona → cubre 4.x también.
   ;   2. Entrada de desinstalación del MSI 5.2.0 (product code pineado).
   ;   3. File presence del host (red para registry limpiado a mano).
-  ;   4. Registry legacy 4.x (marca DigitalPersona) — histórico.
+  ;
+  ; OJO: el registry legacy 4.x (SOFTWARE\DigitalPersona\Bin — era One
+  ; Touch/RTE) ya NO cuenta como "instalado". Ese runtime NO trae el
+  ; agente WebSdk que el FE necesita en el puerto 52181 — es el que dejan
+  ; los sistemas de gym viejos (HDLEON y similares) — y tratarlo como
+  ; skip dejaba la máquina sin Lite Client con el lector muerto en
+  ; silencio (/get_connection → HRESULT 0x80070002 "El sistema no puede
+  ; encontrar el archivo especificado"). Esas máquinas ahora caen al
+  ; pre-check de conflicto de abajo, que nombra el producto DigitalPersona
+  ; viejo con un mensaje accionable en vez de fingir que todo quedó listo.
   ReadRegStr $0 HKLM "${TINTA_DP_SVC}" "ImagePath"
   StrCmp $0 "" 0 tinta_dp_already
   ReadRegStr $0 HKLM "${TINTA_DP_UNINST}" "DisplayName"
   StrCmp $0 "" 0 tinta_dp_already
   IfFileExists "${TINTA_DP_AGENT_BIN}" tinta_dp_already
-  ReadRegStr $0 HKLM "${TINTA_DP_REG_LEGACY}" "InstallDir"
-  StrCmp $0 "" tinta_dp_download tinta_dp_already
+  Goto tinta_dp_download
 
   tinta_dp_download:
     ; Pre-check de conflicto ANTES de descargar 55 MB: según HID, el

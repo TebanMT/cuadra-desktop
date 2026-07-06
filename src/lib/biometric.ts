@@ -221,6 +221,15 @@ function classify(err: unknown): BiometricError {
   if (/communication|websocket|connect/i.test(msg)) {
     return new BiometricError("lite_client_unreachable", msg);
   }
+  // HRESULT 0x80070002 (-2147024894, ERROR_FILE_NOT_FOUND): el agente del
+  // Lite Client respondió el /get_connection pero no encuentra una pieza
+  // suya (servicio DpHost parado, instalación a medias, o runtime 4.x de
+  // otro sistema — p.ej. HDLEON — en lugar del Lite Client 5.2 real). Sin
+  // este mapeo caía a sdk_error y el operador veía un mensaje genérico en
+  // vez del accionable "no detecto el lector".
+  if (/-2147024894|0x80070002|no puede encontrar el archivo|cannot find the file/i.test(msg)) {
+    return new BiometricError("lite_client_unreachable", msg);
+  }
   if (/no device|enumerate/i.test(msg)) {
     return new BiometricError("no_device", msg);
   }
