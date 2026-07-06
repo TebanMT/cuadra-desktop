@@ -1,11 +1,11 @@
-import { useState } from "react";
-import { Loader2, Download, Printer, MessageCircle, Link as LinkIcon } from "lucide-react";
+import { Loader2, Download, Printer, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useReceiptPdf, useSendReceipt } from "@/hooks/useBilling";
-import { printPdf } from "@/lib/tauri-bridge";
+import { printPdf, saveBlob } from "@/lib/tauri-bridge";
+import { notifySendReceiptOutcome } from "@/lib/receiptToasts";
 import { billing as t } from "@/strings/billing";
 
 interface Props {
@@ -15,29 +15,35 @@ interface Props {
   onOpenChange(open: boolean): void;
 }
 
+// Nota: no hay botón "Copiar enlace" — no existe (todavía) un link público
+// de comprobante; el que se copiaba antes era la URL local del app
+// (tauri://…), inútil fuera de esta máquina. El canal para compartir es
+// WhatsApp. Si algún día hay links públicos firmados, vuelve el botón.
 export function ReceiptViewer({ paymentId, folio, open, onOpenChange }: Props) {
   const receipt = useReceiptPdf(open ? paymentId : null);
   const send = useSendReceipt(paymentId || "");
-  const [copying, setCopying] = useState(false);
 
   async function download() {
     if (!receipt.data) return;
-    const url = URL.createObjectURL(receipt.data);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `comprobante_${folio || paymentId || "pago"}.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    try {
+      const path = await saveBlob(receipt.data, `comprobante_${folio || paymentId || "pago"}.pdf`);
+      if (path) toast.success(t.receipt.downloadOk(path));
+      // path null = canceló el diálogo — silencio.
+    } catch {
+      toast.error(t.receipt.downloadError);
+    }
   }
 
   async function print() {
     if (!receipt.data) return;
     try {
       const buf = new Uint8Array(await receipt.data.arrayBuffer());
-      await printPdf(buf);
-      toast.success(t.payment.afterAction.printOk);
+      const mode = await printPdf(buf);
+      if (mode === "printed") {
+        toast.success(t.payment.afterAction.printOk);
+      } else {
+        toast.info(t.payment.afterAction.printOpened);
+      }
     } catch {
       toast.error(t.payment.afterAction.printError);
     }
@@ -45,22 +51,10 @@ export function ReceiptViewer({ paymentId, folio, open, onOpenChange }: Props) {
 
   async function sendWhatsapp() {
     try {
-      await send.mutateAsync({ channel: "whatsapp" });
-      toast.success(t.payment.afterAction.whatsappOk);
+      const res = await send.mutateAsync({ channel: "whatsapp" });
+      notifySendReceiptOutcome(res);
     } catch {
       toast.error(t.payment.afterAction.whatsappError);
-    }
-  }
-
-  async function copyLink() {
-    if (!paymentId) return;
-    setCopying(true);
-    try {
-      const link = `${window.location.origin}/payments/${paymentId}/receipt`;
-      await navigator.clipboard.writeText(link);
-      toast.success(t.receipt.linkCopied);
-    } finally {
-      setCopying(false);
     }
   }
 
@@ -93,10 +87,6 @@ export function ReceiptViewer({ paymentId, folio, open, onOpenChange }: Props) {
         </div>
 
         <div className="flex flex-wrap gap-2 justify-end pt-2">
-          <Button variant="outline" onClick={copyLink} disabled={copying || !paymentId}>
-            <LinkIcon className="h-4 w-4" />
-            {t.receipt.copyLink}
-          </Button>
           <Button variant="outline" onClick={download} disabled={!receipt.data}>
             <Download className="h-4 w-4" />
             {t.receipt.download}

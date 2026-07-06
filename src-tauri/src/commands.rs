@@ -71,10 +71,136 @@ pub fn secure_storage_delete(key: String) -> Result<(), String> {
     }
 }
 
+// print_pdf — impresión real (antes: stub que devolvía Ok y el FE cantaba
+// "Enviado a la impresora" sin imprimir nada). Escribe el PDF a un temp y
+// usa el verbo Print de la asociación de PDF del sistema; si la asociación
+// no expone ese verbo (típico: Edge como visor default, sin Acrobat — el
+// caso normal en las PCs de los gyms), cae a ABRIR el visor por defecto.
+// Devuelve "printed" | "opened" para que el FE ponga el copy honesto
+// ("imprime desde el visor") en vez de un éxito falso.
 #[tauri::command]
-pub fn print_pdf(_bytes: Vec<u8>) -> Result<(), String> {
-    log::info!("print_pdf invoked ({} bytes) — stub, not yet wired to OS printer", _bytes.len());
-    Ok(())
+pub async fn print_pdf(bytes: Vec<u8>) -> Result<String, String> {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0);
+    let path = std::env::temp_dir().join(format!("tinta-comprobante-{stamp}.pdf"));
+    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    // Procesos del shell bloqueantes — fuera del hilo principal para no
+    // congelar el webview.
+    tauri::async_runtime::spawn_blocking(move || print_or_open(&path))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[cfg(target_os = "windows")]
+fn print_or_open(path: &std::path::Path) -> Result<String, String> {
+    use std::os::windows::process::CommandExt;
+    // Sin esto, powershell/cmd parpadean una consola frente al operador.
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    let p = path.display().to_string();
+    // $ErrorActionPreference='Stop' vuelve terminante el "verbo no
+    // soportado" → exit code 1 → caemos al open. Comillas simples de PS se
+    // escapan duplicándolas (el temp path no trae, pero por si acaso).
+    let script = format!(
+        "$ErrorActionPreference='Stop'; Start-Process -FilePath '{}' -Verb Print",
+        p.replace('\'', "''")
+    );
+    let printed = std::process::Command::new("powershell")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if printed {
+        return Ok("printed".into());
+    }
+    let opened = std::process::Command::new("cmd")
+        .args(["/C", "start", "", &p])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if opened {
+        Ok("opened".into())
+    } else {
+        Err("no se pudo imprimir ni abrir el comprobante".into())
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn print_or_open(path: &std::path::Path) -> Result<String, String> {
+    // lp manda a la impresora default de CUPS; sin impresora configurada
+    // falla y abrimos Preview (máquina de dev — suficiente).
+    let printed = std::process::Command::new("lp")
+        .arg(path)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if printed {
+        return Ok("printed".into());
+    }
+    let opened = std::process::Command::new("open")
+        .arg(path)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if opened {
+        Ok("opened".into())
+    } else {
+        Err("no se pudo imprimir ni abrir el comprobante".into())
+    }
+}
+
+#[cfg(all(not(target_os = "windows"), not(target_os = "macos")))]
+fn print_or_open(path: &std::path::Path) -> Result<String, String> {
+    let opened = std::process::Command::new("xdg-open")
+        .arg(path)
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+    if opened {
+        Ok("opened".into())
+    } else {
+        Err("no se pudo abrir el comprobante".into())
+    }
+}
+
+// save_file — guardar con diálogo nativo. `<a download>` con blob: es un
+// no-op dentro de WebView2 (Tauri no cablea el download handler de wry),
+// así que "Descargar" mostraba éxito sin escribir NADA a disco. El FE nos
+// pasa los bytes; acá va el diálogo + write. Devuelve la ruta elegida, o
+// None si el operador canceló (el FE no toastea nada en ese caso).
+#[tauri::command]
+pub async fn save_file(
+    app: AppHandle,
+    bytes: Vec<u8>,
+    suggested_name: String,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let ext = std::path::Path::new(&suggested_name)
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    // blocking_save_file no debe correr en el hilo principal (deadlock
+    // documentado del plugin) — spawn_blocking igual que print_pdf.
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        let mut dlg = app.dialog().file().set_file_name(&suggested_name);
+        if !ext.is_empty() {
+            let exts = [ext.as_str()];
+            dlg = dlg.add_filter(ext.to_uppercase(), &exts);
+        }
+        dlg.blocking_save_file()
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    let Some(file_path) = picked else {
+        return Ok(None);
+    };
+    let path = file_path.into_path().map_err(|e| e.to_string())?;
+    std::fs::write(&path, &bytes).map_err(|e| e.to_string())?;
+    Ok(Some(path.display().to_string()))
 }
 
 #[tauri::command]

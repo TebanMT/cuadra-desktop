@@ -216,8 +216,11 @@ export function useRefund(paymentID: string) {
 
 export function useSendReceipt(paymentID: string) {
   return useMutation({
+    // La respuesta real del BE es {status, note}: queued / already_pending
+    // / skipped — el caller decide el toast con notifySendReceiptOutcome
+    // (el tipo viejo {ok, channel, sent_at} nunca existió en el wire).
     mutationFn: (input?: SendReceiptInput) =>
-      api.post<{ ok: true; channel: string; sent_at: string }>(
+      api.post<{ status: string; note?: string }>(
         `/api/v1/payments/${paymentID}/send-receipt`,
         input ?? {}
       ),

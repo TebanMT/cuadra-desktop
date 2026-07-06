@@ -38,6 +38,7 @@ import type { Member, MembershipSummary } from "@/hooks/useMembers";
 import { ApiError } from "@/lib/api";
 import { addMonthsClamped, fmtDate, parseDate, todayIso } from "@/lib/dates";
 import { printPdf } from "@/lib/tauri-bridge";
+import { notifySendReceiptOutcome } from "@/lib/receiptToasts";
 import { api } from "@/lib/api";
 import { billing as t } from "@/strings/billing";
 import { members as mt } from "@/strings/members";
@@ -411,8 +412,12 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
     try {
       const res = await api.blob(`/api/v1/payments/${success.payment_id}/receipt.pdf`);
       const buf = new Uint8Array(await res.blob.arrayBuffer());
-      await printPdf(buf);
-      toast.success(t.payment.afterAction.printOk);
+      const mode = await printPdf(buf);
+      if (mode === "printed") {
+        toast.success(t.payment.afterAction.printOk);
+      } else {
+        toast.info(t.payment.afterAction.printOpened);
+      }
     } catch {
       toast.error(t.payment.afterAction.printError);
     }
@@ -422,11 +427,14 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
     if (!success) return;
     setWhatsappState("sending");
     try {
-      await api.post(`/api/v1/payments/${success.payment_id}/send-receipt`, {
-        channel: "whatsapp",
-      });
-      setWhatsappState("sent");
-      toast.success(t.payment.afterAction.whatsappOk);
+      const res = await api.post<{ status: string; note?: string }>(
+        `/api/v1/payments/${success.payment_id}/send-receipt`,
+        { channel: "whatsapp" }
+      );
+      // skipped (sin teléfono) deja el botón re-intentable: el operador
+      // puede capturar el teléfono y volver a mandar sin cerrar el modal.
+      setWhatsappState(res.status === "skipped" ? "error" : "sent");
+      notifySendReceiptOutcome(res);
     } catch {
       setWhatsappState("error");
       toast.error(t.payment.afterAction.whatsappError);

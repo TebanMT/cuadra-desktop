@@ -98,6 +98,7 @@ pub fn run() {
             commands::secure_storage_get,
             commands::secure_storage_delete,
             commands::print_pdf,
+            commands::save_file,
             commands::quit_app,
             commands::shutdown_sidecar,
             commands::read_auto_rollback_marker,

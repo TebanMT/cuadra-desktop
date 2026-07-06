@@ -53,8 +53,16 @@ export const billing = {
       close: "Listo",
       whatsappSending: "Enviando por WhatsApp…",
       whatsappError: "No pudimos enviar el comprobante. Intenta más tarde.",
-      whatsappOk: "Comprobante enviado.",
+      // El envío es asíncrono (cola → sync → dispatcher cloud → Twilio):
+      // decir "enviado" a secas hacía que el operador esperara el mensaje
+      // al instante y reportara "no hace nada".
+      whatsappOk: "Comprobante en camino — le llega por WhatsApp en unos minutos.",
+      whatsappAlready: "El comprobante ya está en camino.",
+      whatsappSkipped: "No se pudo enviar el comprobante.",
       printOk: "Enviado a la impresora.",
+      // El sistema no siempre expone el verbo "imprimir" para PDFs (Edge
+      // sin Acrobat): en ese caso abrimos el visor y se lo decimos.
+      printOpened: "Abrí el comprobante en tu visor de PDF — imprímelo desde ahí.",
       printError: "No pudimos imprimir.",
     },
     errors: {
@@ -84,10 +92,10 @@ export const billing = {
   receipt: {
     title: (folio: string) => `Comprobante ${folio}`,
     download: "Descargar",
+    downloadOk: (path: string) => `Comprobante guardado en ${path}`,
+    downloadError: "No pudimos guardar el comprobante.",
     print: "Imprimir",
     sendWhatsapp: "Enviar por WhatsApp",
-    copyLink: "Copiar enlace",
-    linkCopied: "Enlace copiado al portapapeles.",
     loading: "Generando comprobante…",
     error: "No pudimos cargar el comprobante.",
     close: "Cerrar",
