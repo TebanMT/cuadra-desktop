@@ -61,7 +61,7 @@ import { useMoneyVisibility, MASKED_MONEY } from "@/hooks/useMoneyVisibility";
 import { fmtDate } from "@/lib/dates";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
-import { downloadBlob } from "@/lib/tauri-bridge";
+import { saveBlob } from "@/lib/tauri-bridge";
 import { reports as t } from "@/strings/reports";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { canAccessPlusFeatures } from "@/hooks/useSubscription";
@@ -244,8 +244,10 @@ function ReportsContent({
         to: period === "custom" ? customTo : undefined,
       });
       const filename = res.filename ?? `reporte-${period}-${data.from}_${data.to}.${format}`;
-      downloadBlob(res.blob, filename);
-      toast.success(t.page.exportSuccess);
+      // saveBlob usa el diálogo nativo (el <a download> de antes era un
+      // no-op silencioso en WebView2). path null = canceló — sin toast.
+      const path = await saveBlob(res.blob, filename);
+      if (path) toast.success(t.page.exportSuccess);
     } catch {
       toast.error(t.page.exportError);
     } finally {

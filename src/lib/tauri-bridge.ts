@@ -61,13 +61,18 @@ export async function secureStorageDelete(key: string): Promise<void> {
   await invoke("secure_storage_delete", { key });
 }
 
-export async function printPdf(bytes: Uint8Array): Promise<void> {
+// printPdf manda el PDF a la impresora default vía el verbo Print del
+// sistema; si la asociación de PDF no lo soporta (Edge sin Acrobat — el
+// caso normal), el comando abre el visor por defecto y devolvemos
+// "opened" para que el caller ponga el copy honesto ("imprime desde el
+// visor") en vez de un éxito falso.
+export async function printPdf(bytes: Uint8Array): Promise<"printed" | "opened"> {
   if (!isTauri()) {
     console.warn("printPdf called outside Tauri — no-op");
-    return;
+    return "printed";
   }
   const invoke = await getInvoke();
-  await invoke("print_pdf", { bytes: Array.from(bytes) });
+  return (await invoke("print_pdf", { bytes: Array.from(bytes) })) as "printed" | "opened";
 }
 
 export async function quitApp(): Promise<void> {
@@ -92,15 +97,31 @@ export async function getAppVersion(): Promise<string> {
   return _appVersion;
 }
 
-export function downloadBlob(blob: Blob, filename: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+// saveBlob guarda un archivo con diálogo nativo y devuelve la ruta
+// elegida, o null si el usuario canceló. Dentro de Tauri NO se puede usar
+// `<a download>` con blob: — WebView2 lo ignora en silencio (Tauri no
+// cablea el download handler de wry), así que "Descargar"/"Exportar"
+// mostraban éxito sin escribir nada a disco. Fuera del shell (vite dev)
+// cae al anchor clásico del navegador.
+export async function saveBlob(blob: Blob, filename: string): Promise<string | null> {
+  if (!isTauri()) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    return filename;
+  }
+  const invoke = await getInvoke();
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  const path = await invoke("save_file", {
+    bytes: Array.from(bytes),
+    suggestedName: filename,
+  });
+  return (path as string | null) ?? null;
 }
 
 export async function listenEvent<T = unknown>(
