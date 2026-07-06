@@ -161,19 +161,40 @@ describe("CheckinFloatPage", () => {
     expect(playCheckinTone).toHaveBeenCalledWith("denied");
   });
 
-  it("el último resultado queda visible hasta el siguiente (sin auto-fade)", async () => {
+  it("el resultado sobrevive al TTL del kiosko pero REGRESA a 'Esperando huella…' después", async () => {
     vi.useFakeTimers();
     try {
       render(<CheckinFloatPage />);
       act(() => loopOpts!.onCheckin(makeEvent()));
-      // Muy pasado el TTL del kiosko (3.5s) el resultado sigue en pantalla —
-      // ese es el punto de la feature: el toast muere, esta superficie no.
+
+      // Pasado el auto-fade del kiosko (3.5s) sigue visible — el punto de
+      // la feature: el toast muere bajo modales, esta superficie no.
       act(() => {
-        vi.advanceTimersByTime(60_000);
+        vi.advanceTimersByTime(5_000);
       });
       expect(screen.getByText("Ana López")).toBeInTheDocument();
 
-      // Y el siguiente resultado lo reemplaza.
+      // Pero al vencer el TTL vuelve la animación de espera — la señal
+      // para el siguiente socio (feedback del piloto 6-jul-2026).
+      act(() => {
+        vi.advanceTimersByTime(6_000);
+      });
+      expect(screen.queryByText("Ana López")).not.toBeInTheDocument();
+      expect(screen.getByText(t.float.waiting)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("un resultado nuevo reemplaza al anterior y re-arma el TTL", async () => {
+    vi.useFakeTimers();
+    try {
+      render(<CheckinFloatPage />);
+      act(() => loopOpts!.onCheckin(makeEvent()));
+      act(() => {
+        vi.advanceTimersByTime(8_000);
+      });
+      // Segundo socio antes de que expire el primero.
       act(() =>
         loopOpts!.onCheckin(
           makeEvent({ member_id: "m-2", member_name: "Luis Ramos" }),
@@ -181,6 +202,18 @@ describe("CheckinFloatPage", () => {
       );
       expect(screen.getByText("Luis Ramos")).toBeInTheDocument();
       expect(screen.queryByText("Ana López")).not.toBeInTheDocument();
+
+      // El timer se re-armó con el segundo resultado: a los 8s de éste
+      // sigue visible, y expira hasta cumplir SU propio TTL.
+      act(() => {
+        vi.advanceTimersByTime(8_000);
+      });
+      expect(screen.getByText("Luis Ramos")).toBeInTheDocument();
+      act(() => {
+        vi.advanceTimersByTime(3_000);
+      });
+      expect(screen.queryByText("Luis Ramos")).not.toBeInTheDocument();
+      expect(screen.getByText(t.float.waiting)).toBeInTheDocument();
     } finally {
       vi.useRealTimers();
     }

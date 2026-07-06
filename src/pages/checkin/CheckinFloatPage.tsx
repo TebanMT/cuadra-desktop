@@ -41,9 +41,13 @@ import type { CheckinEvent } from "@/hooks/useCheckin";
 //     (useCheckinResultRelay); esta ventana lo pinta y pone el tono. El
 //     loop propio existe para el caso en que ESTA ventana tenga el foco
 //     (recién abierta, o el operador la movió) — ahí procesamos nosotros.
-//   - El último resultado queda visible hasta el siguiente. Sin auto-fade:
-//     el punto de la feature es que el resultado no muera a los 3s bajo un
-//     modal como le pasa al toast.
+//   - El resultado queda visible un buen rato (RESULT_TTL_MS) y luego
+//     REGRESA a "Esperando huella…". El TTL largo conserva el punto de la
+//     feature (no muere a los 3s bajo un modal como el toast), pero el
+//     regreso a idle es necesario: sin él, el siguiente socio se acerca al
+//     mostrador y ve el veredicto del anterior — la animación de espera es
+//     la señal de "el lector está listo para TI" (feedback del piloto,
+//     6-jul-2026).
 //   - v1 huella-only: sin NumberPad. Un teclado aquí robaría el foco del
 //     teclado físico al operador a media venta (los dígitos del socio
 //     caerían en el formulario que el operador tenga abierto). El número
@@ -83,6 +87,13 @@ interface LastResult {
   at: string; // HH:mm local del gym (tz de la PC)
 }
 
+// Cuánto vive el resultado en pantalla antes de volver a "Esperando
+// huella…". Más largo que el auto-fade del kiosko (3.5s): la ventana es
+// chica y el socio puede tardar en voltear a verla — pero finito, para que
+// el siguiente socio encuentre la animación de espera y no el veredicto
+// del anterior.
+const RESULT_TTL_MS = 10_000;
+
 export default function CheckinFloatPage() {
   const bio = useBiometricStatus();
   const readerConnected = useReaderConnected();
@@ -94,6 +105,15 @@ export default function CheckinFloatPage() {
 
   const [processing, setProcessing] = useState(false);
   const [last, setLast] = useState<LastResult | null>(null);
+
+  // Regreso a idle tras RESULT_TTL_MS. Cada resultado nuevo re-arma el
+  // timer (dependencia en `last`); al expirar vuelve la animación de
+  // espera — la señal para el siguiente socio de que el lector está listo.
+  useEffect(() => {
+    if (!last) return;
+    const id = window.setTimeout(() => setLast(null), RESULT_TTL_MS);
+    return () => window.clearTimeout(id);
+  }, [last]);
 
   // Lock de scroll — misma razón que el kiosko: la ventana es un appliance,
   // no una página.
