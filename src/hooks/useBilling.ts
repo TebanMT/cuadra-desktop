@@ -164,6 +164,11 @@ const KEYS = {
 function invalidateMember(qc: ReturnType<typeof useQueryClient>, memberID?: string | null) {
   qc.invalidateQueries({ queryKey: ["billing"] });
   qc.invalidateQueries({ queryKey: ["members"] });
+  // Todo cobro/venta/devolución mueve los KPIs del dashboard y de
+  // Reportes (ingresos, egresos con devoluciones, utilidad, top socios) —
+  // sin esto el operador cobraba y el dashboard seguía mostrando lo viejo
+  // hasta 60s de staleTime.
+  qc.invalidateQueries({ queryKey: ["reports"] });
   if (memberID) qc.invalidateQueries({ queryKey: ["billing", "history", memberID] });
 }
 

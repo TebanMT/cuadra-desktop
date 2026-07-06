@@ -9,6 +9,7 @@ import { DevModeBanner } from "@/components/layout/DevModeBanner";
 import { SidecarFailed } from "@/pages/shell/SidecarFailed";
 import { useSidecarUrl } from "@/hooks/useSidecarUrl";
 import { useHydrateAuth } from "@/hooks/useAuth";
+import { useSyncPullRefresh } from "@/hooks/useSyncStatus";
 import { router } from "@/routes";
 import { queryClient } from "@/lib/queryClient";
 import { setOnPlanRequired, setOnSubscriptionInactive } from "@/lib/api";
@@ -17,6 +18,9 @@ import { BiometricStreamProvider } from "@/lib/biometricStreamProvider";
 
 function Bootstrapped() {
   useHydrateAuth();
+  // Cuando el sync trae cambios (last_pulled_at avanza), invalida el caché
+  // para que dashboard/reportes/socios reflejen lo que acaba de aterrizar.
+  useSyncPullRefresh();
   // No setOnAuthExpired wiring — the sidecar mints effectively-eternal JWTs
   // and refresh failures no longer drop the session. The only exit from a
   // signed-in state is the explicit "Cerrar sesión" action in useLogout.

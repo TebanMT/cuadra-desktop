@@ -226,7 +226,12 @@ export function useAdjustStock(productId: string) {
   return useMutation({
     mutationFn: (input: AdjustStockInput) =>
       api.post<Product>(`/api/v1/products/${productId}/adjust-stock`, toAdjustStockWire(input)),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["products"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["products"] });
+      // Un restock con costo mueve "egresos por mercancía" y el stock
+      // crítico del dashboard/Reportes.
+      qc.invalidateQueries({ queryKey: ["reports"] });
+    },
   });
 }
 

@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
@@ -25,6 +26,10 @@ export interface SyncStatus {
   // mistyped as last_sync_at / pending_count, which made the UI permanently
   // read undefined for "Nunca" and "0 pendientes" regardless of agent state.
   last_synced_at: string | null;
+  // last_pulled_at avanza SÓLO cuando un pull aplicó cambios del cloud
+  // (last_synced_at bumpea en cada ciclo exitoso aunque no haya traído
+  // nada). Es la señal para invalidar queries: "hay datos nuevos abajo".
+  last_pulled_at?: string | null;
   queue_pending_count: number;
   last_error: string | null;
   // auth_invalid surface también cuando el sidecar nunca recibió token
@@ -45,6 +50,38 @@ export function useSyncStatus(enabled = true) {
     refetchIntervalInBackground: true,
     enabled,
   });
+}
+
+// useSyncPullRefresh — invalida el caché de react-query cuando el sync
+// trajo cambios. Se monta UNA vez (App) y observa last_pulled_at del
+// polling de /sync/status: si avanzó, un pull aplicó filas nuevas en el
+// SQLite local (renovación hecha en otro device, cambios cloud-side, o el
+// full-sync inicial que acaba de terminar) y TODO lo leído puede estar
+// viejo. Sin esto, el dashboard mostraba datos pre-sync hasta que una
+// mutación local casualmente invalidaba sus queries (bug del dogfood:
+// "el sync fue exitoso pero el dashboard no se actualizó").
+//
+// invalidateQueries() sin filtro es deliberado: react-query sólo refetchea
+// las queries ACTIVAS (las montadas en pantalla) — el resto se marca stale
+// y se refetchea al montarse. Costo real: un puñado de requests al sidecar
+// local por pull con cambios.
+export function useSyncPullRefresh() {
+  const status = useSyncStatus();
+  const lastSeen = useRef<string | null | undefined>(undefined);
+  const pulled = status.data?.last_pulled_at ?? null;
+  useEffect(() => {
+    if (status.data === undefined) return; // aún sin primer snapshot
+    if (lastSeen.current === undefined) {
+      // Primer snapshot tras montar: las queries recién nacieron, no hay
+      // nada viejo que invalidar.
+      lastSeen.current = pulled;
+      return;
+    }
+    if (pulled && pulled !== lastSeen.current) {
+      lastSeen.current = pulled;
+      void queryClient.invalidateQueries();
+    }
+  }, [status.data, pulled]);
 }
 
 // useTriggerSync nudges the sidecar agent to run an immediate sync cycle

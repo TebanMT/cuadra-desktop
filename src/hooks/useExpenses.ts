@@ -89,7 +89,11 @@ export function useCreateExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateExpenseInput) => api.post<Expense>("/api/v1/expenses", input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["expenses"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      // Los gastos mueven egresos/utilidad en dashboard y Reportes.
+      qc.invalidateQueries({ queryKey: ["reports"] });
+    },
   });
 }
 
@@ -97,7 +101,11 @@ export function useUpdateExpense(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateExpenseInput) => api.patch<Expense>(`/api/v1/expenses/${id}`, input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["expenses"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      // Los gastos mueven egresos/utilidad en dashboard y Reportes.
+      qc.invalidateQueries({ queryKey: ["reports"] });
+    },
   });
 }
 
@@ -105,6 +113,10 @@ export function useDeleteExpense() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => api.delete<void>(`/api/v1/expenses/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["expenses"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["expenses"] });
+      // Los gastos mueven egresos/utilidad en dashboard y Reportes.
+      qc.invalidateQueries({ queryKey: ["reports"] });
+    },
   });
 }
