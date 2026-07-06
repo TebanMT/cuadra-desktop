@@ -60,7 +60,7 @@ env:
   # acá un tag de core (ej. v1.0.0) antes de taggear, o pásalo en el input
   # core_ref. "main" = último commit (no reproducible). El SHA bundleado queda
   # en el log del step "Checkout tinta-core".
-  TINTA_CORE_REF: v1.0.8
+  TINTA_CORE_REF: v1.0.9
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
