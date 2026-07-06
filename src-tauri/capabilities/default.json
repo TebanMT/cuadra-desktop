@@ -1,10 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capabilities for the main Tinta window and the kiosk window. Both load the same SPA and share the same API surface (auth, checkin, sidecar IPC).",
+  "description": "Capabilities for the main Tinta window, the kiosk window and the floating check-in window. All load the same SPA and share the same API surface (auth, checkin, sidecar IPC). checkin-float MUST be listed here: without it the new window's IPC fails silently. window:allow-start-dragging exists for the float window's custom drag region (decorations:false).",
   "windows": [
     "main",
-    "kiosk"
+    "kiosk",
+    "checkin-float"
   ],
   "permissions": [
     "core:default",
@@ -13,6 +14,7 @@
     "core:window:allow-show",
     "core:window:allow-hide",
     "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
     "core:event:default",
     "core:path:default",
     "core:webview:default",

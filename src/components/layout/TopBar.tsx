@@ -10,6 +10,7 @@ import {
   LogIn as Door,
   LogOut,
   Moon,
+  PictureInPicture2,
   Settings,
   ShoppingCart,
   Sun,
@@ -34,6 +35,9 @@ import { useAttentionRequired } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { countAttentionItems } from "@/lib/attention";
 import { openKioskWindow } from "@/lib/kioskWindow";
+import { openCheckinFloatWindow } from "@/lib/floatWindow";
+import { useWindowPresence } from "@/hooks/useWindowPresence";
+import { CHECKIN_FLOAT_WINDOW_LABEL, KIOSK_WINDOW_LABEL } from "@/lib/windowLabels";
 import { QuickPayModal } from "@/components/billing/QuickPayModal";
 import { Badge } from "@/components/ui/badge";
 import { getAvatarPalette, getInitials } from "@/lib/avatar";
@@ -92,6 +96,14 @@ export function TopBar() {
   const attention = useAttentionRequired();
   const money = useMoneyVisibility();
   const readerDisconnected = bio.data?.available === true && !bio.data?.connected;
+
+  // Exclusión mutua kiosko ↔ check-in flotante: son modos para
+  // configuraciones físicas distintas (pantalla dedicada vs compartida) y
+  // ambos corren stream biométrico + registran check-ins. Con uno abierto,
+  // el launcher del otro se deshabilita; los open* de lib también lo
+  // guardan (para el atajo C y botones de otras páginas) con un toast.
+  const kioskOpen = useWindowPresence(KIOSK_WINDOW_LABEL);
+  const floatOpen = useWindowPresence(CHECKIN_FLOAT_WINDOW_LABEL);
 
   const [payOpen, setPayOpen] = useState(false);
 
@@ -183,10 +195,19 @@ export function TopBar() {
             tone="brand"
           />
           <QuickActionButton
-            onClick={() => openKioskWindow()}
+            onClick={() => void openKioskWindow()}
             icon={Door}
             label="Abrir kiosko"
             kbd="C"
+            disabled={floatOpen}
+            disabledTitle={ct.float.kioskBlockedByFloat}
+          />
+          <QuickActionButton
+            onClick={() => void openCheckinFloatWindow()}
+            icon={PictureInPicture2}
+            label={ct.float.launcher}
+            disabled={kioskOpen}
+            disabledTitle={ct.float.blockedByKiosk}
           />
           <QuickActionButton
             onClick={() => navigate("/sales")}
@@ -312,44 +333,60 @@ export function TopBar() {
 }
 
 // QuickActionButton — botón cuadrado icon-only para la toolbar global del
-// TopBar. La kbd se publicita con un mini-badge en la esquina inferior
-// derecha (no duplica el ancho del botón) y se mantiene en title +
+// TopBar. La kbd (opcional) se publicita con un mini-badge en la esquina
+// inferior derecha (no duplica el ancho del botón) y se mantiene en title +
 // aria-label como fallback para screen readers. El "tone='brand'" se
 // usa para la acción primaria de cobrar — la más frecuente y la que el
-// operador quiere encontrar primero.
+// operador quiere encontrar primero. `disabled` + `disabledTitle` cubren
+// la exclusión kiosko ↔ flotante: el botón queda visible (el operador
+// aprende que existe) pero el title explica por qué no responde.
 function QuickActionButton({
   onClick,
   icon: Icon,
   label,
   kbd,
   tone = "neutral",
+  disabled = false,
+  disabledTitle,
 }: {
   onClick: () => void;
   icon: typeof DollarSign;
   label: string;
-  kbd: string;
+  kbd?: string;
   tone?: "neutral" | "brand";
+  disabled?: boolean;
+  disabledTitle?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      disabled={disabled}
       aria-label={label}
-      title={`${label} (${kbd})`}
+      title={
+        disabled && disabledTitle
+          ? disabledTitle
+          : kbd
+          ? `${label} (${kbd})`
+          : label
+      }
       className={cn(
         "relative inline-flex items-center justify-center h-9 w-9 rounded-md transition-colors",
         tone === "brand"
           ? "bg-brick-100 text-brick-500 hover:bg-brick-200 dark:bg-brick-500/20 dark:text-brick-300"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground",
+        disabled && "opacity-40 pointer-events-auto hover:bg-transparent hover:text-muted-foreground cursor-not-allowed"
       )}
     >
       <Icon className="h-4 w-4" strokeWidth={2.25} />
-      <span
-        aria-hidden="true"
-        className="pointer-events-none absolute bottom-0.5 right-1 font-mono text-[9px] font-semibold leading-none tracking-tight opacity-60"
-      >
-        {kbd}
-      </span>
+      {kbd && (
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute bottom-0.5 right-1 font-mono text-[9px] font-semibold leading-none tracking-tight opacity-60"
+        >
+          {kbd}
+        </span>
+      )}
     </button>
   );
 }

@@ -301,6 +301,20 @@ import type { CheckinEvent } from "./useCheckin";
 
 interface UseBiometricCheckinLoopOptions {
   enabled: boolean;
+  // suppressed=true mantiene la suscripción viva (el stream de esta ventana
+  // no se cae ni se re-negocia con el Lite Client) pero IGNORA los samples:
+  // ni POST al BE ni callbacks de resultado. Distinto de enabled=false, que
+  // desuscribe y apaga el stream de la ventana.
+  //
+  // Caso de uso: el GlobalCheckinScanner de la main mientras la ventana
+  // flotante de check-in está abierta. La flotante corre su propio loop
+  // (postea y muestra el resultado); si la main también posteara, cada
+  // huella registraría DOS check-ins cuando el Lite Client multiplexa el
+  // sample a ambas ventanas — el BE no dedupea re-checkins inmediatos
+  // (recordCheckin crea fila incondicional). Y aunque no multiplexara,
+  // sonaría/toastearía doble. Silenciar sin desuscribir deja la
+  // convivencia de streams EXACTAMENTE como hoy con el kiosko.
+  suppressed?: boolean;
   onAttempt?(): void;
   // onCheckin fires when the BE matched the fingerprint to a socio and
   // wrote a checkin row. The event is the real wire payload.
@@ -354,6 +368,9 @@ export function useBiometricCheckinLoop(opts: UseBiometricCheckinLoopOptions) {
   useBiometricSubscription({
     enabled: opts.enabled,
     onSample: (png) => {
+      // El check del suppressed va ANTES del inflight: un sample ignorado
+      // no debe bloquear al siguiente.
+      if (optsRef.current.suppressed) return;
       if (cancelledRef.current || inflightRef.current) return;
       inflightRef.current = true;
       optsRef.current.onAttempt?.();

@@ -4,30 +4,45 @@
 // monitor o ventana aparte. Todas las funciones son no-op fuera de Tauri
 // (devtools en navegador) — el fallback ahí es navegar a /kiosk.
 
+import { toast } from "sonner";
 import { isTauri } from "./utils";
+import { CHECKIN_FLOAT_WINDOW_LABEL, KIOSK_WINDOW_LABEL } from "./windowLabels";
+import { checkin as t } from "@/strings/checkin";
 
-export const KIOSK_WINDOW_LABEL = "kiosk";
+export { KIOSK_WINDOW_LABEL };
 
 async function getModule() {
   const mod = await import("@tauri-apps/api/webviewWindow");
   return mod;
 }
 
-export async function openKioskWindow(): Promise<void> {
+export type OpenKioskWindowResult = "created" | "focused" | "blocked_by_float";
+
+export async function openKioskWindow(): Promise<OpenKioskWindowResult> {
   if (!isTauri()) {
     // Fuera de Tauri (vite dev en navegador): abrir el kiosko en una
     // pestaña nueva con un nombre fijo — repetir el click solo enfoca
     // la pestaña existente en vez de duplicar. Aproxima el comportamiento
     // de Tauri sin necesidad de correr `tauri dev`.
     window.open("/kiosk", KIOSK_WINDOW_LABEL);
-    return;
+    return "created";
   }
   const { WebviewWindow } = await getModule();
+
+  // Exclusión con el check-in flotante: ambos modos corren stream biométrico
+  // alwaysOn y postean check-ins — a la vez duplicarían registro y feedback.
+  // Ver floatWindow.ts para el guard en la otra dirección.
+  const float = await WebviewWindow.getByLabel(CHECKIN_FLOAT_WINDOW_LABEL);
+  if (float) {
+    toast.warning(t.float.kioskBlockedByFloat);
+    return "blocked_by_float";
+  }
+
   const existing = await WebviewWindow.getByLabel(KIOSK_WINDOW_LABEL);
   if (existing) {
     await existing.show();
     await existing.setFocus();
-    return;
+    return "focused";
   }
   // Ventana del kiosko: maximizada pero NO fullscreen — así respeta la
   // barra del OS (taskbar Windows / dock+menu macOS) y el operador puede
@@ -46,6 +61,7 @@ export async function openKioskWindow(): Promise<void> {
     alwaysOnTop: false,
     focus: true,
   });
+  return "created";
 }
 
 export async function closeKioskWindow(): Promise<void> {

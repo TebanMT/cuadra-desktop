@@ -6,6 +6,8 @@ import {
   useReaderConnected,
 } from "@/hooks/useBiometric";
 import { eventToFeedback } from "@/components/checkin/CheckinFeedback";
+import { useWindowPresence } from "@/hooks/useWindowPresence";
+import { CHECKIN_FLOAT_WINDOW_LABEL } from "@/lib/windowLabels";
 import type { CheckinEvent } from "@/hooks/useCheckin";
 import { playCheckinTone } from "@/lib/audio";
 
@@ -19,11 +21,19 @@ import { playCheckinTone } from "@/lib/audio";
 // este scanner vuelve a recibir samples automáticamente. No hay que
 // detectar la ruta — la coordinación vive en el provider.
 //
+// Cómo convive con la ventana flotante de check-in: mientras exista la
+// ventana "checkin-float", este scanner se SILENCIA (suppressed) sin
+// desuscribirse — la flotante postea el check-in y muestra el resultado;
+// si la main también posteara/toasteara, cada huella registraría y sonaría
+// doble. Al cerrarse la flotante, la presencia cae y este scanner retoma
+// solo. Ver el porqué completo en useBiometricCheckinLoop.suppressed.
+//
 // Montado una sola vez en DashboardLayout (encima del <Outlet>), así
 // sobrevive a la navegación entre pantallas.
 export function GlobalCheckinScanner() {
   const bio = useBiometricStatus();
   const readerConnected = useReaderConnected();
+  const floatOpen = useWindowPresence(CHECKIN_FLOAT_WINDOW_LABEL);
 
   const available = !!bio.data?.available && readerConnected === true;
 
@@ -72,6 +82,7 @@ export function GlobalCheckinScanner() {
 
   useBiometricCheckinLoop({
     enabled: available,
+    suppressed: floatOpen,
     onCheckin,
     onNoMatch,
     // Sin onAttempt / onError visibles — un toast por cada lectura sería
