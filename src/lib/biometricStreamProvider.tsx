@@ -58,7 +58,7 @@ import {
   type CaptureStream,
 } from "./biometric";
 import { isTauri } from "./utils";
-import { KIOSK_WINDOW_LABEL } from "./kioskWindow";
+import { CHECKIN_FLOAT_WINDOW_LABEL, KIOSK_WINDOW_LABEL } from "./windowLabels";
 
 // Stream state machine. `running` = stream activo en HW. `paused` = el
 // stream estaba running pero se soltó por un claim de enroll (local o
@@ -122,8 +122,9 @@ const QUERY_REPLY_WINDOW_MS = 250;
 interface ProviderProps {
   children: ReactNode;
   // alwaysOn=true mantiene el stream encendido aunque no haya subscribers
-  // (caso de la ventana del kiosko: es su razón de existir). Si no se
-  // pasa, se derive: la ventana con label "kiosk" siempre es alwaysOn.
+  // (caso de las ventanas kiosko y check-in flotante: es su razón de
+  // existir). Si no se pasa, se deriva por label: "kiosk" y
+  // "checkin-float" son alwaysOn.
   alwaysOn?: boolean;
   // testing seam — saltar el startCaptureStream real cuando vitest
   // monta el provider en jsdom. Tests pueden simular samples llamando
@@ -178,10 +179,13 @@ export function BiometricStreamProvider({
       const label = await currentWindowLabel();
       if (cancelled) return;
       myLabelRef.current = label;
-      // Heurística por defecto: la ventana etiquetada como kiosko siempre
-      // tiene el stream encendido. El override por prop sigue mandando.
+      // Heurística por defecto: las ventanas cuya razón de existir es leer
+      // huellas (kiosko y check-in flotante) siempre tienen el stream
+      // encendido. El override por prop sigue mandando.
       if (alwaysOn === undefined) {
-        setResolvedAlwaysOn(label === KIOSK_WINDOW_LABEL);
+        setResolvedAlwaysOn(
+          label === KIOSK_WINDOW_LABEL || label === CHECKIN_FLOAT_WINDOW_LABEL,
+        );
       }
       setLabelReady(true);
     })();

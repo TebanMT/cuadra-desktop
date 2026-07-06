@@ -34,6 +34,7 @@ import QuickSalePage from "@/pages/sales/QuickSalePage";
 import CashClosePage from "@/pages/reports/CashClosePage";
 import ReportsPage from "@/pages/reports/ReportsPage";
 import CheckinPage from "@/pages/checkin/CheckinPage";
+import CheckinFloatPage from "@/pages/checkin/CheckinFloatPage";
 import CobrosPage from "@/pages/billing/CobrosPage";
 import KioskPage from "@/pages/kiosk/KioskPage";
 import BroadcastPage from "@/pages/messaging/BroadcastPage";
@@ -82,6 +83,11 @@ export const router = createBrowserRouter([
       // dashboard cloud a pagar; al siguiente sync exitoso el bloqueo cede.
       { path: "/auth/subscription-blocked", element: <SubscriptionBlocked /> },
       { path: "/kiosk", element: <KioskPage /> },
+      // Ventana flotante de check-in (label "checkin-float"). Igual que el
+      // kiosko: fuera de DashboardLayout (sin sidebar/topbar) pero dentro
+      // de ProtectedRoute + UpdaterShell — misma SPA, mismo boot, misma
+      // auth hidratada.
+      { path: "/checkin-float", element: <CheckinFloatPage /> },
       {
         element: <DashboardLayout />,
         children: [

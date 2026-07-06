@@ -65,7 +65,11 @@ export function feedbackTone(kind: FeedbackKind): FeedbackTone {
   }
 }
 
-function detailFor(state: FeedbackState): string {
+// Exportada para superficies que pintan el resultado con su propio layout
+// (p.ej. la tarjeta compacta de la ventana flotante) pero DEBEN decir
+// exactamente lo mismo que el kiosko — un socio que ve mensajes distintos
+// en cada pantalla desconfía del sistema.
+export function feedbackDetail(state: FeedbackState): string {
   const days = state.daysUntilExpiry ?? 0;
   switch (state.kind) {
     case "success_active":
@@ -138,7 +142,7 @@ interface Props {
 export function CheckinFeedback({ state, size = "lg", idleMessage, className }: Props) {
   const tone = feedbackTone(state.kind);
   const styles = TONE_STYLES[tone];
-  const detail = detailFor(state);
+  const detail = feedbackDetail(state);
 
   const circleSize =
     size === "xl"
