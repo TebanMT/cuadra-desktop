@@ -266,11 +266,12 @@ interface MethodTabsProps {
 }
 
 function MethodTabs({ method, onChange, fingerprintAvailable, numberAvailable }: MethodTabsProps) {
-  const tabs: Array<{ key: Method; icon: typeof Fingerprint; label: string; show: boolean }> = [
+  const allTabs: Array<{ key: Method; icon: typeof Fingerprint; label: string; show: boolean }> = [
     { key: "fingerprint", icon: Fingerprint, label: t.page.methods.fingerprint, show: fingerprintAvailable },
     { key: "number", icon: KeyRound, label: t.page.methods.number, show: numberAvailable },
     { key: "manual", icon: SearchIcon, label: t.page.methods.manual, show: true },
-  ].filter((tab) => tab.show);
+  ];
+  const tabs = allTabs.filter((tab) => tab.show);
 
   if (tabs.length <= 1) return null;
 

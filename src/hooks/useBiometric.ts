@@ -192,7 +192,7 @@ export function useRegisterFingerprint(
     // Capture the same finger CAPTURES_TOTAL times — each placement becomes
     // its own template (best-of-N matching at checkin). The operator lifts
     // and re-places between shots; the modal's progress dots cue them.
-    const pngs: Uint8Array[] = [];
+    const pngs: Uint8Array<ArrayBuffer>[] = [];
     try {
     for (let i = 0; i < CAPTURES_TOTAL; i++) {
       setProgress({
@@ -200,7 +200,7 @@ export function useRegisterFingerprint(
         captures_done: i,
         captures_total: CAPTURES_TOTAL,
       });
-      let png: Uint8Array;
+      let png: Uint8Array<ArrayBuffer>;
       try {
         const result = await captureOnePng({ signal: ctrl.signal });
         // Reject low-quality captures at the door of enrollment so that
@@ -306,14 +306,15 @@ interface UseBiometricCheckinLoopOptions {
   // ni POST al BE ni callbacks de resultado. Distinto de enabled=false, que
   // desuscribe y apaga el stream de la ventana.
   //
-  // Caso de uso: el GlobalCheckinScanner de la main mientras la ventana
-  // flotante de check-in está abierta. La flotante corre su propio loop
-  // (postea y muestra el resultado); si la main también posteara, cada
-  // huella registraría DOS check-ins cuando el Lite Client multiplexa el
-  // sample a ambas ventanas — el BE no dedupea re-checkins inmediatos
-  // (recordCheckin crea fila incondicional). Y aunque no multiplexara,
-  // sonaría/toastearía doble. Silenciar sin desuscribir deja la
-  // convivencia de streams EXACTAMENTE como hoy con el kiosko.
+  // Caso de uso: el GlobalCheckinScanner de la main mientras una ventana
+  // de check-in dedicada (kiosko o flotante) está abierta. La ventana
+  // dedicada corre su propio loop (postea y muestra el resultado); si la
+  // main también posteara, cada huella registraría DOS check-ins cuando
+  // el Lite Client multiplexa el sample a ambas ventanas — el BE no
+  // dedupea re-checkins inmediatos (recordCheckin crea fila
+  // incondicional). Y aunque no multiplexara, sonaría/toastearía doble.
+  // Silenciar sin desuscribir mantiene el stream de la main vivo, listo
+  // para retomar solo al cerrarse la ventana dedicada.
   suppressed?: boolean;
   onAttempt?(): void;
   // onCheckin fires when the BE matched the fingerprint to a socio and

@@ -203,7 +203,7 @@ function resetWebSdkSession(): void {
 // acquisition. The raw `samples` string is JSON — feeding it straight to
 // atob() throws InvalidCharacterError, so it must be JSON.parsed first.
 // See @digitalpersona/fingerprint docs/usage/index.adoc.
-function decodeSample(ns: FingerprintNamespace, sample: string): Uint8Array {
+function decodeSample(ns: FingerprintNamespace, sample: string): Uint8Array<ArrayBuffer> {
   const parsed = JSON.parse(sample) as unknown;
   const b64url = Array.isArray(parsed) ? String(parsed[0]) : String(parsed);
   const std = ns.b64UrlTo64(b64url);
@@ -248,7 +248,7 @@ interface CaptureOneOptions {
  *
  * Throws BiometricError with a code the hook can map to a Spanish string.
  */
-export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<{ png: Uint8Array; sdkQuality: number }> {
+export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<{ png: Uint8Array<ArrayBuffer>; sdkQuality: number }> {
   const timeoutMs = opts.timeoutMs ?? 30_000;
   // Force a fresh /get_connection bootstrap — the cached agent port goes
   // stale between captures and causes "communication failure".
@@ -263,10 +263,10 @@ export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<{ png
     throw new BiometricError("no_device", "no scanner plugged in");
   }
 
-  return new Promise<{ png: Uint8Array; sdkQuality: number }>((resolve, reject) => {
+  return new Promise<{ png: Uint8Array<ArrayBuffer>; sdkQuality: number }>((resolve, reject) => {
     let lastQuality = 0;
     let settled = false;
-    const finish = (value: { png: Uint8Array; sdkQuality: number } | BiometricError) => {
+    const finish = (value: { png: Uint8Array<ArrayBuffer>; sdkQuality: number } | BiometricError) => {
       if (settled) return;
       settled = true;
       reader.off("QualityReported", onQuality);
@@ -333,7 +333,7 @@ export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<{ png
 }
 
 interface CaptureStreamHandlers {
-  onSample(png: Uint8Array, sdkQuality: number): void;
+  onSample(png: Uint8Array<ArrayBuffer>, sdkQuality: number): void;
   onDeviceConnected?(): void;
   onDeviceDisconnected?(): void;
   // onError fires on transient SDK errors (low quality, etc) and on

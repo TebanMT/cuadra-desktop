@@ -4,8 +4,9 @@ import { isTauri } from "@/lib/utils";
 // useWindowPresence — ¿existe ahora mismo una WebviewWindow con este label?
 //
 // Lo usan dos superficies:
-//   - GlobalCheckinScanner (main): silenciarse mientras la flotante de
-//     check-in está abierta (anti doble-feedback / doble-POST).
+//   - GlobalCheckinScanner (main): silenciarse mientras el kiosko o la
+//     flotante de check-in están abiertos (anti doble-feedback /
+//     doble-POST).
 //   - TopBar: deshabilitar el launcher del kiosko cuando la flotante está
 //     abierta y viceversa (exclusión mutua).
 //

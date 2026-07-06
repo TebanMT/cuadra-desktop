@@ -383,14 +383,15 @@ interface AttentionSummary {
 }
 
 function AttentionCard({ summary }: { summary: AttentionSummary }) {
-  const items: { label: string; count: number; tone: "warning" | "danger" | "accent" | "neutral" }[] = [
+  const allItems: { label: string; count: number; tone: "warning" | "danger" | "accent" | "neutral" }[] = [
     { label: "Por vencer pronto", count: summary.expiring_soon, tone: "warning" },
     { label: "Vencidos por recuperar", count: summary.expired_recoverable, tone: "danger" },
     { label: "Sin venir 21+ días", count: summary.inactive_involuntary, tone: "neutral" },
     { label: "Stock bajo", count: summary.low_stock, tone: "warning" },
     { label: "Saldos pendientes", count: summary.pending_balance, tone: "warning" },
     { label: "Cumpleañeros hoy", count: summary.birthdays_today, tone: "accent" },
-  ].filter((i) => i.count > 0);
+  ];
+  const items = allItems.filter((i) => i.count > 0);
 
   // Soft pills — disciplina semantica consistente con Badge.
   const toneClass = {

@@ -88,7 +88,7 @@ export function OperatorResetPasswordModal({ operator, open, onOpenChange }: Pro
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>✓ {t.operators.resetPwd.success}</DialogTitle>
-            <DialogDescription>{t.operators.createForm.successHint}</DialogDescription>
+            <DialogDescription>{t.operators.createForm.successHint(operator.full_name)}</DialogDescription>
           </DialogHeader>
           <div className="rounded-md border bg-muted/40 p-4 space-y-2 font-mono text-sm">
             <div>

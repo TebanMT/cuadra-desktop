@@ -5,7 +5,7 @@ import { cleanup } from "@testing-library/react";
 afterEach(() => cleanup());
 
 if (typeof globalThis.ResizeObserver === "undefined") {
-  // @ts-expect-error minimal shim for jsdom
+  // minimal shim for jsdom
   globalThis.ResizeObserver = class {
     observe() {}
     unobserve() {}
@@ -34,9 +34,8 @@ if (typeof window !== "undefined" && !window.HTMLElement.prototype.scrollIntoVie
 }
 
 if (typeof window !== "undefined" && !window.HTMLElement.prototype.hasPointerCapture) {
-  // @ts-expect-error radix-select probes for this in jsdom
+  // radix-select probes for these in jsdom
   window.HTMLElement.prototype.hasPointerCapture = vi.fn();
-  // @ts-expect-error radix-select probes for this in jsdom
   window.HTMLElement.prototype.releasePointerCapture = vi.fn();
 }
 

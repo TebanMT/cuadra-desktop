@@ -300,6 +300,8 @@ export function useLoginPIN() {
           email: data.email,
           phone: data.phone ?? null,
           role: data.role,
+          // Logging in via PIN proves the user has one.
+          has_pin: data.has_pin ?? true,
         },
         {
           gym_id: data.gym_id,

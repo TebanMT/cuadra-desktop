@@ -875,8 +875,11 @@ function ChartIncomeVsExpenses({
               r: 5,
               fill: "hsl(var(--chart-1))",
               cursor: "pointer",
-              onClick: (_: unknown, payload: { payload?: { date?: string } }) => {
-                if (payload?.payload?.date) onDayClick(payload.payload.date);
+              // recharts tipa el primer arg como DotProps, pero en runtime
+              // el dot activo recibe también `payload` (el data point).
+              onClick: (props) => {
+                const { payload } = props as unknown as { payload?: { date?: string } };
+                if (payload?.date) onDayClick(payload.date);
               },
             }}
           />
@@ -943,8 +946,9 @@ function ChartCheckins({
             fill="hsl(var(--chart-2))"
             radius={[6, 6, 0, 0]}
             cursor="pointer"
-            onClick={(d: { date?: string } | undefined) => {
-              if (d?.date) onDayClick(d.date.slice(0, 10));
+            onClick={(d) => {
+              const date = (d.payload as { date?: string } | undefined)?.date;
+              if (date) onDayClick(date.slice(0, 10));
             }}
           />
         </BarChart>

@@ -197,11 +197,8 @@ export function DataTableRow({
   children,
   onClick,
   className,
-}: {
-  children: React.ReactNode;
-  onClick?: () => void;
-  className?: string;
-}) {
+  ...rest
+}: React.ComponentPropsWithoutRef<"tr">) {
   return (
     <tr
       onClick={onClick}
@@ -210,6 +207,7 @@ export function DataTableRow({
         onClick && "cursor-pointer hover:bg-muted/50",
         className
       )}
+      {...rest}
     >
       {children}
     </tr>
@@ -219,9 +217,11 @@ export function DataTableRow({
 export function DataTableCell({
   children,
   className,
-}: {
-  children?: React.ReactNode;
-  className?: string;
-}) {
-  return <td className={cn("px-5 py-3 text-sm", className)}>{children}</td>;
+  ...rest
+}: React.ComponentPropsWithoutRef<"td">) {
+  return (
+    <td className={cn("px-5 py-3 text-sm", className)} {...rest}>
+      {children}
+    </td>
+  );
 }

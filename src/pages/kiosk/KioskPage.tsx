@@ -17,6 +17,7 @@ import {
   useReaderConnected,
 } from "@/hooks/useBiometric";
 import { useSyncStatus, levelOf } from "@/hooks/useSyncStatus";
+import { emitKioskCheckinResult } from "@/hooks/useKioskCheckinRelay";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { closeCurrentWindow, isCurrentWindowKiosk } from "@/lib/kioskWindow";
@@ -135,6 +136,11 @@ export default function KioskPage() {
   // Capture vive en el frontend per ADR-004-bis. El JS SDK habla con el
   // Lite Client local; cada huella detectada POST-ea a /biometric/checkin
   // y el backend ejecuta UC-029 contra la galería del gym activo.
+  //
+  // Cada resultado se relaya a la main vía evento Tauri: mientras este
+  // kiosko exista, el GlobalCheckinScanner está suprimido (anti
+  // doble-POST) y sin el relay el operador se quedaría sin su toast de
+  // quién entró. Ver useKioskCheckinRelay.
   useBiometricCheckinLoop({
     enabled: fingerprintAvailable,
     onAttempt: () => setFeedback({ kind: "processing" }),
@@ -142,11 +148,13 @@ export default function KioskPage() {
       const fb = eventToFeedback(ev);
       setFeedback(fb);
       announceTone(fb);
+      void emitKioskCheckinResult({ kind: "checkin", event: ev });
     },
     onNoMatch: () => {
       const fb: FeedbackState = { kind: "denied_not_found" };
       setFeedback(fb);
       announceTone(fb);
+      void emitKioskCheckinResult({ kind: "no_match" });
     },
     onError: () => {
       // SDK / matcher failure mid-stream. El banner ya refleja el estado
@@ -317,7 +325,7 @@ export default function KioskPage() {
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 opacity-70">
             <SyncIcon className={cn("h-4 w-4", syncColor)} />
-            <span>{syncLevel === "fail" ? t.kiosk.syncOffline : t.kiosk.sync}</span>
+            <span>{syncLevel === "warn" || syncLevel === "error" ? t.kiosk.syncOffline : t.kiosk.sync}</span>
           </span>
           <span className="opacity-50" aria-hidden="true">·</span>
           {/* Tap-target visible para salir — opacidad baja (no compite con

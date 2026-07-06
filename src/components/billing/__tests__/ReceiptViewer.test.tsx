@@ -26,9 +26,7 @@ describe("ReceiptViewer", () => {
     vi.clearAllMocks();
     if (!URL.createObjectURL) {
       // jsdom shim
-      // @ts-expect-error jsdom shim
       URL.createObjectURL = vi.fn(() => "blob:fake");
-      // @ts-expect-error jsdom shim
       URL.revokeObjectURL = vi.fn();
     }
   });

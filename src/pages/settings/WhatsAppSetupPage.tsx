@@ -125,7 +125,7 @@ function ConnectedView({ state }: { state: StateLike }) {
               <Stat
                 label={t.whatsapp.connected.stats.failed}
                 value={stats.failed_last_30d.toString()}
-                variant={stats.failed_last_30d > 0 ? "danger" : undefined}
+                variant={stats.failed_last_30d > 0 ? "destructive" : undefined}
               />
               <Stat
                 label={t.whatsapp.connected.stats.successRate}

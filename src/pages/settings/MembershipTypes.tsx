@@ -413,7 +413,7 @@ function MembershipsTab() {
 interface DialogFlagsProps {
   chargeEnrollment: boolean;
   chargeMaintenance: boolean;
-  maintenanceFrequency: "monthly" | "annual";
+  maintenanceFrequency: MaintenanceFrequency;
   // Defaults gym-level que pre-llenan el form al crear planes nuevos.
   // En edición se ignoran (el form usa los amounts del plan).
   defaultEnrollmentAmount: number;

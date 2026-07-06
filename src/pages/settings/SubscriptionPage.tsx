@@ -188,7 +188,7 @@ export default function SubscriptionPage() {
         <StatCard
           title="Plan actual"
           value={planLabel(plan)}
-          tone={isTrial ? "warning" : "primary"}
+          tone={isTrial ? "warning" : "accent"}
           icon={Sparkles}
           hint={isTrial ? trialHint(trialDaysLeft) : undefined}
         />

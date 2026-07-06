@@ -5,7 +5,7 @@ import { renderWithProviders } from "@/test/utils";
 import { MemberStatusModal } from "../MemberStatusModal";
 
 const { patch } = vi.hoisted(() => ({
-  patch: vi.fn(async () => ({ id: "m1", status: "inactive" })),
+  patch: vi.fn(async (_path: string, _body?: unknown) => ({ id: "m1", status: "inactive" })),
 }));
 
 vi.mock("@/lib/api", async () => {

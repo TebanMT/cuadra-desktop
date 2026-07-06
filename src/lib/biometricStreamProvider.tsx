@@ -74,7 +74,7 @@ export interface BiometricSubscriber {
   // Cada subscriber recibe el PNG + la quality del SDK por cada dedazo.
   // Los handlers son optional — un consumer puede sólo querer saber
   // device-status sin samples.
-  onSample?(png: Uint8Array, sdkQuality: number): void;
+  onSample?(png: Uint8Array<ArrayBuffer>, sdkQuality: number): void;
   onDeviceConnected?(): void;
   onDeviceDisconnected?(): void;
   onError?(code: BiometricErrorCode): void;

@@ -199,7 +199,7 @@ export default function AttentionRequiredPage() {
                         id: p.product_id,
                         name: p.name,
                         stock: p.stock,
-                        min_stock: p.min_stock,
+                        stock_minimum: p.min_stock,
                         gym_id: "",
                         category: "",
                         price: 0,
