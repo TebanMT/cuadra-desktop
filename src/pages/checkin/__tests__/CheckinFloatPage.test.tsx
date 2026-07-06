@@ -27,6 +27,21 @@ vi.mock("@/hooks/useWindowPresence", () => ({
   useWindowPresence: () => kioskPresent,
 }));
 
+// Relay entre ventanas — capturamos los handlers para simular resultados
+// que la main procesó (el camino normal: el Lite Client enruta el sample
+// a la ventana con foco, que casi siempre es la main).
+interface RelayOpts {
+  onCheckin(ev: CheckinEvent): void;
+  onNoMatch(): void;
+}
+let relayOpts: RelayOpts | null = null;
+vi.mock("@/hooks/useCheckinResultRelay", () => ({
+  useCheckinResultRelay: (opts: RelayOpts) => {
+    relayOpts = opts;
+  },
+  emitCheckinResult: vi.fn(async () => {}),
+}));
+
 let streamStatus = "running";
 vi.mock("@/lib/biometricStreamProvider", () => ({
   useBiometricStreamStatus: () => streamStatus,
@@ -70,6 +85,7 @@ function makeEvent(overrides: Partial<CheckinEvent> = {}): CheckinEvent {
 describe("CheckinFloatPage", () => {
   beforeEach(() => {
     loopOpts = null;
+    relayOpts = null;
     bioAvailable = true;
     readerConnected = true;
     kioskPresent = false;
@@ -168,6 +184,23 @@ describe("CheckinFloatPage", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("pinta con tono un resultado RELAYADO desde la main (el camino normal sin foco)", () => {
+    render(<CheckinFloatPage />);
+    act(() => relayOpts!.onCheckin(makeEvent()));
+
+    expect(screen.getByText("Ana López")).toBeInTheDocument();
+    expect(screen.getByText(t.feedback.successActive(26))).toBeInTheDocument();
+    expect(playCheckinTone).toHaveBeenCalledWith("success");
+  });
+
+  it("pinta un no-match relayado desde la main", () => {
+    render(<CheckinFloatPage />);
+    act(() => relayOpts!.onNoMatch());
+
+    expect(screen.getByText(t.float.noMatchTitle)).toBeInTheDocument();
+    expect(playCheckinTone).toHaveBeenCalledWith("denied");
   });
 
   it("el botón de cerrar propio cierra la ventana (no hay chrome del OS)", () => {

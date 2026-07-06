@@ -15,6 +15,7 @@ import {
   useBiometricStatus,
   useReaderConnected,
 } from "@/hooks/useBiometric";
+import { useCheckinResultRelay } from "@/hooks/useCheckinResultRelay";
 import { useWindowPresence } from "@/hooks/useWindowPresence";
 import { useBiometricStreamStatus } from "@/lib/biometricStreamProvider";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
@@ -24,6 +25,7 @@ import { KIOSK_WINDOW_LABEL } from "@/lib/windowLabels";
 import { getAvatarPalette, getInitials } from "@/lib/avatar";
 import { cn, isTauri } from "@/lib/utils";
 import { checkin as t } from "@/strings/checkin";
+import type { CheckinEvent } from "@/hooks/useCheckin";
 
 // CheckinFloatPage — contenido de la ventana "checkin-float" (ver
 // floatWindow.ts). Superficie PERSISTENTE y visible para el socio del
@@ -33,11 +35,12 @@ import { checkin as t } from "@/strings/checkin";
 // veredicto aunque el operador esté a media venta en la ventana principal.
 //
 // Decisiones clave:
-//   - Corre su PROPIO useBiometricCheckinLoop (mismo mecanismo que el
-//     kiosko): esta ventana postea el check-in y pinta la respuesta del BE.
-//     El GlobalCheckinScanner de la main se silencia mientras existamos
-//     (ver suppressed en useBiometricCheckinLoop) — una sola ventana
-//     registra y suena.
+//   - El Lite Client entrega los samples a la ventana CON FOCO (verificado
+//     en gym piloto, 6-jul-2026). Como el operador casi siempre tiene el
+//     foco en la main, es la MAIN quien procesa el check-in y nos lo relaya
+//     (useCheckinResultRelay); esta ventana lo pinta y pone el tono. El
+//     loop propio existe para el caso en que ESTA ventana tenga el foco
+//     (recién abierta, o el operador la movió) — ahí procesamos nosotros.
 //   - El último resultado queda visible hasta el siguiente. Sin auto-fade:
 //     el punto de la feature es que el resultado no muera a los 3s bajo un
 //     modal como le pasa al toast.
@@ -152,36 +155,52 @@ export default function CheckinFloatPage() {
     else if (tone === "denied") playCheckinTone("denied");
   }
 
-  // Mismo loop que el kiosko: cada huella POST-ea a /biometric/checkin y
-  // pintamos el evento real del BE. Se apaga si el kiosko está abierto
-  // (exclusión mutua — el kiosko ya es la superficie del socio) o si no
-  // hay lector utilizable.
+  // Pintar un resultado + tono — mismo camino para los check-ins que esta
+  // ventana procesó (loop propio, cuando tuvo el foco) y para los que la
+  // main procesó y nos relaya. El socio no distingue quién posteó.
+  function showCheckin(ev: CheckinEvent) {
+    const fb = eventToFeedback(ev);
+    const when = new Date(ev.created_at);
+    setLast({
+      feedback: fb,
+      memberId: ev.member_id,
+      at: format(Number.isNaN(when.getTime()) ? new Date() : when, "HH:mm"),
+    });
+    setProcessing(false);
+    announceTone(fb);
+  }
+
+  function showNoMatch() {
+    const fb: FeedbackState = { kind: "denied_not_found" };
+    setLast({ feedback: fb, memberId: null, at: format(new Date(), "HH:mm") });
+    setProcessing(false);
+    announceTone(fb);
+  }
+
+  // Loop propio — sólo recibe samples cuando ESTA ventana tiene el foco
+  // (enrutamiento por foco del Lite Client). Se apaga si el kiosko está
+  // abierto (exclusión mutua) o si no hay lector utilizable.
   useBiometricCheckinLoop({
     enabled: fingerprintAvailable && !kioskPresent,
     onAttempt: () => setProcessing(true),
-    onCheckin: (ev) => {
-      const fb = eventToFeedback(ev);
-      const when = new Date(ev.created_at);
-      setLast({
-        feedback: fb,
-        memberId: ev.member_id,
-        at: format(Number.isNaN(when.getTime()) ? new Date() : when, "HH:mm"),
-      });
-      setProcessing(false);
-      announceTone(fb);
-    },
-    onNoMatch: () => {
-      const fb: FeedbackState = { kind: "denied_not_found" };
-      setLast({ feedback: fb, memberId: null, at: format(new Date(), "HH:mm") });
-      setProcessing(false);
-      announceTone(fb);
-    },
+    onCheckin: showCheckin,
+    onNoMatch: showNoMatch,
     onError: () => {
       // El header ya refleja el estado del lector vía el dot + el estado
       // "lector desconectado" del body; un sample fallido no borra el
       // último resultado.
       setProcessing(false);
     },
+  });
+
+  // Resultados procesados por la main (o el kiosko) — el camino NORMAL en
+  // operación real: el operador tiene el foco en la main, la main postea y
+  // esta ventana sólo exhibe. Esta ventana no emite nada (vive en la misma
+  // pantalla del operador), así que no hay echo que filtrar aquí, pero el
+  // hook lo hace de todos modos por si eso cambia.
+  useCheckinResultRelay({
+    onCheckin: showCheckin,
+    onNoMatch: showNoMatch,
   });
 
   const readerDotOn = streamStatus === "running";

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import type { CheckinEvent } from "@/hooks/useCheckin";
 import {
   CHECKIN_FLOAT_WINDOW_LABEL,
@@ -11,7 +12,6 @@ import {
 // mock a propósito: el toast debe decir exactamente lo mismo que el kiosko.
 interface LoopOpts {
   enabled: boolean;
-  suppressed?: boolean;
   onCheckin(ev: CheckinEvent): void;
   onNoMatch?(): void;
 }
@@ -39,10 +39,12 @@ interface RelayOpts {
   onNoMatch(): void;
 }
 let relayOpts: RelayOpts | null = null;
-vi.mock("@/hooks/useKioskCheckinRelay", () => ({
-  useKioskCheckinRelay: (opts: RelayOpts) => {
+const emitCheckinResult = vi.fn(async (_payload: unknown) => {});
+vi.mock("@/hooks/useCheckinResultRelay", () => ({
+  useCheckinResultRelay: (opts: RelayOpts) => {
     relayOpts = opts;
   },
+  emitCheckinResult: (payload: unknown) => emitCheckinResult(payload),
 }));
 
 const toastSuccess = vi.fn();
@@ -79,6 +81,15 @@ function makeEvent(overrides: Partial<CheckinEvent> = {}): CheckinEvent {
   };
 }
 
+// El scanner lee la ruta actual (en /checkin la página es dueña del loop).
+function renderAt(path = "/") {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <GlobalCheckinScanner />
+    </MemoryRouter>,
+  );
+}
+
 describe("GlobalCheckinScanner", () => {
   beforeEach(() => {
     loopOpts = null;
@@ -91,30 +102,29 @@ describe("GlobalCheckinScanner", () => {
     toastWarning.mockClear();
     toastError.mockClear();
     playCheckinTone.mockClear();
+    emitCheckinResult.mockClear();
   });
 
-  describe("supresión por ventanas dedicadas", () => {
-    it("sin kiosko ni flotante corre sin suprimir", () => {
-      render(<GlobalCheckinScanner />);
+  describe("gating del loop", () => {
+    it("corre habilitado en cualquier ruta normal", () => {
+      renderAt("/sales");
       expect(loopOpts?.enabled).toBe(true);
-      expect(loopOpts?.suppressed).toBe(false);
     });
 
-    it("con la flotante abierta se suprime", () => {
+    it("en /checkin se apaga: CheckinPage es dueña del loop de la ventana (anti doble-POST intra-ventana)", () => {
+      renderAt("/checkin");
+      expect(loopOpts?.enabled).toBe(false);
+    });
+
+    it("sigue habilitado con la flotante o el kiosko abiertos (el foco decide quién recibe)", () => {
       floatPresent = true;
-      render(<GlobalCheckinScanner />);
-      expect(loopOpts?.suppressed).toBe(true);
-    });
-
-    it("con el kiosko abierto se suprime (anti doble-POST del multiplex)", () => {
-      kioskPresent = true;
-      render(<GlobalCheckinScanner />);
-      expect(loopOpts?.suppressed).toBe(true);
+      renderAt("/");
+      expect(loopOpts?.enabled).toBe(true);
     });
 
     it("sin lector utilizable apaga el loop", () => {
       readerConnected = false;
-      render(<GlobalCheckinScanner />);
+      renderAt("/");
       expect(loopOpts?.enabled).toBe(false);
     });
 
@@ -125,19 +135,23 @@ describe("GlobalCheckinScanner", () => {
     });
   });
 
-  describe("resultados propios (el scanner posteó) — toast CON tono", () => {
-    it("permitido: toast success con el detalle canónico y tono", () => {
-      render(<GlobalCheckinScanner />);
+  describe("resultados propios sin superficie dedicada — toast CON tono + relay", () => {
+    it("permitido: toast success con el detalle canónico, tono y emit al relay", () => {
+      renderAt("/");
       act(() => loopOpts!.onCheckin(makeEvent()));
 
       expect(toastSuccess).toHaveBeenCalledWith("✓ Ana López ingresó", {
         description: t.feedback.successActive(26),
       });
       expect(playCheckinTone).toHaveBeenCalledWith("success");
+      expect(emitCheckinResult).toHaveBeenCalledWith({
+        kind: "checkin",
+        event: expect.objectContaining({ id: "chk-1" }),
+      });
     });
 
     it("por vencer: toast warning y tono warning", () => {
-      render(<GlobalCheckinScanner />);
+      renderAt("/");
       act(() =>
         loopOpts!.onCheckin(
           makeEvent({ result: "allowed_expiring_soon", days_until_expiry: 2 }),
@@ -151,7 +165,7 @@ describe("GlobalCheckinScanner", () => {
     });
 
     it("vencido: toast error y tono denied", () => {
-      render(<GlobalCheckinScanner />);
+      renderAt("/");
       act(() =>
         loopOpts!.onCheckin(
           makeEvent({ result: "denied_expired", days_until_expiry: -3 }),
@@ -164,8 +178,8 @@ describe("GlobalCheckinScanner", () => {
       expect(playCheckinTone).toHaveBeenCalledWith("denied");
     });
 
-    it("no-match: toast error y tono denied", () => {
-      render(<GlobalCheckinScanner />);
+    it("no-match: toast error, tono denied y emit al relay", () => {
+      renderAt("/");
       act(() => loopOpts!.onNoMatch!());
 
       expect(toastError).toHaveBeenCalledWith(
@@ -173,24 +187,50 @@ describe("GlobalCheckinScanner", () => {
         expect.objectContaining({ description: expect.any(String) }),
       );
       expect(playCheckinTone).toHaveBeenCalledWith("denied");
+      expect(emitCheckinResult).toHaveBeenCalledWith({ kind: "no_match" });
     });
   });
 
-  describe("resultados relayados del kiosko — toast SIN tono", () => {
-    it("permitido relayado: mismo toast, cero tono (el kiosko ya sonó)", () => {
+  describe("resultados propios CON superficie dedicada abierta — toast SIN tono (la superficie suena)", () => {
+    it("con la flotante abierta: toastea pero no suena, y emite el relay para que la flotante pinte", () => {
+      floatPresent = true;
+      renderAt("/");
+      act(() => loopOpts!.onCheckin(makeEvent()));
+
+      expect(toastSuccess).toHaveBeenCalled();
+      expect(playCheckinTone).not.toHaveBeenCalled();
+      expect(emitCheckinResult).toHaveBeenCalledWith({
+        kind: "checkin",
+        event: expect.objectContaining({ id: "chk-1" }),
+      });
+    });
+
+    it("con el kiosko abierto: ídem", () => {
       kioskPresent = true;
-      render(<GlobalCheckinScanner />);
+      renderAt("/");
+      act(() => loopOpts!.onNoMatch!());
+
+      expect(toastError).toHaveBeenCalled();
+      expect(playCheckinTone).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("resultados relayados de otra ventana — toast SIN tono y sin re-emitir", () => {
+    it("permitido relayado: mismo toast, cero tono (la otra ventana ya sonó)", () => {
+      kioskPresent = true;
+      renderAt("/");
       act(() => relayOpts!.onCheckin(makeEvent()));
 
       expect(toastSuccess).toHaveBeenCalledWith("✓ Ana López ingresó", {
         description: t.feedback.successActive(26),
       });
       expect(playCheckinTone).not.toHaveBeenCalled();
+      expect(emitCheckinResult).not.toHaveBeenCalled();
     });
 
     it("denegado relayado: toast error sin tono", () => {
       kioskPresent = true;
-      render(<GlobalCheckinScanner />);
+      renderAt("/");
       act(() =>
         relayOpts!.onCheckin(
           makeEvent({ result: "denied_no_membership", days_until_expiry: null }),
@@ -205,7 +245,7 @@ describe("GlobalCheckinScanner", () => {
 
     it("no-match relayado: toast error sin tono", () => {
       kioskPresent = true;
-      render(<GlobalCheckinScanner />);
+      renderAt("/");
       act(() => relayOpts!.onNoMatch());
 
       expect(toastError).toHaveBeenCalledWith(
@@ -213,6 +253,7 @@ describe("GlobalCheckinScanner", () => {
         expect.objectContaining({ description: expect.any(String) }),
       );
       expect(playCheckinTone).not.toHaveBeenCalled();
+      expect(emitCheckinResult).not.toHaveBeenCalled();
     });
   });
 });

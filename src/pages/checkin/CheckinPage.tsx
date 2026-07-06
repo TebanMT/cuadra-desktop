@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Maximize2, Fingerprint, KeyRound, Search as SearchIcon } from "lucide-react";
+import { Maximize2, Fingerprint, KeyRound, PictureInPicture2, Search as SearchIcon } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,10 @@ import {
 import { useAuthStore } from "@/stores/useAuthStore";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { openKioskWindow } from "@/lib/kioskWindow";
-import { useKioskWindowOpen } from "@/hooks/useKioskWindow";
+import { openCheckinFloatWindow } from "@/lib/floatWindow";
+import { useWindowPresence } from "@/hooks/useWindowPresence";
+import { emitCheckinResult } from "@/hooks/useCheckinResultRelay";
+import { KIOSK_WINDOW_LABEL } from "@/lib/windowLabels";
 import { checkin as t } from "@/strings/checkin";
 
 type Method = "fingerprint" | "number" | "manual";
@@ -33,7 +36,7 @@ const AUTOFADE_MS = 5000;
 
 export default function CheckinPage() {
   const operator = useAuthStore((s) => s.user);
-  const kioskOpen = useKioskWindowOpen();
+  const kioskOpen = useWindowPresence(KIOSK_WINDOW_LABEL);
   const bio = useBiometricStatus();
   const readerConnected = useReaderConnected();
   const methods = useCheckinMethods();
@@ -96,13 +99,23 @@ export default function CheckinPage() {
   // un sample por dedazo; el hook lo POST-ea a /biometric/checkin y
   // devuelve el match real (announce) o un no-match (feedback denied sin
   // tocar la lista de recientes).
+  //
+  // En esta ruta ESTA página es dueña del loop de la ventana main — el
+  // GlobalCheckinScanner se apaga en /checkin para que la misma huella no
+  // registre dos check-ins (el provider multiplexa samples a todos los
+  // subscribers de la ventana). Cada resultado de huella se emite al relay
+  // para que la flotante/kiosko lo pinten al socio si están abiertos.
   useBiometricCheckinLoop({
     enabled: fingerprintAvailable,
     onAttempt: () => setFeedback({ kind: "processing" }),
-    onCheckin: announce,
+    onCheckin: (ev) => {
+      announce(ev);
+      void emitCheckinResult({ kind: "checkin", event: ev });
+    },
     onNoMatch: () => {
       setFeedback({ kind: "denied_not_found" });
       playCheckinTone("denied");
+      void emitCheckinResult({ kind: "no_match" });
     },
   });
 
@@ -177,10 +190,29 @@ export default function CheckinPage() {
             {format(now, "EEEE d MMM · HH:mm", { locale: es })}
           </span>
         </div>
-        <Button variant="outline" size="sm" onClick={() => openKioskWindow()} className="rounded-md">
-          <Maximize2 className="h-4 w-4" />
-          {kioskOpen ? t.page.goToKiosk : t.page.openKiosk}
-        </Button>
+        {/* Accesos a las dos superficies del socio. La exclusión mutua
+            (kiosko ↔ flotante) vive en los open* de lib — si el otro modo
+            está activo, avisan con toast en lugar de abrir. */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void openCheckinFloatWindow()}
+            className="rounded-md"
+          >
+            <PictureInPicture2 className="h-4 w-4" />
+            {t.float.launcher}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void openKioskWindow()}
+            className="rounded-md"
+          >
+            <Maximize2 className="h-4 w-4" />
+            {kioskOpen ? t.page.goToKiosk : t.page.openKiosk}
+          </Button>
+        </div>
       </header>
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_320px] overflow-hidden">

@@ -11,9 +11,10 @@ function pretendInTauri(on: boolean) {
 }
 
 // ── mock: bus de eventos Tauri en memoria ──────────────────────────────
-// Mismo seam que useWindowPresence.test — listen registra, busEmit
-// dispara. El emit real del módulo pasa por emitMock para poder afirmar
-// "fuera de Tauri no se emite".
+// listen registra, busEmit dispara. El emit real del módulo pasa por
+// emitMock para poder afirmar "fuera de Tauri no se emite". Igual que en
+// Tauri real, el emisor TAMBIÉN recibe sus propios eventos (echo) — el
+// filtrado por source es parte del contrato bajo prueba.
 type Listener = (e: { payload: unknown }) => void;
 const listeners = new Map<string, Set<Listener>>();
 
@@ -34,11 +35,17 @@ vi.mock("@tauri-apps/api/event", () => ({
   emit: (event: string, payload: unknown) => emitMock(event, payload),
 }));
 
+// ── mock: label de la ventana actual ───────────────────────────────────
+let currentLabel = "main";
+vi.mock("@tauri-apps/api/webviewWindow", () => ({
+  getCurrentWebviewWindow: () => ({ label: currentLabel }),
+}));
+
 import {
-  useKioskCheckinRelay,
-  emitKioskCheckinResult,
-  EVT_KIOSK_CHECKIN_RESULT,
-} from "../useKioskCheckinRelay";
+  useCheckinResultRelay,
+  emitCheckinResult,
+  EVT_CHECKIN_RESULT,
+} from "../useCheckinResultRelay";
 
 const CHECKIN_EVENT: CheckinEvent = {
   id: "chk-1",
@@ -59,10 +66,11 @@ async function flushBoot() {
   });
 }
 
-describe("useKioskCheckinRelay", () => {
+describe("useCheckinResultRelay", () => {
   beforeEach(() => {
     listeners.clear();
     emitMock.mockClear();
+    currentLabel = "main";
     pretendInTauri(true);
   });
 
@@ -70,14 +78,15 @@ describe("useKioskCheckinRelay", () => {
     pretendInTauri(false);
   });
 
-  it("entrega un resultado de check-in relayado a onCheckin", async () => {
+  it("entrega a onCheckin un resultado emitido por OTRA ventana", async () => {
     const onCheckin = vi.fn();
     const onNoMatch = vi.fn();
-    renderHook(() => useKioskCheckinRelay({ onCheckin, onNoMatch }));
+    renderHook(() => useCheckinResultRelay({ onCheckin, onNoMatch }));
     await flushBoot();
 
     act(() =>
-      busEmit(EVT_KIOSK_CHECKIN_RESULT, {
+      busEmit(EVT_CHECKIN_RESULT, {
+        source: "kiosk",
         kind: "checkin",
         event: CHECKIN_EVENT,
       }),
@@ -87,44 +96,75 @@ describe("useKioskCheckinRelay", () => {
     expect(onNoMatch).not.toHaveBeenCalled();
   });
 
+  it("descarta el echo de la propia ventana (source === label propio)", async () => {
+    const onCheckin = vi.fn();
+    const onNoMatch = vi.fn();
+    renderHook(() => useCheckinResultRelay({ onCheckin, onNoMatch }));
+    await flushBoot();
+
+    // Caso real: CheckinPage (main) emite; el GlobalCheckinScanner (main)
+    // escucha en la MISMA ventana. Sin el filtro, el operador vería el
+    // resultado dos veces (página + toast).
+    act(() =>
+      busEmit(EVT_CHECKIN_RESULT, {
+        source: "main",
+        kind: "checkin",
+        event: CHECKIN_EVENT,
+      }),
+    );
+    act(() => busEmit(EVT_CHECKIN_RESULT, { source: "main", kind: "no_match" }));
+
+    expect(onCheckin).not.toHaveBeenCalled();
+    expect(onNoMatch).not.toHaveBeenCalled();
+  });
+
   it("entrega un no-match relayado a onNoMatch", async () => {
     const onCheckin = vi.fn();
     const onNoMatch = vi.fn();
-    renderHook(() => useKioskCheckinRelay({ onCheckin, onNoMatch }));
+    renderHook(() => useCheckinResultRelay({ onCheckin, onNoMatch }));
     await flushBoot();
 
-    act(() => busEmit(EVT_KIOSK_CHECKIN_RESULT, { kind: "no_match" }));
+    act(() => busEmit(EVT_CHECKIN_RESULT, { source: "kiosk", kind: "no_match" }));
 
     expect(onNoMatch).toHaveBeenCalledTimes(1);
     expect(onCheckin).not.toHaveBeenCalled();
   });
 
-  it("round-trip: emitKioskCheckinResult llega al listener", async () => {
-    const onCheckin = vi.fn();
-    const onNoMatch = vi.fn();
-    renderHook(() => useKioskCheckinRelay({ onCheckin, onNoMatch }));
-    await flushBoot();
+  it("emitCheckinResult estampa el source de la ventana actual", async () => {
+    currentLabel = "checkin-float";
+    await emitCheckinResult({ kind: "checkin", event: CHECKIN_EVENT });
 
-    await act(async () => {
-      await emitKioskCheckinResult({ kind: "checkin", event: CHECKIN_EVENT });
-    });
-
-    expect(emitMock).toHaveBeenCalledWith(EVT_KIOSK_CHECKIN_RESULT, {
+    expect(emitMock).toHaveBeenCalledWith(EVT_CHECKIN_RESULT, {
+      source: "checkin-float",
       kind: "checkin",
       event: CHECKIN_EVENT,
     });
+  });
+
+  it("round-trip entre ventanas: emit del kiosko llega al listener de main", async () => {
+    const onCheckin = vi.fn();
+    renderHook(() => useCheckinResultRelay({ onCheckin, onNoMatch: vi.fn() }));
+    await flushBoot();
+
+    // El "kiosko" emite (cambiamos el label ANTES del emit; el listener ya
+    // resolvió "main" en su boot).
+    currentLabel = "kiosk";
+    await act(async () => {
+      await emitCheckinResult({ kind: "checkin", event: CHECKIN_EVENT });
+    });
+
     expect(onCheckin).toHaveBeenCalledWith(CHECKIN_EVENT);
   });
 
   it("un payload malformado no revienta ni dispara callbacks", async () => {
     const onCheckin = vi.fn();
     const onNoMatch = vi.fn();
-    renderHook(() => useKioskCheckinRelay({ onCheckin, onNoMatch }));
+    renderHook(() => useCheckinResultRelay({ onCheckin, onNoMatch }));
     await flushBoot();
 
-    act(() => busEmit(EVT_KIOSK_CHECKIN_RESULT, "garbage"));
-    act(() => busEmit(EVT_KIOSK_CHECKIN_RESULT, null));
-    act(() => busEmit(EVT_KIOSK_CHECKIN_RESULT, { kind: "otra_cosa" }));
+    act(() => busEmit(EVT_CHECKIN_RESULT, "garbage"));
+    act(() => busEmit(EVT_CHECKIN_RESULT, null));
+    act(() => busEmit(EVT_CHECKIN_RESULT, { source: "kiosk", kind: "otra_cosa" }));
 
     expect(onCheckin).not.toHaveBeenCalled();
     expect(onNoMatch).not.toHaveBeenCalled();
@@ -135,14 +175,15 @@ describe("useKioskCheckinRelay", () => {
     const second = vi.fn();
     const { rerender } = renderHook(
       ({ cb }: { cb: (ev: CheckinEvent) => void }) =>
-        useKioskCheckinRelay({ onCheckin: cb, onNoMatch: vi.fn() }),
+        useCheckinResultRelay({ onCheckin: cb, onNoMatch: vi.fn() }),
       { initialProps: { cb: first } },
     );
     await flushBoot();
 
     rerender({ cb: second });
     act(() =>
-      busEmit(EVT_KIOSK_CHECKIN_RESULT, {
+      busEmit(EVT_CHECKIN_RESULT, {
+        source: "kiosk",
         kind: "checkin",
         event: CHECKIN_EVENT,
       }),
@@ -151,29 +192,29 @@ describe("useKioskCheckinRelay", () => {
     expect(first).not.toHaveBeenCalled();
     expect(second).toHaveBeenCalledWith(CHECKIN_EVENT);
     // Y sigue habiendo UN solo listener registrado.
-    expect(listeners.get(EVT_KIOSK_CHECKIN_RESULT)?.size).toBe(1);
+    expect(listeners.get(EVT_CHECKIN_RESULT)?.size).toBe(1);
   });
 
   it("al desmontar se desuscribe del bus", async () => {
     const { unmount } = renderHook(() =>
-      useKioskCheckinRelay({ onCheckin: vi.fn(), onNoMatch: vi.fn() }),
+      useCheckinResultRelay({ onCheckin: vi.fn(), onNoMatch: vi.fn() }),
     );
     await flushBoot();
-    expect(listeners.get(EVT_KIOSK_CHECKIN_RESULT)?.size).toBe(1);
+    expect(listeners.get(EVT_CHECKIN_RESULT)?.size).toBe(1);
 
     unmount();
-    expect(listeners.get(EVT_KIOSK_CHECKIN_RESULT)?.size).toBe(0);
+    expect(listeners.get(EVT_CHECKIN_RESULT)?.size).toBe(0);
   });
 
   it("fuera de Tauri no escucha ni emite", async () => {
     pretendInTauri(false);
     const onCheckin = vi.fn();
-    renderHook(() => useKioskCheckinRelay({ onCheckin, onNoMatch: vi.fn() }));
+    renderHook(() => useCheckinResultRelay({ onCheckin, onNoMatch: vi.fn() }));
     await flushBoot();
 
-    expect(listeners.get(EVT_KIOSK_CHECKIN_RESULT)?.size ?? 0).toBe(0);
+    expect(listeners.get(EVT_CHECKIN_RESULT)?.size ?? 0).toBe(0);
 
-    await emitKioskCheckinResult({ kind: "no_match" });
+    await emitCheckinResult({ kind: "no_match" });
     expect(emitMock).not.toHaveBeenCalled();
   });
 });
