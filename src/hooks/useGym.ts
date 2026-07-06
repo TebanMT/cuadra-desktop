@@ -119,6 +119,37 @@ export function useConfirmTransferOwnership() {
   });
 }
 
+// Knobs cosméticos del feedback de check-in (DA-031.5) que el dueño edita
+// en Ajustes → Perfil del gym: cuánto dura el veredicto en pantalla
+// ("Duración del feedback al check-in") y a qué volumen suena el tono
+// ("Volumen del kiosko"). Los consumen TODAS las superficies de check-in
+// (kiosko, flotante, /checkin y el scanner global) — un solo knob, mismo
+// comportamiento en todas.
+//
+// El BE siempre responde valores concretos (defaults 4000ms / 80); los
+// fallbacks de aquí sólo cubren el primer render (query cargando) y BEs
+// viejos sin el campo.
+export const CHECKIN_FEEDBACK_TTL_FALLBACK_MS = 4000;
+export const CHECKIN_TONE_VOLUME_FALLBACK = 0.8;
+
+export interface CheckinFeedbackSettings {
+  ttlMs: number;
+  // 0..1 — listo para playCheckinTone (el wire lo trae 0..100). 0 = mudo,
+  // decisión legítima del dueño; por eso NO se le aplica fallback.
+  volume: number;
+}
+
+export function useCheckinFeedbackSettings(): CheckinFeedbackSettings {
+  const gym = useGymProfile();
+  const ttlMs =
+    gym.data?.kiosk_feedback_ttl_ms ?? CHECKIN_FEEDBACK_TTL_FALLBACK_MS;
+  const volume =
+    typeof gym.data?.kiosk_volume === "number"
+      ? gym.data.kiosk_volume / 100
+      : CHECKIN_TONE_VOLUME_FALLBACK;
+  return { ttlMs, volume };
+}
+
 export const TIMEZONES_MX = [
   "America/Mexico_City",
   "America/Cancun",

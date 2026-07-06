@@ -34,6 +34,11 @@ vi.mock("@/hooks/useWindowPresence", () => ({
     label === "kiosk" ? kioskPresent : label === "checkin-float" ? floatPresent : false,
 }));
 
+// Knobs del dueño (Ajustes → Perfil del gym) — el scanner usa el volumen.
+vi.mock("@/hooks/useGym", () => ({
+  useCheckinFeedbackSettings: () => ({ ttlMs: 4000, volume: 0.8 }),
+}));
+
 interface RelayOpts {
   onCheckin(ev: CheckinEvent): void;
   onNoMatch(): void;
@@ -143,7 +148,7 @@ describe("GlobalCheckinScanner", () => {
       expect(toastSuccess).toHaveBeenCalledWith("✓ Ana López ingresó", {
         description: t.feedback.successActive(26),
       });
-      expect(playCheckinTone).toHaveBeenCalledWith("success");
+      expect(playCheckinTone).toHaveBeenCalledWith("success", 0.8);
       expect(emitCheckinResult).toHaveBeenCalledWith({
         kind: "checkin",
         event: expect.objectContaining({ id: "chk-1" }),
@@ -161,7 +166,7 @@ describe("GlobalCheckinScanner", () => {
       expect(toastWarning).toHaveBeenCalledWith("⚠ Ana López ingresó", {
         description: t.feedback.successExpiringSoon(2),
       });
-      expect(playCheckinTone).toHaveBeenCalledWith("warning");
+      expect(playCheckinTone).toHaveBeenCalledWith("warning", 0.8);
     });
 
     it("vencido: toast error y tono denied", () => {
@@ -175,7 +180,7 @@ describe("GlobalCheckinScanner", () => {
       expect(toastError).toHaveBeenCalledWith("✗ Ana López no puede entrar", {
         description: t.feedback.deniedExpired(3),
       });
-      expect(playCheckinTone).toHaveBeenCalledWith("denied");
+      expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
     });
 
     it("no-match: toast error, tono denied y emit al relay", () => {
@@ -186,7 +191,7 @@ describe("GlobalCheckinScanner", () => {
         "No reconocimos la huella",
         expect.objectContaining({ description: expect.any(String) }),
       );
-      expect(playCheckinTone).toHaveBeenCalledWith("denied");
+      expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
       expect(emitCheckinResult).toHaveBeenCalledWith({ kind: "no_match" });
     });
   });

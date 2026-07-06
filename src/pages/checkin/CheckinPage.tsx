@@ -28,11 +28,10 @@ import { openCheckinFloatWindow } from "@/lib/floatWindow";
 import { useWindowPresence } from "@/hooks/useWindowPresence";
 import { emitCheckinResult } from "@/hooks/useCheckinResultRelay";
 import { KIOSK_WINDOW_LABEL } from "@/lib/windowLabels";
+import { useCheckinFeedbackSettings } from "@/hooks/useGym";
 import { checkin as t } from "@/strings/checkin";
 
 type Method = "fingerprint" | "number" | "manual";
-
-const AUTOFADE_MS = 5000;
 
 export default function CheckinPage() {
   const operator = useAuthStore((s) => s.user);
@@ -78,8 +77,13 @@ export default function CheckinPage() {
     setFeedback({ kind: "idle" });
   }, []);
 
+  // Duración del veredicto + volumen del tono — mismos knobs del kiosko
+  // ("Duración del feedback al check-in" / "Volumen del kiosko" en
+  // Ajustes → Perfil del gym). Antes esta página fijaba 5s en duro.
+  const { ttlMs, volume } = useCheckinFeedbackSettings();
+
   // auto-fade after a result is shown
-  useAutoFade(feedback, { ttlMs: AUTOFADE_MS, onExpire: reset });
+  useAutoFade(feedback, { ttlMs, onExpire: reset });
 
   function announce(ev: CheckinEvent) {
     const fb = eventToFeedback(ev);
@@ -87,9 +91,9 @@ export default function CheckinPage() {
     setLastEvent(ev);
     recents.prepend(ev);
     const tone = feedbackTone(fb.kind);
-    if (tone === "success") playCheckinTone("success");
-    else if (tone === "warning") playCheckinTone("warning");
-    else if (tone === "denied") playCheckinTone("denied");
+    if (tone === "success") playCheckinTone("success", volume);
+    else if (tone === "warning") playCheckinTone("warning", volume);
+    else if (tone === "denied") playCheckinTone("denied", volume);
   }
 
   const checkinManual = useCheckinManual();
@@ -114,7 +118,7 @@ export default function CheckinPage() {
     },
     onNoMatch: () => {
       setFeedback({ kind: "denied_not_found" });
-      playCheckinTone("denied");
+      playCheckinTone("denied", volume);
       void emitCheckinResult({ kind: "no_match" });
     },
   });
@@ -127,7 +131,7 @@ export default function CheckinPage() {
     } catch (err) {
       const msg = checkinErrorMessage(err, t.feedback.deniedNotFound);
       setFeedback({ kind: "denied_not_found", detail: msg });
-      playCheckinTone("denied");
+      playCheckinTone("denied", volume);
     }
   }
 
@@ -143,7 +147,7 @@ export default function CheckinPage() {
       const msg = checkinErrorMessage(err, t.numberPad.invalid);
       setNumberError(msg);
       setFeedback({ kind: "denied_not_found", detail: msg });
-      playCheckinTone("denied");
+      playCheckinTone("denied", volume);
       setNumberInput("");
     }
   }
