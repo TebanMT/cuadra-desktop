@@ -62,13 +62,12 @@
 ; install y cada auto-update):
 ;   - Servicio: DpHost ("HID Authentication Device Service") →
 ;     SYSTEM\CurrentControlSet\Services\DpHost (hive sin split WOW64).
-;   - Uninstall (vista 64-bit): product code {AFB5AC65-...}, DisplayName
-;     "HID Authentication Device Client" 5.2.0.50. El GUID cambia si HID
-;     publica versión nueva — bumpear junto con TINTA_DP_URL/SHA256.
 ;   - Binario del host: HID Global\Authentication Device Client\Bin\
 ;     DpHostW.exe (dpcagnt.exe y DigitalPersona\Bin eran de la era 4.x).
+;     La entrada Uninstall del MSI ({AFB5AC65-...}) NO se usa como señal:
+;     un install rodado atrás por el conflicto DP puede dejarla junto con
+;     archivos huérfanos sin producto funcional (ver cascada abajo).
 !define TINTA_DP_SVC "SYSTEM\CurrentControlSet\Services\DpHost"
-!define TINTA_DP_UNINST "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{AFB5AC65-F772-4AA8-ADA1-630480C03438}"
 !define TINTA_DP_AGENT_BIN "$PROGRAMFILES64\HID Global\Authentication Device Client\Bin\DpHostW.exe"
 !define TINTA_DP_TEMP_EXE "$TEMP\tinta-hid-adc.exe"
 !define TINTA_DP_TEMP_PS1 "$TEMP\tinta-dp-fetch.ps1"
@@ -167,25 +166,29 @@
   ; innecesaria y una elevación UAC molesta.
   SetRegView 64
 
-  ; Detección en cascada contra el footprint REAL (ver defines arriba):
-  ; 3 chequeos, cualquiera positivo gatilla skip.
+  ; Detección contra el footprint REAL (ver defines arriba): 2 chequeos,
+  ; cualquiera positivo gatilla skip. Ambos apuntan a piezas FUNCIONALES
+  ; del producto, no a rastros de registro:
   ;   1. Servicio DpHost — la señal más robusta: la hive SYSTEM no tiene
   ;      split WOW64 y el servicio ES lo que el FE necesita corriendo.
-  ;   2. Entrada de desinstalación del MSI 5.2.0 (product code pineado).
-  ;   3. File presence del host (red para registry limpiado a mano).
+  ;      Cubre installs en rutas custom (ImagePath apunta a donde sea).
+  ;   2. File presence del host (red para registry limpiado a mano).
   ;
-  ; OJO: el registry legacy 4.x (SOFTWARE\DigitalPersona\Bin — era One
-  ; Touch/RTE) ya NO cuenta como "instalado". Ese runtime NO trae el
-  ; agente WebSdk que el FE necesita en el puerto 52181 — es el que dejan
-  ; los sistemas de gym viejos (HDLEON y similares) — y tratarlo como
-  ; skip dejaba la máquina sin Lite Client con el lector muerto en
-  ; silencio (/get_connection → HRESULT 0x80070002 "El sistema no puede
-  ; encontrar el archivo especificado"). Esas máquinas ahora caen al
-  ; pre-check de conflicto de abajo, que nombra el producto DigitalPersona
-  ; viejo con un mensaje accionable en vez de fingir que todo quedó listo.
+  ; Señales que ya NO cuentan como "instalado" (ambas mordieron en campo):
+  ;   - Registry legacy 4.x (SOFTWARE\DigitalPersona\Bin — era One
+  ;     Touch/RTE): ese runtime NO trae el agente WebSdk del puerto 52181;
+  ;     es lo que dejan sistemas de gym viejos (HDLEON y similares), y el
+  ;     skip dejaba el lector muerto en silencio (/get_connection →
+  ;     HRESULT 0x80070002 "no se puede encontrar el archivo").
+  ;   - Entrada de desinstalación del MSI: un install que chocó con el
+  ;     conflicto DP (7336428) y rodó atrás puede dejar registro y
+  ;     archivos huérfanos (visto en el gym piloto: Bin\ con sólo
+  ;     Branding.dll, sin DpHostW.exe) — el registro solo NO prueba que
+  ;     el producto funcione. Las máquinas que fallan estos chequeos caen
+  ;     al pre-check de conflicto de abajo, que nombra el producto DP
+  ;     viejo con mensaje accionable, o al install del MSI (que repara
+  ;     una instalación a medias) — nunca a un skip silencioso.
   ReadRegStr $0 HKLM "${TINTA_DP_SVC}" "ImagePath"
-  StrCmp $0 "" 0 tinta_dp_already
-  ReadRegStr $0 HKLM "${TINTA_DP_UNINST}" "DisplayName"
   StrCmp $0 "" 0 tinta_dp_already
   IfFileExists "${TINTA_DP_AGENT_BIN}" tinta_dp_already
   Goto tinta_dp_download
