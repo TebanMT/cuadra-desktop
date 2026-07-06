@@ -56,8 +56,20 @@
 !define TINTA_DP_URL_FALLBACK "https://crossmatch.hid.gl/lite-client/store/5.2.0/HID%20Authentication%20Device%20Client.exe"
 !define TINTA_DP_SHA256 "C5268289CF772FE288DEAC4CFC12E09BCC7055C29C7EBFA569D53570EE5E977A"
 !define TINTA_DP_HELP_URL "https://crossmatch.hid.gl/lite-client/"
-!define TINTA_DP_AGENT_BIN "$PROGRAMFILES64\DigitalPersona\Bin\dpcagnt.exe"
-!define TINTA_DP_REG_NEW "SOFTWARE\HID Global\HID Authentication Device Client"
+; Footprint REAL del Authentication Device Client 5.2.0.50, dump-eado de
+; una instalación real el 5-jul-2026 (NO suposiciones — las claves
+; anteriores no existían y el installer re-descargaba 55 MB en cada
+; install y cada auto-update):
+;   - Servicio: DpHost ("HID Authentication Device Service") →
+;     SYSTEM\CurrentControlSet\Services\DpHost (hive sin split WOW64).
+;   - Uninstall (vista 64-bit): product code {AFB5AC65-...}, DisplayName
+;     "HID Authentication Device Client" 5.2.0.50. El GUID cambia si HID
+;     publica versión nueva — bumpear junto con TINTA_DP_URL/SHA256.
+;   - Binario del host: HID Global\Authentication Device Client\Bin\
+;     DpHostW.exe (dpcagnt.exe y DigitalPersona\Bin eran de la era 4.x).
+!define TINTA_DP_SVC "SYSTEM\CurrentControlSet\Services\DpHost"
+!define TINTA_DP_UNINST "SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{AFB5AC65-F772-4AA8-ADA1-630480C03438}"
+!define TINTA_DP_AGENT_BIN "$PROGRAMFILES64\HID Global\Authentication Device Client\Bin\DpHostW.exe"
 !define TINTA_DP_REG_LEGACY "SOFTWARE\DigitalPersona\Bin"
 !define TINTA_DP_TEMP_EXE "$TEMP\tinta-hid-adc.exe"
 !define TINTA_DP_TEMP_PS1 "$TEMP\tinta-dp-fetch.ps1"
@@ -156,20 +168,21 @@
   ; innecesaria y una elevación UAC molesta.
   SetRegView 64
 
-  ; Detección en cascada: 3 chequeos, cualquiera positivo gatilla skip.
-  ;   1. Registry de la línea nueva (5.x — HID Global rebrand).
-  ;   2. Registry legacy (4.x y anteriores — marca DigitalPersona).
-  ;   3. File presence del agente (red de seguridad para instalaciones
-  ;      portables, antivirus que limpiaron registry, etc).
-  ReadRegStr $0 HKLM "${TINTA_DP_REG_NEW}" "InstallDir"
-  StrCmp $0 "" tinta_dp_check_legacy tinta_dp_already
-
-  tinta_dp_check_legacy:
-    ReadRegStr $0 HKLM "${TINTA_DP_REG_LEGACY}" "InstallDir"
-    StrCmp $0 "" tinta_dp_check_file tinta_dp_already
-
-  tinta_dp_check_file:
-    IfFileExists "${TINTA_DP_AGENT_BIN}" tinta_dp_already tinta_dp_download
+  ; Detección en cascada contra el footprint REAL (ver defines arriba):
+  ; 4 chequeos, cualquiera positivo gatilla skip.
+  ;   1. Servicio DpHost — la señal más robusta: la hive SYSTEM no tiene
+  ;      split WOW64 y el servicio ES lo que el FE necesita corriendo.
+  ;      El nombre viene de la era DigitalPersona → cubre 4.x también.
+  ;   2. Entrada de desinstalación del MSI 5.2.0 (product code pineado).
+  ;   3. File presence del host (red para registry limpiado a mano).
+  ;   4. Registry legacy 4.x (marca DigitalPersona) — histórico.
+  ReadRegStr $0 HKLM "${TINTA_DP_SVC}" "ImagePath"
+  StrCmp $0 "" 0 tinta_dp_already
+  ReadRegStr $0 HKLM "${TINTA_DP_UNINST}" "DisplayName"
+  StrCmp $0 "" 0 tinta_dp_already
+  IfFileExists "${TINTA_DP_AGENT_BIN}" tinta_dp_already
+  ReadRegStr $0 HKLM "${TINTA_DP_REG_LEGACY}" "InstallDir"
+  StrCmp $0 "" tinta_dp_download tinta_dp_already
 
   tinta_dp_download:
     ; Pre-check de conflicto ANTES de descargar 55 MB: según HID, el
