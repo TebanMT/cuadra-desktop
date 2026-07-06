@@ -27,6 +27,15 @@ vi.mock("@/hooks/useWindowPresence", () => ({
   useWindowPresence: () => kioskPresent,
 }));
 
+// Knobs del dueño (Ajustes → Perfil del gym): duración del veredicto en
+// pantalla + volumen del tono. Variables para probar que la página los
+// honra en vez de hardcodear.
+let mockTtlMs = 10_000;
+let mockVolume = 0.8;
+vi.mock("@/hooks/useGym", () => ({
+  useCheckinFeedbackSettings: () => ({ ttlMs: mockTtlMs, volume: mockVolume }),
+}));
+
 // Relay entre ventanas — capturamos los handlers para simular resultados
 // que la main procesó (el camino normal: el Lite Client enruta el sample
 // a la ventana con foco, que casi siempre es la main).
@@ -86,6 +95,8 @@ describe("CheckinFloatPage", () => {
   beforeEach(() => {
     loopOpts = null;
     relayOpts = null;
+    mockTtlMs = 10_000;
+    mockVolume = 0.8;
     bioAvailable = true;
     readerConnected = true;
     kioskPresent = false;
@@ -127,7 +138,7 @@ describe("CheckinFloatPage", () => {
     act(() => loopOpts!.onCheckin(makeEvent()));
     expect(screen.getByText("Ana López")).toBeInTheDocument();
     expect(screen.getByText(t.feedback.successActive(26))).toBeInTheDocument();
-    expect(playCheckinTone).toHaveBeenCalledWith("success");
+    expect(playCheckinTone).toHaveBeenCalledWith("success", 0.8);
   });
 
   it("membresía vencida pinta el detalle de denegado y suena denied", () => {
@@ -139,7 +150,7 @@ describe("CheckinFloatPage", () => {
     );
     expect(screen.getByText("Ana López")).toBeInTheDocument();
     expect(screen.getByText(t.feedback.deniedExpired(3))).toBeInTheDocument();
-    expect(playCheckinTone).toHaveBeenCalledWith("denied");
+    expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
   });
 
   it("por vencer pinta el detalle ámbar y suena warning", () => {
@@ -150,7 +161,7 @@ describe("CheckinFloatPage", () => {
       ),
     );
     expect(screen.getByText(t.feedback.successExpiringSoon(2))).toBeInTheDocument();
-    expect(playCheckinTone).toHaveBeenCalledWith("warning");
+    expect(playCheckinTone).toHaveBeenCalledWith("warning", 0.8);
   });
 
   it("huella no reconocida muestra el no-match sin nombre", () => {
@@ -158,10 +169,10 @@ describe("CheckinFloatPage", () => {
     act(() => loopOpts!.onNoMatch!());
     expect(screen.getByText(t.float.noMatchTitle)).toBeInTheDocument();
     expect(screen.getByText(t.feedback.deniedNotFound)).toBeInTheDocument();
-    expect(playCheckinTone).toHaveBeenCalledWith("denied");
+    expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
   });
 
-  it("el resultado sobrevive al TTL del kiosko pero REGRESA a 'Esperando huella…' después", async () => {
+  it("el resultado dura lo configurado y REGRESA a 'Esperando huella…'", async () => {
     vi.useFakeTimers();
     try {
       render(<CheckinFloatPage />);
@@ -219,13 +230,31 @@ describe("CheckinFloatPage", () => {
     }
   });
 
+  it("honra el TTL configurado por el dueño (no hay duración en duro)", async () => {
+    mockTtlMs = 2_000; // "Duración del feedback al check-in" al mínimo
+    vi.useFakeTimers();
+    try {
+      render(<CheckinFloatPage />);
+      act(() => loopOpts!.onCheckin(makeEvent()));
+      expect(screen.getByText("Ana López")).toBeInTheDocument();
+
+      act(() => {
+        vi.advanceTimersByTime(2_500);
+      });
+      expect(screen.queryByText("Ana López")).not.toBeInTheDocument();
+      expect(screen.getByText(t.float.waiting)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("pinta con tono un resultado RELAYADO desde la main (el camino normal sin foco)", () => {
     render(<CheckinFloatPage />);
     act(() => relayOpts!.onCheckin(makeEvent()));
 
     expect(screen.getByText("Ana López")).toBeInTheDocument();
     expect(screen.getByText(t.feedback.successActive(26))).toBeInTheDocument();
-    expect(playCheckinTone).toHaveBeenCalledWith("success");
+    expect(playCheckinTone).toHaveBeenCalledWith("success", 0.8);
   });
 
   it("pinta un no-match relayado desde la main", () => {
@@ -233,7 +262,7 @@ describe("CheckinFloatPage", () => {
     act(() => relayOpts!.onNoMatch());
 
     expect(screen.getByText(t.float.noMatchTitle)).toBeInTheDocument();
-    expect(playCheckinTone).toHaveBeenCalledWith("denied");
+    expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
   });
 
   it("el botón de cerrar propio cierra la ventana (no hay chrome del OS)", () => {

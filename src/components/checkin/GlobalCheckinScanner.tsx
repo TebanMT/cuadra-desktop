@@ -12,6 +12,7 @@ import {
   feedbackTone,
 } from "@/components/checkin/CheckinFeedback";
 import { useWindowPresence } from "@/hooks/useWindowPresence";
+import { useCheckinFeedbackSettings } from "@/hooks/useGym";
 import {
   emitCheckinResult,
   useCheckinResultRelay,
@@ -59,6 +60,9 @@ export function GlobalCheckinScanner() {
   const kioskOpen = useWindowPresence(KIOSK_WINDOW_LABEL);
 
   const available = !!bio.data?.available && readerConnected === true;
+  // Volumen del tono — "Volumen del kiosko" en Ajustes → Perfil del gym;
+  // el mismo knob gobierna todas las superficies de check-in.
+  const { volume } = useCheckinFeedbackSettings();
   const onCheckinRoute = location.pathname === "/checkin";
   // Con una superficie dedicada al socio abierta, el tono lo pone ella
   // (vía relay) — la main sólo toastea. Sin flotante ni kiosko, la main es
@@ -73,15 +77,15 @@ export function GlobalCheckinScanner() {
       const detail = feedbackDetail(fb) || undefined;
       switch (tone) {
         case "success":
-          if (withTone) playCheckinTone("success");
+          if (withTone) playCheckinTone("success", volume);
           toast.success(`✓ ${memberName} ingresó`, { description: detail });
           break;
         case "warning":
-          if (withTone) playCheckinTone("warning");
+          if (withTone) playCheckinTone("warning", volume);
           toast.warning(`⚠ ${memberName} ingresó`, { description: detail });
           break;
         case "denied":
-          if (withTone) playCheckinTone("denied");
+          if (withTone) playCheckinTone("denied", volume);
           toast.error(`✗ ${memberName} no puede entrar`, {
             description: detail ?? "Acceso denegado.",
           });
@@ -92,15 +96,15 @@ export function GlobalCheckinScanner() {
           break;
       }
     },
-    [],
+    [volume],
   );
 
   const toastNoMatch = useCallback((withTone: boolean) => {
-    if (withTone) playCheckinTone("denied");
+    if (withTone) playCheckinTone("denied", volume);
     toast.error("No reconocimos la huella", {
       description: "Vuelve a apoyar o usa el número de socio.",
     });
-  }, []);
+  }, [volume]);
 
   // Memoizamos los handlers para no re-suscribir el loop en cada render
   // (caro: el provider trata cada cambio de subscriber como vida nueva).

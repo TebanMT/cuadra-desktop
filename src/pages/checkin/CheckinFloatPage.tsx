@@ -17,6 +17,7 @@ import {
 } from "@/hooks/useBiometric";
 import { useCheckinResultRelay } from "@/hooks/useCheckinResultRelay";
 import { useWindowPresence } from "@/hooks/useWindowPresence";
+import { useCheckinFeedbackSettings } from "@/hooks/useGym";
 import { useBiometricStreamStatus } from "@/lib/biometricStreamProvider";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { closeCurrentWindow } from "@/lib/kioskWindow";
@@ -41,13 +42,12 @@ import type { CheckinEvent } from "@/hooks/useCheckin";
 //     (useCheckinResultRelay); esta ventana lo pinta y pone el tono. El
 //     loop propio existe para el caso en que ESTA ventana tenga el foco
 //     (recién abierta, o el operador la movió) — ahí procesamos nosotros.
-//   - El resultado queda visible un buen rato (RESULT_TTL_MS) y luego
-//     REGRESA a "Esperando huella…". El TTL largo conserva el punto de la
-//     feature (no muere a los 3s bajo un modal como el toast), pero el
-//     regreso a idle es necesario: sin él, el siguiente socio se acerca al
-//     mostrador y ve el veredicto del anterior — la animación de espera es
-//     la señal de "el lector está listo para TI" (feedback del piloto,
-//     6-jul-2026).
+//   - El resultado queda visible y luego REGRESA a "Esperando huella…" —
+//     sin el regreso a idle, el siguiente socio se acercaba al mostrador y
+//     veía el veredicto del anterior (feedback del piloto, 6-jul-2026). La
+//     duración NO va en duro: la gobierna "Duración del feedback al
+//     check-in" (Ajustes → Perfil del gym), el mismo knob del kiosko —
+//     igual que el volumen del tono (useCheckinFeedbackSettings).
 //   - v1 huella-only: sin NumberPad. Un teclado aquí robaría el foco del
 //     teclado físico al operador a media venta (los dígitos del socio
 //     caerían en el formulario que el operador tenga abierto). El número
@@ -87,13 +87,6 @@ interface LastResult {
   at: string; // HH:mm local del gym (tz de la PC)
 }
 
-// Cuánto vive el resultado en pantalla antes de volver a "Esperando
-// huella…". Más largo que el auto-fade del kiosko (3.5s): la ventana es
-// chica y el socio puede tardar en voltear a verla — pero finito, para que
-// el siguiente socio encuentre la animación de espera y no el veredicto
-// del anterior.
-const RESULT_TTL_MS = 10_000;
-
 export default function CheckinFloatPage() {
   const bio = useBiometricStatus();
   const readerConnected = useReaderConnected();
@@ -103,17 +96,21 @@ export default function CheckinFloatPage() {
   const fingerprintAvailable =
     !!bio.data?.available && readerConnected === true;
 
+  // Duración del veredicto + volumen del tono — knobs del dueño en
+  // Ajustes → Perfil del gym, compartidos con el kiosko.
+  const { ttlMs, volume } = useCheckinFeedbackSettings();
+
   const [processing, setProcessing] = useState(false);
   const [last, setLast] = useState<LastResult | null>(null);
 
-  // Regreso a idle tras RESULT_TTL_MS. Cada resultado nuevo re-arma el
-  // timer (dependencia en `last`); al expirar vuelve la animación de
+  // Regreso a idle tras el TTL configurado. Cada resultado nuevo re-arma
+  // el timer (dependencia en `last`); al expirar vuelve la animación de
   // espera — la señal para el siguiente socio de que el lector está listo.
   useEffect(() => {
     if (!last) return;
-    const id = window.setTimeout(() => setLast(null), RESULT_TTL_MS);
+    const id = window.setTimeout(() => setLast(null), ttlMs);
     return () => window.clearTimeout(id);
-  }, [last]);
+  }, [last, ttlMs]);
 
   // Lock de scroll — misma razón que el kiosko: la ventana es un appliance,
   // no una página.
@@ -170,9 +167,9 @@ export default function CheckinFloatPage() {
 
   function announceTone(state: FeedbackState) {
     const tone = feedbackTone(state.kind);
-    if (tone === "success") playCheckinTone("success");
-    else if (tone === "warning") playCheckinTone("warning");
-    else if (tone === "denied") playCheckinTone("denied");
+    if (tone === "success") playCheckinTone("success", volume);
+    else if (tone === "warning") playCheckinTone("warning", volume);
+    else if (tone === "denied") playCheckinTone("denied", volume);
   }
 
   // Pintar un resultado + tono — mismo camino para los check-ins que esta

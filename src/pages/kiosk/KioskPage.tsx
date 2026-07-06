@@ -24,9 +24,8 @@ import {
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { closeCurrentWindow, isCurrentWindowKiosk } from "@/lib/kioskWindow";
+import { useCheckinFeedbackSettings } from "@/hooks/useGym";
 import { checkin as t } from "@/strings/checkin";
-
-const AUTOFADE_MS = 3500;
 
 /**
  * Reloj memoizado — re-render solo cuando cambia el minuto, no cada
@@ -127,13 +126,19 @@ export default function KioskPage() {
     setNumberError(null);
   }, []);
 
-  useAutoFade(feedback, { ttlMs: AUTOFADE_MS, onExpire: reset });
+  // Duración del veredicto + volumen del tono — "Duración del feedback al
+  // check-in" y "Volumen del kiosko" en Ajustes → Perfil del gym. Antes
+  // esos knobs se guardaban pero NADIE los leía (3.5s y volumen default en
+  // duro aquí).
+  const { ttlMs, volume } = useCheckinFeedbackSettings();
+
+  useAutoFade(feedback, { ttlMs, onExpire: reset });
 
   function announceTone(state: FeedbackState) {
     const tone = feedbackTone(state.kind);
-    if (tone === "success") playCheckinTone("success");
-    else if (tone === "warning") playCheckinTone("warning");
-    else if (tone === "denied") playCheckinTone("denied");
+    if (tone === "success") playCheckinTone("success", volume);
+    else if (tone === "warning") playCheckinTone("warning", volume);
+    else if (tone === "denied") playCheckinTone("denied", volume);
   }
 
   // Capture vive en el frontend per ADR-004-bis. El JS SDK habla con el
@@ -206,7 +211,7 @@ export default function KioskPage() {
       // hay clics rápidos.
       setNumberShake(true);
       window.setTimeout(() => setNumberShake(false), 400);
-      playCheckinTone("denied");
+      playCheckinTone("denied", volume);
       setNumberInput("");
     }
   }
