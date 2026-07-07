@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 
-export type SyncLevel = "ok" | "syncing" | "warn" | "error" | "auth" | "stale";
+export type SyncLevel = "ok" | "syncing" | "warn" | "error" | "auth" | "stale" | "syncError";
 
 export interface SyncStatus {
   state:
@@ -17,6 +17,10 @@ export interface SyncStatus {
     // (típicamente por revocación tras 30+ días de idle). La UI muestra
     // CTA de re-login en lugar de "Sin internet".
     | "auth_invalid"
+    // sync_error: el último fallo fue al APLICAR un cambio en esta laptop
+    // (no de red — el servidor respondió). La UI lo muestra accionable
+    // ("actualiza / reporta"), no como "Sin internet".
+    | "sync_error"
     // schema_upgrade_required: el cloud devolvió 426 al sync (ADR-001
     // §3.8). El binario quedó atrás del wire protocol — la UI dispara
     // un modal bloqueante "Actualízala" en lugar de toast.
@@ -40,6 +44,10 @@ export interface SyncStatus {
   // independiente (e.g. para deshabilitar acciones sin tocar el switch
   // del state principal).
   schema_upgrade_required?: boolean;
+  // quarantined_count: cambios del servidor que no se pudieron aplicar y
+  // el sync SALTÓ tras varios intentos, para no quedar atascado. >0
+  // mantiene el estado en "sync_error" (no silencioso).
+  quarantined_count?: number;
 }
 
 export function useSyncStatus(enabled = true) {
@@ -115,6 +123,10 @@ export function levelOf(status?: SyncStatus | null): SyncLevel {
       // Tono propio: la credencial del sidecar está muerta y hace falta
       // re-login. Distinto de error genérico — la acción es clara.
       return "auth";
+    case "sync_error":
+      // Falla al guardar un cambio localmente (no de red). Tono propio
+      // para NO decir "Sin internet" cuando sí hay.
+      return "syncError";
     case "schema_upgrade_required":
       // Cliente desactualizado contra el cloud — el modal bloqueante
       // toma la pantalla, pero el indicador igual cambia de color para
