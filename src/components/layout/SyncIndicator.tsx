@@ -57,6 +57,8 @@ export function SyncIndicator() {
       ? shell.sync.syncing
       : level === "auth"
       ? shell.sync.authInvalid
+      : level === "syncError"
+      ? shell.sync.syncError
       : level === "warn"
       ? shell.sync.offline
       : shell.sync.error;
@@ -92,7 +94,11 @@ export function SyncIndicator() {
               {shell.sync.detailsTitle}
             </DialogTitle>
             <DialogDescription>
-              {level === "auth" ? shell.sync.authInvalidHint : label}
+              {level === "auth"
+                ? shell.sync.authInvalidHint
+                : level === "syncError"
+                ? shell.sync.syncErrorHint
+                : label}
             </DialogDescription>
           </DialogHeader>
           <SyncDetail status={data} />
@@ -124,6 +130,9 @@ function SyncDetail({ status }: { status?: SyncStatus | null }) {
           : shell.sync.never}
       </Row>
       <Row label={shell.sync.pending}>{status?.queue_pending_count ?? 0}</Row>
+      {(status?.quarantined_count ?? 0) > 0 && (
+        <Row label={shell.sync.quarantined}>{status?.quarantined_count}</Row>
+      )}
       <Row label={shell.sync.lastError}>
         {status?.last_error || shell.sync.none}
       </Row>

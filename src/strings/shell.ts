@@ -35,12 +35,16 @@ export const shell = {
     syncing: "Sincronizando…",
     offline: "Sin internet, todo guardado en esta laptop.",
     error: "Hay un problema sincronizando.",
+    syncError: "Hay un problema al guardar cambios del servidor.",
+    syncErrorHint:
+      "Sí hay internet: el servidor respondió, pero un cambio no se pudo guardar en esta laptop. Suele arreglarse actualizando la app. Si sigue, comparte el 'Último error' con soporte.",
     authInvalid: "Vuelve a iniciar sesión para sincronizar.",
     authInvalidHint:
       "La credencial de esta laptop expiró. Tus cambios siguen guardados; vuelve a iniciar sesión para reanudar el sync.",
     detailsTitle: "Estado de sincronización",
     lastSync: "Último sync exitoso",
     pending: "Cambios pendientes",
+    quarantined: "Cambios que no se pudieron aplicar",
     lastError: "Último error",
     never: "Nunca",
     none: "Ninguno",
