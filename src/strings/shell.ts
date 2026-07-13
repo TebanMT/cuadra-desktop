@@ -43,6 +43,8 @@ export const shell = {
       "Esta computadora tiene más de una semana sin subir sus cambios. La operación local sigue funcionando, pero revisa el internet — el dashboard del celular no verá lo nuevo hasta sincronizar.",
     stale: "Actualiza la app para seguir sincronizando.",
     syncError: "Hay un problema al guardar cambios del servidor.",
+    syncErrorPushHint:
+      "Sí hay internet, pero el servidor está rechazando uno o más cambios hechos en esta computadora. Nada se pierde — los cambios siguen guardados aquí. Comparte el 'Último error' con soporte para destrabarlos.",
     syncErrorHint:
       "Sí hay internet: el servidor respondió, pero un cambio no se pudo guardar en esta laptop. Suele arreglarse actualizando la app. Si sigue, comparte el 'Último error' con soporte.",
     authInvalid: "Vuelve a iniciar sesión para sincronizar.",

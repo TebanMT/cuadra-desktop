@@ -79,7 +79,13 @@ export function SyncIndicator() {
               {level === "auth"
                 ? shell.sync.authInvalidHint
                 : level === "syncError"
-                ? shell.sync.syncErrorHint
+                ? // sync_error cubre dos causas distintas; el copy debe
+                  // apuntar a la correcta: filas de ESTA laptop que el
+                  // servidor rechazó (queue_stuck) vs cambios del servidor
+                  // que no se pudieron aplicar AQUÍ (quarantined/apply).
+                  (data?.queue_stuck_count ?? 0) > 0
+                  ? shell.sync.syncErrorPushHint
+                  : shell.sync.syncErrorHint
                 : level === "offline"
                 ? shell.sync.offlineHint
                 : level === "offlineLong"
