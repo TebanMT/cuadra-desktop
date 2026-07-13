@@ -45,6 +45,7 @@ export const shell = {
     lastSync: "Último sync exitoso",
     pending: "Cambios pendientes",
     quarantined: "Cambios que no se pudieron aplicar",
+    stuckPush: "Cambios que no han podido subir",
     lastError: "Último error",
     never: "Nunca",
     none: "Ninguno",

@@ -48,6 +48,11 @@ export interface SyncStatus {
   // el sync SALTÓ tras varios intentos, para no quedar atascado. >0
   // mantiene el estado en "sync_error" (no silencioso).
   quarantined_count?: number;
+  // queue_stuck_count: cambios de esta laptop que el servidor rechazó
+  // varias veces (el ciclo global "exitoso" los dejaba invisibles: el
+  // indicador decía "Sincronizado" con la cola atorada). >0 también
+  // mantiene "sync_error"; el last_error trae el motivo de la fila.
+  queue_stuck_count?: number;
 }
 
 export function useSyncStatus(enabled = true) {
