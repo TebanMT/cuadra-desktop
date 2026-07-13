@@ -28,13 +28,15 @@ const MEMBER = { member_id: "m1", full_name: "Rosa Robles", phone: "+52551112223
 
 function renderModal(overrides: Partial<Parameters<typeof CheckoutModal>[0]> = {}) {
   const onConfirm = vi.fn(async () => {});
-  const props = {
+  const props: Parameters<typeof CheckoutModal>[0] = {
     open: true,
     onOpenChange: vi.fn(),
     total: 180,
     itemCount: 3,
     member: null,
     onMemberChange: vi.fn(),
+    memberDebt: 0,
+    onSettle: vi.fn(),
     submitting: false,
     onConfirm,
     ...overrides,
@@ -65,15 +67,27 @@ describe("CheckoutModal", () => {
     await waitFor(() => expect(onConfirm).toHaveBeenCalledWith({ method: "card" }));
   });
 
-  it("fiado sin socio: pide asociar y NO confirma", async () => {
+  it("fiado sin socio: apunta al asociador del summary y NO confirma", async () => {
     const user = userEvent.setup();
     const { onConfirm } = renderModal({ member: null });
 
+    // El asociador vive en el summary del modal (siempre visible).
+    expect(screen.getByRole("button", { name: /Asociar a socio/i })).toBeInTheDocument();
+
     await user.click(screen.getByRole("button", { name: "Fiado" }));
-    // Sin socio el pane muestra el asociador y el CTA queda deshabilitado.
-    expect(screen.getByText(/¿A quién se lo fías\?/i)).toBeInTheDocument();
+    expect(screen.getByText(/Asocia al socio/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Confirmar — cobrar/ })).toBeDisabled();
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+
+  it("socio con deuda: el chip ámbar aparece y dispara onSettle", async () => {
+    const user = userEvent.setup();
+    const onSettle = vi.fn();
+    renderModal({ member: MEMBER, memberDebt: 13, onSettle });
+
+    const chip = screen.getByRole("button", { name: /Debe \$13\.00/ });
+    await user.click(chip);
+    expect(onSettle).toHaveBeenCalled();
   });
 
   it("fiado parcial: manda paid y el método de lo cobrado ahora", async () => {

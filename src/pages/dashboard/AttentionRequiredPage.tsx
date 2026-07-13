@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   CalendarClock,
@@ -47,7 +47,15 @@ type FilterKey = "all" | "expired" | "expiring" | "balance";
 export default function AttentionRequiredPage() {
   const data = useAttentionRequired();
   const [stockTarget, setStockTarget] = useState<Product | null>(null);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  // ?filter=balance|expired|expiring — deep-link desde el KPI "Por cobrar"
+  // del dashboard (y quien venga después). Sólo estado inicial: el usuario
+  // puede cambiar de pill sin ensuciar la URL.
+  const [searchParams] = useSearchParams();
+  const initialFilter = ((): FilterKey => {
+    const f = searchParams.get("filter");
+    return f === "expired" || f === "expiring" || f === "balance" ? f : "all";
+  })();
+  const [filter, setFilter] = useState<FilterKey>(initialFilter);
 
   const inbox = useMemo<SocioInboxRow[]>(() => {
     if (!data.data) return [];

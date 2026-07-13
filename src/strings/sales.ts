@@ -6,8 +6,6 @@ export const sales = {
     removeAssociation: "Quitar",
     associateSearchPlaceholder: "Buscar por nombre o teléfono…",
     associateNoResults: "Sin resultados",
-    close: "Cerrar",
-    backToDashboard: "Cerrar",
     empty: "Aún no hay productos para vender.",
     emptyHint: "Agrega productos en la sección de Productos.",
     uncategorized: "Sin categoría",
@@ -38,10 +36,9 @@ export const sales = {
     checkout: {
       title: "Cobrar",
       totalLabel: "Total a cobrar",
-      summary: (n: number, member?: string) =>
-        `${n === 1 ? "1 producto" : `${n} productos`} · ${member ?? "público general"}`,
+      itemsSummary: (n: number) => (n === 1 ? "1 producto" : `${n} productos`),
       fiado: "Fiado",
-      fiadoWho: "¿A quién se lo fías?",
+      fiadoNeedsMember: "Asocia al socio (arriba) para poder fiar.",
       fiadoQuestion: "¿Cuánto te deja ahora?",
       fiadoMethodQuestion: "¿Cómo te paga lo de ahora?",
       cashQuestion: "¿Con cuánto te pagan?",

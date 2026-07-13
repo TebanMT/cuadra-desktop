@@ -6,6 +6,7 @@ import {
   Handshake,
   Loader2,
   Smartphone,
+  Wallet,
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,12 @@ interface CheckoutModalProps {
   itemCount: number;
   member: MemberSearchResult | null;
   onMemberChange(m: MemberSearchResult | null): void;
+  // Deuda total del socio asociado (0 si no hay socio o no debe). El chip
+  // ámbar del summary la exhibe; onSettle abre el modal de abono ENCIMA
+  // de este (Radix anida bien) — el momento de cobrar la deuda es cuando
+  // la persona está en el mostrador pagando otra cosa.
+  memberDebt: number;
+  onSettle(): void;
   submitting: boolean;
   // Lanza la venta. Debe THROW en error — el modal lo muestra sin
   // cerrarse; en éxito el dueño (la página) cierra y limpia.
@@ -53,6 +60,8 @@ export function CheckoutModal({
   itemCount,
   member,
   onMemberChange,
+  memberDebt,
+  onSettle,
   submitting,
   onConfirm,
 }: CheckoutModalProps) {
@@ -155,9 +164,27 @@ export function CheckoutModal({
               {fmtMoney(total)}
             </span>
           </div>
-          <p className="text-xs text-muted-foreground">
-            {t.page.checkout.summary(itemCount, member?.full_name)}
-          </p>
+          {/* La asociación de socio vive AQUÍ, en el momento del cobro —
+              antes era un botón permanente en el header de la página que
+              se usaba en 1 de cada 10 ventas. Asociar liga la venta al
+              historial del socio y habilita fiado; si además debe, el
+              chip ámbar lo exhibe con acción directa de abono. */}
+          <div className="flex items-center gap-2 flex-wrap pt-0.5">
+            <span className="text-xs text-muted-foreground">
+              {t.page.checkout.itemsSummary(itemCount)} ·
+            </span>
+            <MemberAssociator member={member} onChange={onMemberChange} />
+            {member && memberDebt > 0 && (
+              <button
+                type="button"
+                onClick={onSettle}
+                className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors"
+              >
+                <Wallet className="h-3.5 w-3.5" />
+                {t.page.debt.chip(fmtMoney(memberDebt))}
+              </button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-4">
@@ -212,12 +239,9 @@ export function CheckoutModal({
           {isFiado && (
             <div className="space-y-3 rounded-md border border-warning/40 bg-warning/5 p-3">
               {!member ? (
-                <div className="space-y-2">
-                  <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                    {t.page.checkout.fiadoWho}
-                  </Label>
-                  <MemberAssociator member={member} onChange={onMemberChange} />
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  {t.page.checkout.fiadoNeedsMember}
+                </p>
               ) : (
                 <>
                   <div className="space-y-1.5">

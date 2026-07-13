@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -12,6 +12,7 @@ import {
   TrendingDown,
   TrendingUp,
   Users,
+  Wallet,
   X,
 } from "lucide-react";
 import {
@@ -26,7 +27,7 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { useDashboard } from "@/hooks/useReports";
+import { useDashboard, useAttentionRequired } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { fmtMoney } from "@/hooks/useBilling";
 import { fmtDate } from "@/lib/dates";
@@ -213,12 +214,22 @@ function DashboardContent({
     [hideAmounts]
   );
 
+  // Deuda por cobrar (fiado) — se alimenta de la misma lista de deudores
+  // de Atención requerida (react-query la cachea; el sidecar es local).
+  // Cuando el fix del SUM de deudores aterrice en core, este número
+  // hereda la corrección sin tocar nada aquí.
+  const navigate = useNavigate();
+  const attention = useAttentionRequired();
+  const debtors = attention.data?.pending_balance ?? [];
+  const debtTotal = debtors.reduce((sum, d) => sum + d.balance, 0);
+
   return (
     <>
-      {/* KPI Grid — 6 tiles: en pantallas medianas wrappea; en lg+ entran
-          en una sola fila de 6. El trío financiero (Ingresos · Egresos ·
-          Ganancia) va junto para que el dueño lea "entró / salió / gané". */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-6">
+      {/* KPI Grid — 7 tiles en dos filas de 4+3: arriba el estado del mes
+          (Socios · Ingresos · Egresos · Ganancia — "entró / salió / gané"),
+          abajo lo accionable ("gente y dinero en la calle": vencen, por
+          recuperar, por cobrar). */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title={t.kpis.activeMembers}
           value={data.active_members.value.toLocaleString("es-MX")}
@@ -295,6 +306,15 @@ function DashboardContent({
           tone={recoverableCount > 0 ? "danger" : "neutral"}
           delta={deltaText(data.recoverable)}
           hint={data.recoverable.delta_pct !== null ? t.kpis.vsLastPeriod : undefined}
+        />
+        <StatCard
+          title={t.kpis.pendingDebt}
+          value={maskMoney(fmtMoney(debtTotal))}
+          icon={Wallet}
+          tone={debtTotal > 0 ? "warning" : "neutral"}
+          delta={debtors.length > 0 ? t.kpis.pendingDebtCount(debtors.length) : null}
+          hint={debtTotal > 0 ? t.kpis.pendingDebtHint : undefined}
+          onClick={() => navigate("/attention-required?filter=balance")}
         />
       </div>
 

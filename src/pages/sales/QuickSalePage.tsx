@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Loader2,
@@ -9,7 +8,6 @@ import {
   Search,
   Tag,
   Trash2,
-  Wallet,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -33,7 +31,6 @@ import {
 } from "@/hooks/useSales";
 import { fmtMoney, usePaymentHistory, type PaymentMethod } from "@/hooks/useBilling";
 import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
-import { MemberAssociator } from "@/components/sales/MemberAssociator";
 import { CheckoutModal } from "@/components/sales/CheckoutModal";
 import { levelOf, useSyncStatus } from "@/hooks/useSyncStatus";
 import { api, ApiError } from "@/lib/api";
@@ -70,7 +67,6 @@ function badgeForStock(level: StockLevel, stock: number) {
 }
 
 export default function QuickSalePage() {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const products = useActiveProducts();
   const sync = useSyncStatus();
@@ -233,10 +229,6 @@ export default function QuickSalePage() {
     setPromo(null);
   }
 
-  function close() {
-    navigate("/");
-  }
-
   // Teclado mínimo — sólo lo que acompaña el flujo natural de tecleo:
   //   Enter (en la búsqueda) → agrega el primer match con stock.
   //   Esc                    → limpia la BÚSQUEDA, nada más.
@@ -348,22 +340,6 @@ export default function QuickSalePage() {
         >
           {t.page.title}
         </h1>
-        <div className="flex items-center gap-2">
-          <MemberAssociator member={member} onChange={setMember} />
-          {member && memberDebt > 0 && oldestMemberDebt && (
-            <button
-              type="button"
-              onClick={() => setSettleOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors"
-            >
-              <Wallet className="h-3.5 w-3.5" />
-              {t.page.debt.chip(fmtMoney(memberDebt))}
-            </button>
-          )}
-          <Button variant="ghost" size="icon" onClick={close} aria-label={t.page.close}>
-            <X className="h-5 w-5" />
-          </Button>
-        </div>
       </header>
 
       {member && oldestMemberDebt && (
@@ -630,6 +606,8 @@ export default function QuickSalePage() {
         itemCount={cartLines.reduce((n, l) => n + l.qty, 0)}
         member={member}
         onMemberChange={setMember}
+        memberDebt={memberDebt}
+        onSettle={() => setSettleOpen(true)}
         submitting={register.isPending}
         onConfirm={handleCheckoutConfirm}
       />
