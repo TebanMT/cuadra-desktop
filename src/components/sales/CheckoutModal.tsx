@@ -135,7 +135,18 @@ export function CheckoutModal({
 
   return (
     <Dialog open={open} onOpenChange={(o) => !submitting && onOpenChange(o)}>
-      <DialogContent className="max-w-md">
+      {/* El cobro no se cierra por clicks afuera: (1) un misclick en el
+          momento del dinero tiraría método/monto ya capturados, y (2) el
+          Popover del asociador de socio (pane de fiado) vive en un portal
+          FUERA del DialogContent — sin esto, Radix trataba el pointerdown
+          sobre el resultado de búsqueda como "interacción externa" y
+          cerraba el modal antes de que el click asociara al socio. Se
+          cierra con la X o Esc. */}
+      <DialogContent
+        className="max-w-md"
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle>{t.page.checkout.title}</DialogTitle>
           <div className="flex items-baseline justify-between pt-1">
