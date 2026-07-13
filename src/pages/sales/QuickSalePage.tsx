@@ -257,63 +257,38 @@ export default function QuickSalePage() {
     navigate("/");
   }
 
-  // Atajos globales:
-  //   E / T / C  → método de pago (cash / transfer / card). No se
-  //                disparan si el operador está escribiendo en un input.
-  //   Esc        → limpia el carrito (si tiene algo). Si está vacío y el
-  //                foco está en el search, blurea el search.
-  //   Enter      → agrega el primer match al carrito cuando hay query
-  //                visible. (Reemplaza el viejo keyBuffer invisible.)
+  // Teclado mínimo — sólo lo que acompaña el flujo natural de tecleo:
+  //   Enter (en la búsqueda) → agrega el primer match con stock.
+  //   Esc                    → limpia la BÚSQUEDA, nada más.
+  //
+  // Los atajos E/T/C de método de pago se eliminaron: cambiar el método
+  // es un clic por venta (no ahorran nada) y con el foco fuera del input
+  // teclear un nombre de producto cambiaba el método en silencio. Esc
+  // tampoco vacía ya el carrito: un Esc accidental tiraba una cuenta de
+  // N productos sin confirmación ni undo — vaciar tiene su botón.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
-      const isInput =
-        target &&
-        (target.tagName.toLowerCase() === "input" ||
-          target.tagName.toLowerCase() === "textarea" ||
-          target.isContentEditable);
 
-      // Esc siempre disponible — incluso desde el search input — para
-      // dar al operador una salida rápida del estado actual.
       if (e.key === "Escape") {
-        if (cartLines.length > 0 || search) {
+        if (search) {
           e.preventDefault();
-          clearCart();
           setSearch("");
         }
         return;
       }
 
-      // Enter desde el search agrega el primer producto filtrado con
-      // stock disponible. Asegura el flujo "tecleo + Enter" sin mouse.
-      if (e.key === "Enter" && isInput && target === searchRef.current) {
+      if (e.key === "Enter" && target === searchRef.current) {
         const first = filtered.find((p) => p.active && p.stock > 0);
         if (first) {
           e.preventDefault();
           addToCart(first, 1);
         }
-        return;
-      }
-
-      // Atajos de método: sólo cuando NO hay un input enfocado, sin
-      // modificadores. Una sola letra E/T/C. Mayúsculas y minúsculas.
-      if (!isInput && !e.metaKey && !e.ctrlKey && !e.altKey) {
-        const k = e.key.toLowerCase();
-        if (k === "e") {
-          e.preventDefault();
-          setMethod("cash");
-        } else if (k === "t") {
-          e.preventDefault();
-          setMethod("transfer");
-        } else if (k === "c") {
-          e.preventDefault();
-          setMethod("card");
-        }
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [cartLines.length, filtered, search]);
+  }, [filtered, search]);
 
   // Autofocus en el search al cargar la página — habilita escribir
   // inmediatamente sin tocar el mouse.
@@ -573,7 +548,6 @@ export default function QuickSalePage() {
                   </div>
                 </section>
               ))}
-              <p className="text-xs text-muted-foreground pt-4">{t.page.keyboard.hint}</p>
             </div>
           )}
         </div>
@@ -676,9 +650,7 @@ export default function QuickSalePage() {
               onApply={(p) => setPromo(p)}
             />
 
-            {/* Método de pago como segmented control con hint de tecla
-                (E/T/C). Hace descubrible el shortcut sin meter un
-                cheat-sheet aparte. */}
+            {/* Método de pago como segmented control. */}
             <div className="space-y-2">
               <Label className="text-xs uppercase tracking-wide text-muted-foreground">
                 {t.page.cart.methodLabel}
@@ -698,17 +670,7 @@ export default function QuickSalePage() {
                     )}
                     aria-pressed={method === m}
                   >
-                    <span>{t.page.cart.methods[m]}</span>
-                    <kbd
-                      className={cn(
-                        "ml-1.5 inline-flex h-4 min-w-[1rem] items-center justify-center rounded px-1 text-[10px] font-mono",
-                        method === m
-                          ? "bg-primary-foreground/20 text-primary-foreground"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      {t.page.cart.methodHints[m]}
-                    </kbd>
+                    {t.page.cart.methods[m]}
                   </button>
                 ))}
               </div>

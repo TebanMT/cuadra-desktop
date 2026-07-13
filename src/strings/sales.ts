@@ -22,11 +22,6 @@ export const sales = {
         transfer: "Transferencia",
         card: "Tarjeta",
       },
-      methodHints: {
-        cash: "E",
-        transfer: "T",
-        card: "C",
-      },
       submit: (amount: string) => `Cobrar ${amount}`,
       submitWithDebt: (paid: string, debt: string) => `Cobrar ${paid} · queda ${debt}`,
       remove: "Quitar",
@@ -101,8 +96,5 @@ export const sales = {
       generic: "No pudimos registrar la venta.",
     },
     offline: "Sin conexión: la venta se guarda localmente y se sincroniza después.",
-    keyboard: {
-      hint: "Atajos: E = efectivo, T = transferencia, C = tarjeta · Esc limpia el carrito.",
-    },
   },
 };
