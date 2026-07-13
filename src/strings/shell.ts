@@ -33,8 +33,15 @@ export const shell = {
   sync: {
     online: "Sincronizado",
     syncing: "Sincronizando…",
-    offline: "Sin internet, todo guardado en esta laptop.",
-    error: "Hay un problema sincronizando.",
+    // Offline NO es error (offline-first): copy que tranquiliza, no que
+    // alarma. El hint del diálogo explica que se sube solo al volver.
+    offline: "Sin conexión — todo se guarda aquí.",
+    offlineHint:
+      "No hay conexión con la nube en este momento. Puedes seguir cobrando y registrando normal: todo queda guardado en esta computadora y se sube solo cuando regrese el internet.",
+    offlineLong: "Llevas días sin sincronizar.",
+    offlineLongHint:
+      "Esta computadora tiene más de una semana sin subir sus cambios. La operación local sigue funcionando, pero revisa el internet — el dashboard del celular no verá lo nuevo hasta sincronizar.",
+    stale: "Actualiza la app para seguir sincronizando.",
     syncError: "Hay un problema al guardar cambios del servidor.",
     syncErrorHint:
       "Sí hay internet: el servidor respondió, pero un cambio no se pudo guardar en esta laptop. Suele arreglarse actualizando la app. Si sigue, comparte el 'Último error' con soporte.",

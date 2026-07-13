@@ -103,6 +103,5 @@ export const sales = {
         `Solo hay ${avail} de ${name}. Ajusta cantidad.`,
       generic: "No pudimos registrar la venta.",
     },
-    offline: "Sin conexión: la venta se guarda localmente y se sincroniza después.",
   },
 };

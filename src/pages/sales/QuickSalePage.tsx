@@ -352,12 +352,6 @@ export default function QuickSalePage() {
         />
       )}
 
-      {offline && (
-        <div className="bg-warning/10 text-warning-foreground border-b border-border px-6 py-2 text-sm">
-          {t.page.offline}
-        </div>
-      )}
-
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_360px] overflow-hidden">
         <div className="overflow-y-auto p-6 space-y-6">
           {/* Search sticky — siempre visible, autofocus al cargar. El

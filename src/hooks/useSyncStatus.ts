@@ -3,7 +3,13 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 
-export type SyncLevel = "ok" | "syncing" | "warn" | "error" | "auth" | "stale" | "syncError";
+// Niveles de UI del sync. Regla de la casa (offline-first): estar sin
+// conexión NO es un error — la operación diaria nunca depende de internet.
+//   offline      → sin conexión con la nube, tono CALMADO (gris, sin alarma).
+//   offlineLong  → >7 días sin sincronizar: visibilidad ámbar (algo
+//                  silencioso puede estar roto), pero NUNCA rojo.
+//   syncError / stale / auth → problemas reales, esos sí alarman.
+export type SyncLevel = "ok" | "syncing" | "offline" | "offlineLong" | "auth" | "stale" | "syncError";
 
 export interface SyncStatus {
   state:
@@ -121,9 +127,9 @@ export function levelOf(status?: SyncStatus | null): SyncLevel {
       return "syncing";
     case "offline_medium":
     case "offline_long":
-      return "warn";
+      return "offline";
     case "offline_critical":
-      return "error";
+      return "offlineLong";
     case "auth_invalid":
       // Tono propio: la credencial del sidecar está muerta y hace falta
       // re-login. Distinto de error genérico — la acción es clara.

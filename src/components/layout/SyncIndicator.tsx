@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
+  CloudOff,
   KeyRound,
   RefreshCw,
 } from "lucide-react";
@@ -29,39 +30,20 @@ export function SyncIndicator() {
   const navigate = useNavigate();
   const level = levelOf(data);
 
-  const Icon =
-    level === "ok"
-      ? CheckCircle2
-      : level === "syncing"
-      ? RefreshCw
-      : level === "auth"
-      ? KeyRound
-      : level === "warn"
-      ? AlertTriangle
-      : AlertCircle;
-  const colorClass =
-    level === "ok"
-      ? "text-success"
-      : level === "syncing"
-      ? "text-muted-foreground"
-      : level === "auth"
-      ? "text-warning"
-      : level === "warn"
-      ? "text-warning"
-      : "text-destructive";
-
-  const label =
-    level === "ok"
-      ? shell.sync.online
-      : level === "syncing"
-      ? shell.sync.syncing
-      : level === "auth"
-      ? shell.sync.authInvalid
-      : level === "syncError"
-      ? shell.sync.syncError
-      : level === "warn"
-      ? shell.sync.offline
-      : shell.sync.error;
+  // Un lugar por nivel. Disciplina de severidad (offline-first): sin
+  // conexión NO es error — gris calmado con nube; ámbar sólo cuando
+  // llevas DÍAS sin sincronizar (visibilidad, no pánico); el rojo queda
+  // reservado para problemas reales (rechazos del servidor, app vieja).
+  const LEVEL_UI = {
+    ok: { icon: CheckCircle2, color: "text-success", label: shell.sync.online },
+    syncing: { icon: RefreshCw, color: "text-muted-foreground", label: shell.sync.syncing },
+    offline: { icon: CloudOff, color: "text-muted-foreground", label: shell.sync.offline },
+    offlineLong: { icon: AlertTriangle, color: "text-warning", label: shell.sync.offlineLong },
+    auth: { icon: KeyRound, color: "text-warning", label: shell.sync.authInvalid },
+    syncError: { icon: AlertCircle, color: "text-destructive", label: shell.sync.syncError },
+    stale: { icon: AlertCircle, color: "text-destructive", label: shell.sync.stale },
+  } as const;
+  const { icon: Icon, color: colorClass, label } = LEVEL_UI[level];
 
   return (
     <div className="flex items-center gap-1">
@@ -98,6 +80,10 @@ export function SyncIndicator() {
                 ? shell.sync.authInvalidHint
                 : level === "syncError"
                 ? shell.sync.syncErrorHint
+                : level === "offline"
+                ? shell.sync.offlineHint
+                : level === "offlineLong"
+                ? shell.sync.offlineLongHint
                 : label}
             </DialogDescription>
           </DialogHeader>
