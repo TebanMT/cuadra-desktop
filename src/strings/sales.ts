@@ -6,6 +6,8 @@ export const sales = {
     removeAssociation: "Quitar",
     associateSearchPlaceholder: "Buscar por nombre o teléfono…",
     associateNoResults: "Sin resultados",
+    associateSearching: "Buscando…",
+    associateCancel: "Cancelar búsqueda",
     empty: "Aún no hay productos para vender.",
     emptyHint: "Agrega productos en la sección de Productos.",
     uncategorized: "Sin categoría",

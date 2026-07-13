@@ -160,6 +160,14 @@ export default function QuickSalePage() {
     });
   }, [items, search, showOutOfStock]);
 
+  // El primer match vendible cuando hay búsqueda activa: es el que Enter
+  // agrega al carrito, así que se resalta en el grid para que el atajo
+  // sea predecible (ves lo que va a entrar antes de soltar el Enter).
+  const firstMatchId = useMemo(() => {
+    if (!search) return null;
+    return filtered.find((p) => p.active && p.stock > 0)?.id ?? null;
+  }, [search, filtered]);
+
   // outOfStockCount — count de agotados que el toggle expondría. Si es
   // 0 escondemos el toggle entero (no aporta señal). Conteo se hace
   // sobre `items` (no filtered) para que respete sólo el dataset, no la
@@ -353,11 +361,13 @@ export default function QuickSalePage() {
       )}
 
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_360px] overflow-hidden">
-        <div className="overflow-y-auto p-6 space-y-6">
-          {/* Search sticky — siempre visible, autofocus al cargar. El
-              operador puede escribir sin tocar el mouse, ver matches en
-              vivo, y Enter agrega el primer match al carrito. */}
-          <div className="sticky top-0 -mt-6 -mx-6 px-6 pt-6 pb-3 bg-background z-10 border-b border-border">
+        <div className="flex flex-col overflow-hidden">
+          {/* Strip de búsqueda FIJO (fuera del scroller) — el sticky con
+              márgenes negativos dejaba una rendija de 24px por donde el
+              título de la categoría se asomaba cortado al hacer scroll.
+              Autofocus al cargar; Enter agrega el primer match (el que
+              se resalta en el grid). */}
+          <div className="border-b border-border bg-background px-6 py-3">
             <div className="flex items-center gap-3 flex-wrap">
               <div className="relative flex-1 min-w-[240px] max-w-lg">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -403,6 +413,7 @@ export default function QuickSalePage() {
             </div>
           </div>
 
+          <div className="flex-1 overflow-y-auto p-6 space-y-8">
           {products.isLoading ? (
             <div className="flex items-center justify-center py-20">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -429,6 +440,7 @@ export default function QuickSalePage() {
                         key={p.id}
                         product={p}
                         cartQty={cart[p.id] ?? 0}
+                        highlight={p.id === firstMatchId}
                         onAdd={() => addToCart(p, 1)}
                         onCustomQty={() => openQtyModal(p)}
                         onRestock={() => setRestockModal(p)}
@@ -439,6 +451,7 @@ export default function QuickSalePage() {
               ))}
             </div>
           )}
+          </div>
         </div>
 
         <aside className="border-l border-border bg-muted/40 flex flex-col overflow-hidden">
@@ -632,12 +645,14 @@ export default function QuickSalePage() {
 interface ProductCardProps {
   product: Product;
   cartQty: number;
+  // highlight: es el primer match de la búsqueda — lo que Enter agrega.
+  highlight?: boolean;
   onAdd(): void;
   onCustomQty(): void;
   onRestock(): void;
 }
 
-function ProductCard({ product, cartQty, onAdd, onCustomQty, onRestock }: ProductCardProps) {
+function ProductCard({ product, cartQty, highlight, onAdd, onCustomQty, onRestock }: ProductCardProps) {
   const level = stockLevel(product);
   const out = level === "out";
   const badge = badgeForStock(level, product.stock);
@@ -707,6 +722,8 @@ function ProductCard({ product, cartQty, onAdd, onCustomQty, onRestock }: Produc
           ? "border-dashed border-muted-foreground/40 bg-muted/30 hover:border-primary/60 hover:bg-primary/5"
           : cartQty > 0
           ? "border-primary shadow-sm bg-primary/5"
+          : highlight
+          ? "border-primary/70 ring-2 ring-primary/25 shadow-sm"
           : "border-border hover:border-primary/60 hover:shadow-sm active:scale-[0.98]"
       )}
     >
