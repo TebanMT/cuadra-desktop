@@ -41,6 +41,12 @@ export function useHotkeys(map: HandlerMap, enabled = true) {
       const handler = mapRef.current[key];
       if (!handler) return;
       if (key !== "Escape" && isEditable(e.target)) return;
+      // preventDefault ANTES de ejecutar: los atajos navegan/abren
+      // superficies con un input autofocuseado (venta rápida, nuevo
+      // socio, modal de cobro) y sin esto el default del keydown
+      // insertaba la letra del atajo en ese input recién enfocado
+      // ("v" aparecía escrito en la búsqueda de productos).
+      e.preventDefault();
       handler(e);
     }
     window.addEventListener("keydown", onKey);

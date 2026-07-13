@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   AlertCircle,
   CalendarClock,
@@ -47,7 +47,15 @@ type FilterKey = "all" | "expired" | "expiring" | "balance";
 export default function AttentionRequiredPage() {
   const data = useAttentionRequired();
   const [stockTarget, setStockTarget] = useState<Product | null>(null);
-  const [filter, setFilter] = useState<FilterKey>("all");
+  // ?filter=balance|expired|expiring — deep-link desde el KPI "Por cobrar"
+  // del dashboard (y quien venga después). Sólo estado inicial: el usuario
+  // puede cambiar de pill sin ensuciar la URL.
+  const [searchParams] = useSearchParams();
+  const initialFilter = ((): FilterKey => {
+    const f = searchParams.get("filter");
+    return f === "expired" || f === "expiring" || f === "balance" ? f : "all";
+  })();
+  const [filter, setFilter] = useState<FilterKey>(initialFilter);
 
   const inbox = useMemo<SocioInboxRow[]>(() => {
     if (!data.data) return [];
@@ -335,12 +343,26 @@ function SocioRow({ row }: { row: SocioInboxRow }) {
             </a>
           </Button>
         )}
-        <Button size="sm" variant="outline" asChild className="rounded-md">
-          <Link to={`/members/${row.member_id}?action=pay`}>
-            <DollarSign className="h-4 w-4" />
-            {t.actions.pay}
-          </Link>
-        </Button>
+        {/* CTA según el problema dominante: si el socio SOLO aparece por
+            saldo pendiente, "Cobrar" (que abre renovación de membresía)
+            era la acción equivocada — el deep-link settle abre el modal
+            de abono al aterrizar en su perfil. Con problemas mixtos gana
+            la renovación; la deuda queda visible en el banner del perfil. */}
+        {row.balance && !row.expired && !row.expiring ? (
+          <Button size="sm" variant="outline" asChild className="rounded-md">
+            <Link to={`/members/${row.member_id}?action=settle`}>
+              <Wallet className="h-4 w-4" />
+              {t.actions.settle}
+            </Link>
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" asChild className="rounded-md">
+            <Link to={`/members/${row.member_id}?action=pay`}>
+              <DollarSign className="h-4 w-4" />
+              {t.actions.pay}
+            </Link>
+          </Button>
+        )}
       </div>
     </li>
   );

@@ -17,6 +17,7 @@ import {
   Search,
   Users,
   UserX,
+  Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ import {
   type SortDir,
 } from "@/hooks/useMembers";
 import { useMembershipTypes } from "@/hooks/useMembershipTypes";
+import { useAttentionRequired } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -176,6 +178,18 @@ export default function MembersPage() {
 
   const counts = useMemberStatusCounts();
   const types = useMembershipTypes(false);
+  // Deuda por socio para el chip "Debe $X" de la fila. Sale de la lista
+  // de deudores de Atención requerida (completa, no paginada) — el
+  // listado de socios no trae este dato y agregarlo ahí cruzaría bounded
+  // contexts (members consultando payments); el join se hace aquí.
+  const attention = useAttentionRequired();
+  const debtByMember = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const d of attention.data?.pending_balance ?? []) {
+      map.set(d.member_id, d.balance);
+    }
+    return map;
+  }, [attention.data]);
 
   const items = list.data?.items ?? [];
   const total = list.data?.total ?? 0;
@@ -381,6 +395,7 @@ export default function MembersPage() {
                   item={it}
                   onClick={() => navigate(`/members/${it.member.id}`)}
                   planMap={planMap}
+                  debt={debtByMember.get(it.member.id) ?? 0}
                 />
               ))}
             </DataTableBody>
@@ -444,9 +459,10 @@ interface MemberRowProps {
   item: MemberListItem;
   onClick(): void;
   planMap: Record<string, string>;
+  debt: number;
 }
 
-function MemberRow({ item, onClick }: MemberRowProps) {
+function MemberRow({ item, onClick, debt }: MemberRowProps) {
   const m = item.member;
   const ms = item.current_membership;
   const status = statusInfo(item);
@@ -473,11 +489,20 @@ function MemberRow({ item, onClick }: MemberRowProps) {
 
       {/* Member */}
       <DataTableCell>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="font-semibold text-foreground">{m.full_name}</span>
           <span className="font-mono text-xs text-muted-foreground tabular">
             #{m.folio}
           </span>
+          {/* Chip sólo cuando debe — una columna "Saldo" mostraría "—"
+              para el 95% de los socios. Mismo lenguaje visual que el chip
+              del POS; el clic del row lleva al perfil, donde vive Abonar. */}
+          {debt > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-warning-100 text-warning-700 dark:bg-warning-500/20 dark:text-warning-100 px-2 py-0.5 text-xs font-medium tabular">
+              <Wallet className="h-3 w-3" />
+              {money.mask(`Debe ${fmtMoney(debt)}`)}
+            </span>
+          )}
         </div>
         {m.phone && (
           <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">

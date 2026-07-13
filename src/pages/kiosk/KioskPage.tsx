@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCircle2, AlertTriangle, AlertCircle, LogOut } from "lucide-react";
+import { CheckCircle2, AlertTriangle, AlertCircle, CloudOff, LogOut } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { CheckinFeedback, eventToFeedback, feedbackTone, useAutoFade, type FeedbackState } from "@/components/checkin/CheckinFeedback";
@@ -271,10 +271,24 @@ export default function KioskPage() {
       : t.kiosk.waitingNoReaderNoPin;
 
   const syncLevel = levelOf(sync.data);
+  // Offline con tono calmado: el kiosko sigue operando igual (huella y
+  // número de socio son 100% locales) — sin conexión no es alarma roja.
   const SyncIcon =
-    syncLevel === "ok" ? CheckCircle2 : syncLevel === "warn" ? AlertTriangle : AlertCircle;
+    syncLevel === "ok"
+      ? CheckCircle2
+      : syncLevel === "offline"
+        ? CloudOff
+        : syncLevel === "offlineLong"
+          ? AlertTriangle
+          : AlertCircle;
   const syncColor =
-    syncLevel === "ok" ? "text-success" : syncLevel === "warn" ? "text-warning" : "text-destructive";
+    syncLevel === "ok"
+      ? "text-success"
+      : syncLevel === "offline"
+        ? "text-muted-foreground"
+        : syncLevel === "offlineLong"
+          ? "text-warning"
+          : "text-destructive";
 
   return (
     <div
@@ -352,7 +366,7 @@ export default function KioskPage() {
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 opacity-70">
             <SyncIcon className={cn("h-4 w-4", syncColor)} />
-            <span>{syncLevel === "warn" || syncLevel === "error" ? t.kiosk.syncOffline : t.kiosk.sync}</span>
+            <span>{syncLevel === "offline" || syncLevel === "offlineLong" ? t.kiosk.syncOffline : t.kiosk.sync}</span>
           </span>
           <span className="opacity-50" aria-hidden="true">·</span>
           {/* Tap-target visible para salir — opacidad baja (no compite con

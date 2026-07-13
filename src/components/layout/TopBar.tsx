@@ -143,6 +143,10 @@ export function TopBar() {
       },
       v: () => navigate("/sales"),
       n: () => navigate("/members/new"),
+      // I de "Inicio" — regreso al dashboard desde cualquier pantalla.
+      // Letra libre de conflictos con los flujos diarios (P/C/V/N) y
+      // con mnemónico directo al label del sidebar.
+      i: () => navigate("/"),
     }),
     [navigate]
   );

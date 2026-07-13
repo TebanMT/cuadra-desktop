@@ -103,6 +103,13 @@ export const billing = {
   detailFlag: {
     pending: (amount: string) => `💰 Saldo pendiente: ${amount}`,
     pendingTitle: "Liquidar saldo",
+    // Desglose del banner cuando la deuda viene de más de un origen.
+    breakdownPart: (concept: string, amount: string) => {
+      const label =
+        { membership: "de mensualidad", product: "de venta", other: "de otros" }[concept] ??
+        `de ${concept}`;
+      return `${amount} ${label}`;
+    },
   },
   history: {
     columns: {

@@ -98,13 +98,28 @@ export default function MemberDetailPage() {
   const member = detail.data?.member;
   const membership = detail.data?.current_membership;
 
+  // La deuda más vieja SIN filtrar por concepto: una venta fiada abona
+  // igual que una mensualidad (UC-019 acepta ambos padres). El filtro
+  // por membership que vivía aquí dejaba huérfana la deuda de ventas —
+  // el banner ni aparecía aunque total_pending sí la contaba.
   const oldestPendingPayment = useMemo(() => {
     const items = history.data?.items ?? [];
     return [...items]
-      .filter((p) => p.balance_pending > 0 && p.concept === "membership")
+      .filter((p) => p.balance_pending > 0)
       .sort((a, b) => a.payment_date.localeCompare(b.payment_date))[0];
   }, [history.data]);
   const totalPending = history.data?.total_pending ?? 0;
+  // Desglose por concepto para el banner ("$100 de venta · $45 de
+  // mensualidad") — sólo se muestra cuando hay más de un origen.
+  const pendingByConcept = useMemo(() => {
+    const sums = new Map<string, number>();
+    for (const p of history.data?.items ?? []) {
+      if (p.balance_pending > 0) {
+        sums.set(p.concept, (sums.get(p.concept) ?? 0) + p.balance_pending);
+      }
+    }
+    return sums;
+  }, [history.data]);
 
   const checkinManual = useCheckinManual();
 
@@ -120,6 +135,18 @@ export default function MemberDetailPage() {
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, detail.data, payOpen, setSearchParams]);
+
+  // ?action=settle — espejo de action=pay para las CTAs de deuda
+  // (Atención requerida → "Abonar"). Espera a que el historial cargue
+  // porque el modal necesita el payment padre con saldo.
+  useEffect(() => {
+    if (searchParams.get("action") === "settle" && oldestPendingPayment && !settleOpen) {
+      setSettleOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("action");
+      setSearchParams(next, { replace: true });
+    }
+  }, [searchParams, oldestPendingPayment, settleOpen, setSearchParams]);
 
   // Dispara un check-in manual del socio actual y muestra un toast con el
   // resultado. La feedback usa el mismo mapping que la pantalla de Check-in
@@ -375,18 +402,28 @@ export default function MemberDetailPage() {
           )}
         </div>
 
-        {/* Saldo pendiente */}
+        {/* Saldo pendiente — cualquier concepto (membresía o venta fiada). */}
         {totalPending > 0 && oldestPendingPayment && (
           <button
             type="button"
             onClick={() => setSettleOpen(true)}
-            className="w-full flex items-center justify-between rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning hover:bg-warning/15"
+            className="w-full flex items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning hover:bg-warning/15"
           >
-            <span className="flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              {bt.detailFlag.pending(money.fmt(totalPending))}
+            <span className="flex items-center gap-2 min-w-0">
+              <Wallet className="h-4 w-4 shrink-0" />
+              <span className="truncate">
+                {bt.detailFlag.pending(money.fmt(totalPending))}
+                {pendingByConcept.size > 1 && (
+                  <span className="opacity-80">
+                    {" — "}
+                    {[...pendingByConcept.entries()]
+                      .map(([c, v]) => bt.detailFlag.breakdownPart(c, money.fmt(v)))
+                      .join(" · ")}
+                  </span>
+                )}
+              </span>
             </span>
-            <span className="text-xs underline">{bt.detailFlag.pendingTitle}</span>
+            <span className="text-xs underline shrink-0">{bt.detailFlag.pendingTitle}</span>
           </button>
         )}
 

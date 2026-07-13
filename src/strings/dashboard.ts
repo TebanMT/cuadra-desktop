@@ -29,6 +29,9 @@ export const dashboard = {
     expensesHint: "Mercancía + otros",
     expiringWeek: "Vencen esta semana",
     recoverable: "Por recuperar",
+    pendingDebt: "Por cobrar (fiado)",
+    pendingDebtCount: (n: number) => (n === 1 ? "1 socio debe" : `${n} socios deben`),
+    pendingDebtHint: "toca para ver quiénes",
     vsLastPeriod: "vs período anterior",
     marginLabel: "margen sobre ventas",
     coverage: (withCost: number, total: number) =>
