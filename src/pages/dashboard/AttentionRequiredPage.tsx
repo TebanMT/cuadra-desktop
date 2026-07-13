@@ -335,12 +335,26 @@ function SocioRow({ row }: { row: SocioInboxRow }) {
             </a>
           </Button>
         )}
-        <Button size="sm" variant="outline" asChild className="rounded-md">
-          <Link to={`/members/${row.member_id}?action=pay`}>
-            <DollarSign className="h-4 w-4" />
-            {t.actions.pay}
-          </Link>
-        </Button>
+        {/* CTA según el problema dominante: si el socio SOLO aparece por
+            saldo pendiente, "Cobrar" (que abre renovación de membresía)
+            era la acción equivocada — el deep-link settle abre el modal
+            de abono al aterrizar en su perfil. Con problemas mixtos gana
+            la renovación; la deuda queda visible en el banner del perfil. */}
+        {row.balance && !row.expired && !row.expiring ? (
+          <Button size="sm" variant="outline" asChild className="rounded-md">
+            <Link to={`/members/${row.member_id}?action=settle`}>
+              <Wallet className="h-4 w-4" />
+              {t.actions.settle}
+            </Link>
+          </Button>
+        ) : (
+          <Button size="sm" variant="outline" asChild className="rounded-md">
+            <Link to={`/members/${row.member_id}?action=pay`}>
+              <DollarSign className="h-4 w-4" />
+              {t.actions.pay}
+            </Link>
+          </Button>
+        )}
       </div>
     </li>
   );

@@ -12,6 +12,7 @@ import {
   Trash2,
   UserCheck,
   UserPlus,
+  Wallet,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -36,7 +37,8 @@ import {
   type MemberSearchResult,
   type RegisterSaleInput,
 } from "@/hooks/useSales";
-import { fmtMoney, type PaymentMethod } from "@/hooks/useBilling";
+import { fmtMoney, usePaymentHistory, type PaymentMethod } from "@/hooks/useBilling";
+import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
 import { levelOf, useSyncStatus } from "@/hooks/useSyncStatus";
 import { useDebounce } from "@/hooks/useDebounce";
 import { api, ApiError } from "@/lib/api";
@@ -112,6 +114,18 @@ export default function QuickSalePage() {
   // tira no-op para los demás kinds. El target del picker es "sale".
   const [promo, setPromo] = useState<Promotion | null>(null);
   const [promoPickerOpen, setPromoPickerOpen] = useState(false);
+  // Deuda del socio asociado: el momento natural de cobrar un fiado es
+  // cuando esa persona vuelve al mostrador. El chip ámbar junto a su
+  // nombre abre el modal de abono sin salir de la venta.
+  const [settleOpen, setSettleOpen] = useState(false);
+  const memberHistory = usePaymentHistory(member?.member_id ?? null, {});
+  const memberDebt = member ? (memberHistory.data?.total_pending ?? 0) : 0;
+  const oldestMemberDebt = useMemo(() => {
+    if (!member) return undefined;
+    return [...(memberHistory.data?.items ?? [])]
+      .filter((p) => p.balance_pending > 0)
+      .sort((a, b) => a.payment_date.localeCompare(b.payment_date))[0];
+  }, [member, memberHistory.data]);
   const searchRef = useRef<HTMLInputElement | null>(null);
 
   const items = useMemo(() => products.data ?? [], [products.data]);
@@ -442,11 +456,31 @@ export default function QuickSalePage() {
         </h1>
         <div className="flex items-center gap-2">
           <MemberAssociator member={member} onChange={setMember} />
+          {member && memberDebt > 0 && oldestMemberDebt && (
+            <button
+              type="button"
+              onClick={() => setSettleOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-3 py-1.5 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors"
+            >
+              <Wallet className="h-3.5 w-3.5" />
+              {t.page.debt.chip(fmtMoney(memberDebt))}
+            </button>
+          )}
           <Button variant="ghost" size="icon" onClick={close} aria-label={t.page.close}>
             <X className="h-5 w-5" />
           </Button>
         </div>
       </header>
+
+      {member && oldestMemberDebt && (
+        <SettleBalanceModal
+          paymentId={oldestMemberDebt.id}
+          memberName={member.full_name}
+          pendingBalance={oldestMemberDebt.balance_pending}
+          open={settleOpen}
+          onOpenChange={setSettleOpen}
+        />
+      )}
 
       {offline && (
         <div className="bg-warning/10 text-warning-foreground border-b border-border px-6 py-2 text-sm">

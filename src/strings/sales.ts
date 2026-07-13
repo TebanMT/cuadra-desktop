@@ -39,6 +39,9 @@ export const sales = {
       exact: "Exacto",
       placeholder: "0",
     },
+    debt: {
+      chip: (amount: string) => `Debe ${amount} · Cobrar deuda`,
+    },
     credit: {
       toggle: "Dejar saldo a deber (fiado)",
       requiresMember: "Asocia un socio para poder fiar.",

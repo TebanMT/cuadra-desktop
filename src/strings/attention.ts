@@ -38,6 +38,7 @@ export const attention = {
   actions: {
     whatsapp: "WhatsApp",
     pay: "Cobrar",
+    settle: "Abonar",
     restock: "Reabastecer",
   },
   // Plantillas pre-cargadas en wa.me. Se diseñaron cortas, en tono

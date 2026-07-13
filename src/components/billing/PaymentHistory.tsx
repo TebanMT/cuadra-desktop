@@ -236,7 +236,11 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                           >
                             {t.history.rowOpenReceipt}
                           </DropdownMenuItem>
-                          {p.balance_pending > 0 && p.concept === "membership" && (
+                          {/* Cualquier concepto con saldo abona (UC-019
+                              acepta padres membership Y product) — el gate
+                              por membership dejaba las ventas fiadas sin
+                              camino visible de cobro. */}
+                          {p.balance_pending > 0 && (
                             <DropdownMenuItem onSelect={() => setSettleTarget(p)}>
                               {t.history.pendingSettle}
                             </DropdownMenuItem>
