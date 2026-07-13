@@ -133,6 +133,9 @@ function SyncDetail({ status }: { status?: SyncStatus | null }) {
       {(status?.quarantined_count ?? 0) > 0 && (
         <Row label={shell.sync.quarantined}>{status?.quarantined_count}</Row>
       )}
+      {(status?.queue_stuck_count ?? 0) > 0 && (
+        <Row label={shell.sync.stuckPush}>{status?.queue_stuck_count}</Row>
+      )}
       <Row label={shell.sync.lastError}>
         {status?.last_error || shell.sync.none}
       </Row>
