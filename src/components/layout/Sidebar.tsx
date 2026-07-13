@@ -38,6 +38,9 @@ interface NavItem {
   icon: typeof CreditCard;
   label: string;
   end?: boolean;
+  // kbd: atajo global de una letra (useHotkeys en TopBar) que este item
+  // publicita — chip sutil expandido, "(X)" en el title colapsado.
+  kbd?: string;
   // plusOnly: el item se OCULTA cuando el gym no es Plus. Mientras Plus
   // siga sin venderse, mostrarlo con badge "Próximamente" contamina la
   // experiencia Standard. Cuando Plus se libere, revertir a render con
@@ -52,7 +55,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: shell.navGroups.operation,
     items: [
-      { to: "/", icon: LayoutDashboard, label: shell.nav.dashboard, end: true },
+      { to: "/", icon: LayoutDashboard, label: shell.nav.dashboard, end: true, kbd: "I" },
       { to: "/checkin", icon: Door, label: shell.nav.checkin },
       { to: "/billing", icon: CreditCard, label: shell.nav.billing },
       { to: "/sales", icon: ShoppingCart, label: shell.nav.sales },
@@ -164,7 +167,7 @@ export function Sidebar() {
                   key={item.to}
                   to={item.to}
                   end={item.end}
-                  title={!hovered ? item.label : undefined}
+                  title={!hovered ? (item.kbd ? `${item.label} (${item.kbd})` : item.label) : undefined}
                   className={({ isActive }) =>
                     cn(
                       "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors h-10",
@@ -186,6 +189,11 @@ export function Sidebar() {
                   >
                     {item.label}
                   </span>
+                  {item.kbd && hovered && (
+                    <kbd className="ml-auto shrink-0 inline-flex h-4 min-w-[1rem] items-center justify-center rounded px-1 text-[10px] font-mono bg-paper-200 text-ink-500 dark:bg-ink-700 dark:text-ink-300">
+                      {item.kbd}
+                    </kbd>
+                  )}
                 </NavLink>
               ))}
             </div>
