@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  AlertTriangle,
   Loader2,
   Minus,
   PackagePlus,
@@ -10,8 +9,6 @@ import {
   Search,
   Tag,
   Trash2,
-  UserCheck,
-  UserPlus,
   Wallet,
   X,
 } from "lucide-react";
@@ -22,8 +19,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   stockLevel,
   useActiveProducts,
@@ -32,15 +27,15 @@ import {
 } from "@/hooks/useProducts";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
 import {
-  useMemberSearch,
   useRegisterSale,
   type MemberSearchResult,
   type RegisterSaleInput,
 } from "@/hooks/useSales";
 import { fmtMoney, usePaymentHistory, type PaymentMethod } from "@/hooks/useBilling";
 import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
+import { MemberAssociator } from "@/components/sales/MemberAssociator";
+import { CheckoutModal } from "@/components/sales/CheckoutModal";
 import { levelOf, useSyncStatus } from "@/hooks/useSyncStatus";
-import { useDebounce } from "@/hooks/useDebounce";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { sales as t } from "@/strings/sales";
@@ -66,11 +61,6 @@ function normalize(s: string): string {
     .trim();
 }
 
-// Cash quick-amount chips. Cubre los billetes típicos del operador
-// mexicano + "Exacto" (= total). Si el total ya rebasa el chip lo
-// escondemos automáticamente para no inducir error.
-const CASH_QUICK_AMOUNTS = [50, 100, 200, 500, 1000] as const;
-
 function badgeForStock(level: StockLevel, stock: number) {
   if (level === "out")
     return { text: t.page.badges.out, className: "bg-destructive text-destructive-foreground" };
@@ -87,12 +77,14 @@ export default function QuickSalePage() {
   const register = useRegisterSale();
 
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [method, setMethod] = useState<PaymentMethod>("cash");
   const [member, setMember] = useState<MemberSearchResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [qtyModal, setQtyModal] = useState<Product | null>(null);
   const [qtyValue, setQtyValue] = useState("1");
   const [search, setSearch] = useState("");
+  // El cobro (método, cambio, fiado) vive en CheckoutModal — la columna
+  // del carrito sólo arma la cuenta.
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
   // Por default escondemos los productos con stock=0 — el operador
   // tiene foco en lo que SÍ se puede vender ahora. El toggle expone los
   // agotados (caso típico: el operador sabe que sí tiene físico pero el
@@ -101,15 +93,6 @@ export default function QuickSalePage() {
   // solo gesto — protege contra olvidos del día a día.
   const [showOutOfStock, setShowOutOfStock] = useState(false);
   const [restockModal, setRestockModal] = useState<Product | null>(null);
-  // Cash change calculator state. Vacío = sin cálculo. parseFloat lo
-  // convierte a número al usarlo; no usamos number en state porque
-  // intermedios como "1" vs "1." tienen UX distinta en input numérico.
-  const [givenCash, setGivenCash] = useState("");
-  // Fiado: el toggle decide si el operador quiere dejar saldo. Si está
-  // ON, paidValue es lo que cobra ahora (default = total). Si OFF, se
-  // ignora — el BE recibe paid omitido y cobra todo. Requiere socio.
-  const [creditMode, setCreditMode] = useState(false);
-  const [paidValue, setPaidValue] = useState("");
   // Promo opcional. En ventas sólo aplican percent / fixed_amount; el BE
   // tira no-op para los demás kinds. El target del picker es "sale".
   const [promo, setPromo] = useState<Promotion | null>(null);
@@ -247,9 +230,6 @@ export default function QuickSalePage() {
     setCart({});
     setMember(null);
     setError(null);
-    setGivenCash("");
-    setCreditMode(false);
-    setPaidValue("");
     setPromo(null);
   }
 
@@ -296,30 +276,6 @@ export default function QuickSalePage() {
     searchRef.current?.focus();
   }, []);
 
-  // Reset del cambio cuando se sale del método cash (no tiene sentido).
-  useEffect(() => {
-    if (method !== "cash") setGivenCash("");
-  }, [method]);
-
-  // Si se quita el socio mientras el toggle de fiado estaba ON, hay que
-  // desactivarlo: fiado-sin-socio es estado inválido.
-  useEffect(() => {
-    if (!member && creditMode) {
-      setCreditMode(false);
-      setPaidValue("");
-    }
-  }, [member, creditMode]);
-
-  // Reset paidValue al total cuando entra a credit mode (default es
-  // "cobrar todo"; el operador baja el valor para crear el saldo).
-  useEffect(() => {
-    if (creditMode) {
-      setPaidValue((v) => (v === "" ? String(total) : v));
-    } else {
-      setPaidValue("");
-    }
-  }, [creditMode, total]);
-
   function openQtyModal(p: Product) {
     if (p.stock <= 0) return;
     setQtyValue(String(cart[p.id] ?? 1));
@@ -338,49 +294,14 @@ export default function QuickSalePage() {
     setQtyModal(null);
   }
 
-  // Cobrado efectivo: lo que de verdad va al payment. En credit mode es
-  // el input; en modo normal es el total completo.
-  const paidNow = useMemo(() => {
-    if (!creditMode) return total;
-    const v = parseFloat(paidValue);
-    if (!Number.isFinite(v)) return 0;
-    return v;
-  }, [creditMode, paidValue, total]);
-
-  const balanceLeft = creditMode ? Math.max(0, total - paidNow) : 0;
-
-  // Cambio en efectivo: positivo = devuelves; negativo = falta. Se
-  // muestra solo cuando method = cash y hay total > 0.
-  const cashGiven = useMemo(() => {
-    const v = parseFloat(givenCash);
-    return Number.isFinite(v) ? v : 0;
-  }, [givenCash]);
-  const cashToCover = creditMode ? paidNow : total;
-  const change = cashGiven - cashToCover;
-
-  async function submit() {
+  // Paso 1 → paso 2: valida lo que es del CARRITO (vacío, stock) antes
+  // de abrir el modal de cobro. Lo que es del cobro (fiado, método) se
+  // valida adentro del modal.
+  function openCheckout() {
     setError(null);
     if (cartLines.length === 0) {
       setError(t.page.errors.cartEmpty);
       return;
-    }
-    if (!method) {
-      setError(t.page.errors.methodRequired);
-      return;
-    }
-    if (creditMode) {
-      if (!member) {
-        setError(t.page.credit.requiresMember);
-        return;
-      }
-      if (paidNow <= 0) {
-        setError(t.page.credit.paidMustBePositive);
-        return;
-      }
-      if (paidNow > total) {
-        setError(t.page.credit.paidExceedsTotal);
-        return;
-      }
     }
     for (const line of cartLines) {
       if (line.qty > line.product.stock) {
@@ -388,36 +309,34 @@ export default function QuickSalePage() {
         return;
       }
     }
+    setCheckoutOpen(true);
+  }
 
+  // Confirmación del modal. THROW en error (el modal lo pinta sin
+  // cerrarse); en éxito cierra, limpia y regresa el foco a la búsqueda
+  // para el siguiente cliente.
+  async function handleCheckoutConfirm(input: { method: PaymentMethod; paid?: number }) {
     const payload: RegisterSaleInput = {
       line_items: cartLines.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
-      payment_method: method,
+      payment_method: input.method,
       ...(member ? { member_id: member.member_id } : {}),
-      ...(creditMode && paidNow < total ? { paid: paidNow } : {}),
+      ...(input.paid !== undefined ? { paid: input.paid } : {}),
       ...(promo ? { promotion: { promotion_id: promo.id } } : {}),
     };
 
-    try {
-      const res = await register.mutateAsync(payload);
-      if (res.pending_offline_sync || offline) {
-        toast.success(t.page.success.offline);
-      } else if (res.balance_pending > 0) {
-        toast.success(
-          `${fmtMoney(res.paid)} cobrados · queda ${fmtMoney(res.balance_pending)} a deber.`
-        );
-      } else {
-        toast.success(t.page.success.online(fmtMoney(res.total)));
-      }
-      clearCart();
-      searchRef.current?.focus();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const data = err.details as Record<string, unknown> | null;
-        setError((data?.exception as string | undefined) || t.page.errors.generic);
-      } else {
-        setError(t.page.errors.generic);
-      }
+    const res = await register.mutateAsync(payload);
+    if (res.pending_offline_sync || offline) {
+      toast.success(t.page.success.offline);
+    } else if (res.balance_pending > 0) {
+      toast.success(
+        `${fmtMoney(res.paid)} cobrados · queda ${fmtMoney(res.balance_pending)} a deber.`
+      );
+    } else {
+      toast.success(t.page.success.online(fmtMoney(res.total)));
     }
+    setCheckoutOpen(false);
+    clearCart();
+    searchRef.current?.focus();
   }
 
   return (
@@ -650,142 +569,15 @@ export default function QuickSalePage() {
               onApply={(p) => setPromo(p)}
             />
 
-            {/* Método de pago como segmented control. */}
-            <div className="space-y-2">
-              <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                {t.page.cart.methodLabel}
-              </Label>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(["cash", "transfer", "card"] as PaymentMethod[]).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setMethod(m)}
-                    className={cn(
-                      "h-10 rounded-md border text-sm font-medium transition-colors",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                      method === m
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background hover:bg-muted border-border text-foreground"
-                    )}
-                    aria-pressed={method === m}
-                  >
-                    {t.page.cart.methods[m]}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Calculadora de cambio (solo cash, total > 0). Chips
-                rápidos con denominaciones MX típicas + "Exacto". El
-                cambio se renderiza en verde si positivo, en rojo si
-                falta para cubrir. */}
-            {method === "cash" && cashToCover > 0 && (
-              <div className="space-y-2 rounded-md border border-border bg-muted/40 p-3">
-                <Label
-                  htmlFor="qs-given"
-                  className="text-xs uppercase tracking-wide text-muted-foreground"
-                >
-                  {t.page.change.label}
-                </Label>
-                <Input
-                  id="qs-given"
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  step="0.01"
-                  value={givenCash}
-                  onChange={(e) => setGivenCash(e.target.value)}
-                  placeholder={t.page.change.placeholder}
-                  className="h-10 text-base"
-                />
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setGivenCash(String(cashToCover))}
-                    className="px-2 py-1 text-xs rounded border border-border bg-background hover:bg-muted transition-colors"
-                  >
-                    {t.page.change.exact}
-                  </button>
-                  {CASH_QUICK_AMOUNTS.filter((v) => v >= cashToCover).map((v) => (
-                    <button
-                      key={v}
-                      type="button"
-                      onClick={() => setGivenCash(String(v))}
-                      className="px-2 py-1 text-xs rounded border border-border bg-background hover:bg-muted transition-colors tabular-nums"
-                    >
-                      ${v}
-                    </button>
-                  ))}
-                </div>
-                {givenCash !== "" && (
-                  <div
-                    className={cn(
-                      "text-sm font-semibold tabular-nums",
-                      change >= 0 ? "text-success" : "text-destructive"
-                    )}
-                  >
-                    {change >= 0
-                      ? t.page.change.result(fmtMoney(change))
-                      : t.page.change.shortfall(fmtMoney(-change))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Fiado: toggle sólo aparece cuando hay socio asociado.
-                Cuando está activo, input para "cobrado ahora" + display
-                de "queda a deber". El submit cambia label.
-
-                Nota: usamos <div> + onClick en lugar de <label> porque
-                Radix Switch es un <button>. Un <label> sin htmlFor
-                envolviendo un button hace double-fire del click (HTML
-                spec: el label forwarda al primer "labelable element"
-                interno; button califica). El stopPropagation en el
-                Switch evita el bubbling al div padre. */}
-            <div className="space-y-2">
-              <CreditToggleRow
-                disabled={!member}
-                checked={creditMode}
-                onToggle={(v) => setCreditMode(v)}
-              />
-              {creditMode && (
-                <div className="space-y-2 rounded-md border border-warning/40 bg-warning/5 p-3">
-                  <Label
-                    htmlFor="qs-paid"
-                    className="text-xs uppercase tracking-wide text-muted-foreground"
-                  >
-                    {t.page.credit.paidLabel}
-                  </Label>
-                  <Input
-                    id="qs-paid"
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    max={total}
-                    step="0.01"
-                    value={paidValue}
-                    onChange={(e) => setPaidValue(e.target.value)}
-                    className="h-10 text-base"
-                  />
-                  <div className="flex items-center gap-2 text-sm font-semibold text-warning tabular-nums">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>{t.page.credit.balanceLabel(fmtMoney(balanceLeft))}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
+            {/* Un solo botón: abre el modal de cobro (método, cambio y
+                fiado viven allá). La columna sólo arma la cuenta. */}
             <Button
               size="lg"
-              className="w-full"
-              onClick={submit}
-              disabled={register.isPending || cartLines.length === 0}
+              className="w-full h-12 text-base"
+              onClick={openCheckout}
+              disabled={cartLines.length === 0}
             >
-              {register.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {balanceLeft > 0
-                ? t.page.cart.submitWithDebt(fmtMoney(paidNow), fmtMoney(balanceLeft))
-                : t.page.cart.submit(fmtMoney(total))}
+              {t.page.cart.submit(fmtMoney(total))}
             </Button>
           </div>
         </aside>
@@ -830,6 +622,17 @@ export default function QuickSalePage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <CheckoutModal
+        open={checkoutOpen}
+        onOpenChange={setCheckoutOpen}
+        total={total}
+        itemCount={cartLines.reduce((n, l) => n + l.qty, 0)}
+        member={member}
+        onMemberChange={setMember}
+        submitting={register.isPending}
+        onConfirm={handleCheckoutConfirm}
+      />
 
       <QuickRestockModal
         product={restockModal}
@@ -1023,157 +826,6 @@ function CartRow({ line, onInc, onDec, onRemove }: CartRowProps) {
         <X className="h-3.5 w-3.5" />
       </Button>
     </div>
-  );
-}
-
-function MemberAssociator({
-  member,
-  onChange,
-}: {
-  member: MemberSearchResult | null;
-  onChange(m: MemberSearchResult | null): void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const debounced = useDebounce(query, 300);
-  const search = useMemberSearch(debounced);
-
-  if (member) {
-    return (
-      <div className="inline-flex items-center gap-2 rounded-md border bg-muted px-3 py-1.5 text-sm">
-        <UserCheck className="h-4 w-4 text-success" />
-        <span className="font-medium">{member.full_name}</span>
-        <button
-          type="button"
-          onClick={() => onChange(null)}
-          className="text-xs text-muted-foreground hover:text-foreground ml-1"
-        >
-          {t.page.removeAssociation}
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="outline" size="sm">
-          <UserPlus className="h-4 w-4" />
-          {t.page.associate}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="p-2 border-b">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              autoFocus
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t.page.associateSearchPlaceholder}
-              className="pl-8 h-9"
-            />
-          </div>
-        </div>
-        <div className="max-h-72 overflow-y-auto">
-          {search.isFetching && (
-            <div className="px-3 py-3 text-sm text-muted-foreground flex items-center gap-2">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              <span>Buscando…</span>
-            </div>
-          )}
-          {!search.isFetching && debounced.length >= 2 && (search.data ?? []).length === 0 && (
-            <p className="px-3 py-3 text-sm text-muted-foreground">{t.page.associateNoResults}</p>
-          )}
-          {(search.data ?? []).map((m) => (
-            <button
-              key={m.member_id}
-              type="button"
-              onClick={() => {
-                onChange(m);
-                setOpen(false);
-                setQuery("");
-              }}
-              className="w-full text-left px-3 py-2 hover:bg-muted text-sm"
-            >
-              <div className="font-medium">{m.full_name}</div>
-              <div className="text-xs text-muted-foreground">{m.phone}</div>
-            </button>
-          ))}
-        </div>
-      </PopoverContent>
-    </Popover>
-  );
-}
-
-// CreditToggleRow — fila del switch de fiado. Aislada en componente
-// propio porque mezcla 3 cosas no-triviales: (1) la fila completa es
-// clickeable (no sólo el switch), (2) cuando está deshabilitada
-// envuelve todo en un Tooltip de Radix para explicar el porqué en
-// hover (el `title` nativo del browser tiene latencia ~700ms y no
-// aparece en touch — el Tooltip es ~150ms y consistente), (3) el
-// stopPropagation del Switch evita el double-toggle vs el onClick del
-// contenedor.
-function CreditToggleRow({
-  disabled,
-  checked,
-  onToggle,
-}: {
-  disabled: boolean;
-  checked: boolean;
-  onToggle(next: boolean): void;
-}) {
-  const row = (
-    <div
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      aria-disabled={disabled}
-      aria-pressed={checked}
-      onClick={() => {
-        if (disabled) return;
-        onToggle(!checked);
-      }}
-      onKeyDown={(e) => {
-        if (disabled) return;
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onToggle(!checked);
-        }
-      }}
-      className={cn(
-        "flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2 select-none transition-colors",
-        disabled
-          ? "opacity-60 cursor-not-allowed"
-          : "cursor-pointer hover:bg-muted/50",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      )}
-    >
-      <span className="text-sm font-medium">{t.page.credit.toggle}</span>
-      <Switch
-        checked={checked}
-        onCheckedChange={(v) => {
-          if (disabled) return;
-          onToggle(!!v);
-        }}
-        onClick={(e) => e.stopPropagation()}
-        disabled={disabled}
-      />
-    </div>
-  );
-
-  // Cuando está deshabilitado, el row queda envuelto en un Tooltip.
-  // delayDuration 150ms — más rápido que el nativo, menos brusco que 0.
-  // Sin asChild Radix pone su propio botón wrapper que rompe el ancho
-  // del contenedor padre (el row ya es full-width); asChild deja al row
-  // como el trigger directo.
-  if (!disabled) return row;
-  return (
-    <Tooltip delayDuration={150}>
-      <TooltipTrigger asChild>{row}</TooltipTrigger>
-      <TooltipContent side="top" className="max-w-[220px] text-center">
-        {t.page.credit.requiresMember}
-      </TooltipContent>
-    </Tooltip>
   );
 }
 

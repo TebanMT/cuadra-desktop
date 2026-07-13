@@ -16,14 +16,12 @@ export const sales = {
       clear: "Limpiar",
       empty: "Empieza haciendo clic en un producto.",
       total: "Total",
-      methodLabel: "Método",
       methods: {
         cash: "Efectivo",
         transfer: "Transferencia",
         card: "Tarjeta",
       },
       submit: (amount: string) => `Cobrar ${amount}`,
-      submitWithDebt: (paid: string, debt: string) => `Cobrar ${paid} · queda ${debt}`,
       remove: "Quitar",
       qtyLabel: "Cantidad",
     },
@@ -37,10 +35,24 @@ export const sales = {
     debt: {
       chip: (amount: string) => `Debe ${amount} · Cobrar deuda`,
     },
+    checkout: {
+      title: "Cobrar",
+      totalLabel: "Total a cobrar",
+      summary: (n: number, member?: string) =>
+        `${n === 1 ? "1 producto" : `${n} productos`} · ${member ?? "público general"}`,
+      fiado: "Fiado",
+      fiadoWho: "¿A quién se lo fías?",
+      fiadoQuestion: "¿Cuánto te deja ahora?",
+      fiadoMethodQuestion: "¿Cómo te paga lo de ahora?",
+      cashQuestion: "¿Con cuánto te pagan?",
+      cardHint: "Cobra en la terminal y confirma aquí.",
+      transferHint: "Verifica que llegó la transferencia y confirma aquí.",
+      confirm: (amount: string) => `Confirmar — cobrar ${amount}`,
+      confirmFiado: (paid: string, debt: string) =>
+        `Confirmar — cobrar ${paid} · quedan ${debt}`,
+    },
     credit: {
-      toggle: "Dejar saldo a deber (fiado)",
       requiresMember: "Asocia un socio para poder fiar.",
-      paidLabel: "Cobrado ahora",
       balanceLabel: (amount: string) => `Queda a deber: ${amount}`,
       paidExceedsTotal: "El monto cobrado no puede ser mayor al total.",
       paidMustBePositive: "Debes cobrar al menos algo ahora.",
@@ -90,7 +102,6 @@ export const sales = {
     },
     errors: {
       cartEmpty: "Agrega al menos un producto al carrito.",
-      methodRequired: "Selecciona el método de pago.",
       stockInsufficient: (name: string, avail: number) =>
         `Solo hay ${avail} de ${name}. Ajusta cantidad.`,
       generic: "No pudimos registrar la venta.",
