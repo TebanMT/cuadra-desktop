@@ -136,5 +136,8 @@ export const products = {
   },
   errors: {
     loadList: "No pudimos cargar los productos.",
+    // Deep-link ?edit=<id> desde el indicador de sync apuntó a un producto
+    // que ya no se encontró (borrado o fuera del catálogo).
+    deepLinkNotFound: "No encontré ese producto — búscalo en la lista.",
   },
 };

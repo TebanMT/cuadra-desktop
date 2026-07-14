@@ -144,15 +144,60 @@ export function useProductsList(filters: ListProductsInput) {
   });
 }
 
+// useProductForDeepLink — resuelve un producto por id para el deep-link
+// ?edit=<id> (llega desde "Abrir para renombrar" del indicador de sync).
+// No existe GET /products/:id; traemos hasta el cap del backend (200,
+// list_products.go) con status=all y buscamos client-side — el catálogo de
+// un gym de barrio cabe sobrado. `null` = no encontrado (borrado o fuera
+// del cap): el caller avisa con toast y no abre nada.
+export function useProductForDeepLink(id: string | null) {
+  return useQuery<Product | null>({
+    queryKey: ["products", "deeplink", id],
+    queryFn: async () => {
+      const res = await api.get<ProductListResponse>("/api/v1/products", {
+        query: { status: "all", page: 1, page_size: 200 },
+      });
+      return res.items.find((p) => p.id === id) ?? null;
+    },
+    enabled: !!id,
+  });
+}
+
+// El backend limita page_size a 200 (prodRepo.MaxPageSize) — y desde el
+// clamp-al-cap ya no resetea a 50 al pedir de más, pero 200 sigue siendo el
+// techo por request. Para traer TODO el catálogo activo (lo que la venta
+// rápida y el buscador global necesitan: un producto ausente es uno que no
+// puedes vender) paginamos hasta agotar. Caso normal (≤200 activos) = UN
+// request; sólo un catálogo grande dispara páginas extra.
+const ACTIVE_PAGE_SIZE = 200;
+
+// Cota dura de páginas (25 × 200 = 5000 productos) — muy por encima de
+// cualquier gym real; existe sólo para que un `total` inconsistente del
+// server nunca cuelgue el fetch en un loop infinito.
+const ACTIVE_MAX_PAGES = 25;
+
+export async function fetchAllActiveProducts(): Promise<Product[]> {
+  const all: Product[] = [];
+  for (let page = 1; page <= ACTIVE_MAX_PAGES; page++) {
+    const res = await api.get<ProductListResponse>("/api/v1/products", {
+      query: { status: "active", page, page_size: ACTIVE_PAGE_SIZE },
+    });
+    all.push(...res.items);
+    // Fin cuando ya juntamos el total reportado, o cuando la página vino
+    // incompleta (última página). La segunda condición es la terminación
+    // real y robusta ante un `total` desactualizado; la primera sólo ahorra
+    // un request de más cuando el total es múltiplo exacto del page size.
+    if (all.length >= res.total || res.items.length < ACTIVE_PAGE_SIZE) {
+      break;
+    }
+  }
+  return all;
+}
+
 export function useActiveProducts() {
   return useQuery<Product[]>({
     queryKey: KEYS.active(),
-    queryFn: async () => {
-      const res = await api.get<ProductListResponse>("/api/v1/products", {
-        query: { status: "active", page: 1, page_size: 500 },
-      });
-      return res.items;
-    },
+    queryFn: fetchAllActiveProducts,
     staleTime: 15_000,
   });
 }

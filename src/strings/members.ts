@@ -382,6 +382,9 @@ export const members = {
         durationCustomInvalid: "La duración personalizada debe ser al menos 1.",
         durationCustomTooLong: "La duración máxima es 5 años (60 meses).",
         generic: "No pudimos guardar. Vuelve a intentar.",
+        // Deep-link ?edit=<id> desde el indicador de sync apuntó a un plan
+        // que ya no está en la lista (lo borraron o cambió de equipo).
+        deepLinkNotFound: "No encontré ese plan — búscalo en la lista.",
       },
       success: {
         created: "Membresía creada.",

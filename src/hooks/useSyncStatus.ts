@@ -59,6 +59,32 @@ export interface SyncStatus {
   // indicador decía "Sincronizado" con la cola atorada). >0 también
   // mantiene "sync_error"; el last_error trae el motivo de la fila.
   queue_stuck_count?: number;
+  // queue_stuck_items: detalle de esas filas (cap 20, más castigadas
+  // primero), ya clasificadas. Permite ofrecer resolución por fila —
+  // p.ej. un rechazo "duplicate" sobre un plan abre el plan para
+  // renombrarlo (el rename re-encola y destraba el sync).
+  queue_stuck_items?: QueueStuckItem[];
+}
+
+// Clasificación de una fila atorada. Espeja StuckQueueItem del sidecar
+// (cuadra-core/src/shared/sync/types.go).
+//   duplicate → la nube ya tiene ese valor (unique index): permanente
+//               hasta que el operador renombre/edite el registro local.
+//   other     → cualquier otro rechazo persistente (visible, sin CTA).
+export type StuckKind = "duplicate" | "other";
+
+export interface QueueStuckItem {
+  queue_id: string;
+  entity_type: string;
+  entity_id: string;
+  operation: string;
+  retry_count: number;
+  kind: StuckKind;
+  // Motivo legible (el cloud nuevo lo manda en español; uno viejo puede
+  // mandar el error crudo — se muestra tal cual).
+  message: string;
+  // Identificador humano del registro ("Mensual", folio, etc.).
+  entity_label?: string;
 }
 
 export function useSyncStatus(enabled = true) {

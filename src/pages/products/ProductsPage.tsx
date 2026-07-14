@@ -50,6 +50,7 @@ import {
   stockLevel,
   useCreateProduct,
   useDeactivateProduct,
+  useProductForDeepLink,
   useProductsList,
   useReactivateProduct,
   useUpdateProduct,
@@ -67,6 +68,7 @@ import { cn, formatMoney } from "@/lib/utils";
 import { ProductForm, type ProductFormSubmitPayload } from "@/components/products/ProductForm";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
 import { AdjustStockModal } from "@/components/products/AdjustStockModal";
+import { SyncStaleHint } from "@/components/shared/SyncStaleHint";
 import { products as t } from "@/strings/products";
 import { common } from "@/strings/common";
 
@@ -157,6 +159,26 @@ export default function ProductsPage() {
   const [adjusting, setAdjusting] = useState<Product | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<Product | null>(null);
   const money = useMoneyVisibility();
+
+  // Deep-link ?edit=<id> — llega desde el indicador de sync ("Abrir para
+  // renombrar" un producto que la nube rechazó por nombre duplicado). El
+  // producto puede no estar en la página/filtros actuales, así que se
+  // resuelve con su propia query y se limpia el param para que el refresh
+  // o el cierre del diálogo no lo re-disparen.
+  const editParam = searchParams.get("edit");
+  const deepLink = useProductForDeepLink(editParam);
+  useEffect(() => {
+    if (!editParam || deepLink.data === undefined) return;
+    if (deepLink.data) {
+      setEditing(deepLink.data);
+    } else {
+      toast.error(t.errors.deepLinkNotFound);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete("edit");
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, deepLink.data]);
   // Ganancia realizada del mes — la calcula el backend de reportes
   // (cross-context products × ventas) y la sirve el dashboard. La reusamos
   // aquí para mostrarla junto a la potencial: la potencial baja al vender,
@@ -708,6 +730,9 @@ function CreateDialog({
         <DialogHeader>
           <DialogTitle>{t.form.titleNew}</DialogTitle>
         </DialogHeader>
+        {/* La validación de nombre duplicado sólo ve lo ya sincronizado a
+            esta laptop — con sync atrasado avisamos ANTES de capturar. */}
+        <SyncStaleHint noun="un producto" />
         <ProductForm
           key={resetKey}
           mode="create"
@@ -789,6 +814,7 @@ function EditDialog({
         <DialogHeader>
           <DialogTitle>{t.form.titleEdit}</DialogTitle>
         </DialogHeader>
+        <SyncStaleHint noun="un producto" />
         {product && (
           <>
             <ProductForm

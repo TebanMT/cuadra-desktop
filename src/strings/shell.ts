@@ -44,7 +44,7 @@ export const shell = {
     stale: "Actualiza la app para seguir sincronizando.",
     syncError: "Hay un problema al guardar cambios del servidor.",
     syncErrorPushHint:
-      "Sí hay internet, pero el servidor está rechazando uno o más cambios hechos en esta computadora. Nada se pierde — los cambios siguen guardados aquí. Comparte el 'Último error' con soporte para destrabarlos.",
+      "Sí hay internet, pero la nube está rechazando uno o más cambios hechos en esta computadora. Nada se pierde — abajo está el detalle de cada uno. Si marca un nombre duplicado, renómbralo para destrabarlo; si no, comparte el error con soporte.",
     syncErrorHint:
       "Sí hay internet: el servidor respondió, pero un cambio no se pudo guardar en esta laptop. Suele arreglarse actualizando la app. Si sigue, comparte el 'Último error' con soporte.",
     authInvalid: "Vuelve a iniciar sesión para sincronizar.",
@@ -60,5 +60,22 @@ export const shell = {
     none: "Ninguno",
     triggerNow: "Sincronizar ahora",
     relogin: "Iniciar sesión",
+    // Detalle de filas rechazadas por la nube (queue_stuck_items).
+    stuckItemsTitle: "Cambios rechazados por la nube",
+    openToRename: "Abrir para renombrar",
+    stuckRetryCount: (n: number) => `${n} intentos`,
+    // Nombres humanos por entity_type para la lista de rechazados. Los
+    // tipos sin entrada muestran el entity_type crudo (mejor feo que
+    // invisible — soporte lo necesita).
+    entityNames: {
+      membership_types: "Plan",
+      products: "Producto",
+      promotions: "Promoción",
+      members: "Socio",
+      memberships: "Membresía",
+      payments: "Pago",
+      users: "Usuario",
+      notification_templates: "Plantilla",
+    } as Record<string, string>,
   },
 };

@@ -42,6 +42,7 @@ import { useGymChargeSettings, useUpdateGymChargeSettings } from "@/hooks/useGym
 import { members as t } from "@/strings/members";
 import { MembershipTypeForm } from "@/components/settings/MembershipTypeForm";
 import { PromotionsTab } from "@/components/settings/PromotionsTab";
+import { SyncStaleHint } from "@/components/shared/SyncStaleHint";
 
 // Página con dos tabs: "Membresías" (el CRUD de planes existente) y
 // "Promociones" (catálogo de promos del BC promotions). El tab activo
@@ -121,6 +122,26 @@ function MembershipsTab() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<MembershipType | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState<MembershipType | null>(null);
+
+  // Deep-link ?edit=<id> — llega desde el indicador de sync ("Abrir para
+  // renombrar" una fila que la nube rechazó por nombre duplicado). Abre el
+  // diálogo de edición cuando la lista cargó y limpia el param para que un
+  // refresh o el cierre del diálogo no lo re-disparen.
+  const [params, setParams] = useSearchParams();
+  const editParam = params.get("edit");
+  useEffect(() => {
+    if (!editParam || !types.data) return;
+    const target = types.data.find((p) => p.id === editParam);
+    if (target) {
+      setEditing(target);
+    } else {
+      toast.error(t.types.form.errors.deepLinkNotFound);
+    }
+    const next = new URLSearchParams(params);
+    next.delete("edit");
+    setParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editParam, types.data]);
 
   // Carga del backend. Antes esto vivía en localStorage; ahora la
   // fuente de verdad es `gyms.charge_settings`. El hook hace migración
@@ -462,6 +483,9 @@ function CreateDialog({
         <DialogHeader>
           <DialogTitle>{t.types.form.titleNew}</DialogTitle>
         </DialogHeader>
+        {/* La validación de nombre duplicado sólo ve lo ya sincronizado a
+            esta laptop — con sync atrasado avisamos ANTES de capturar. */}
+        <SyncStaleHint noun="un plan" />
         <MembershipTypeForm
           submitting={create.isPending}
           chargeEnrollment={chargeEnrollment}
@@ -521,6 +545,7 @@ function EditDialog({
         <DialogHeader>
           <DialogTitle>{t.types.form.titleEdit}</DialogTitle>
         </DialogHeader>
+        <SyncStaleHint noun="un plan" />
         {type && (
           <MembershipTypeForm
             initial={type}

@@ -6,6 +6,7 @@ import {
   AlertCircle,
   CloudOff,
   KeyRound,
+  Pencil,
   RefreshCw,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -19,9 +20,33 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { useSyncStatus, useTriggerSync, levelOf, type SyncStatus } from "@/hooks/useSyncStatus";
+import {
+  useSyncStatus,
+  useTriggerSync,
+  levelOf,
+  type QueueStuckItem,
+  type SyncStatus,
+} from "@/hooks/useSyncStatus";
 import { cn } from "@/lib/utils";
 import { shell } from "@/strings/shell";
+
+// Tipos con pantalla de edición propia donde un rechazo por duplicado se
+// resuelve renombrando: la ruta abre el diálogo de edición del registro
+// (?edit=<id>). El rename re-encola el snapshot por coalescing de
+// sync_queue y el siguiente push destraba la fila.
+const EDIT_ROUTES: Record<string, (id: string) => string> = {
+  membership_types: (id) => `/settings/membership-types?edit=${id}`,
+  products: (id) => `/products?edit=${id}`,
+};
+
+// stuckEditRoute — ruta de resolución para una fila atorada, o null cuando
+// no hay acción directa (rechazos no-duplicados, o tipos sin pantalla de
+// edición). Exportada para test.
+export function stuckEditRoute(it: QueueStuckItem): string | null {
+  if (it.kind !== "duplicate") return null;
+  const route = EDIT_ROUTES[it.entity_type];
+  return route ? route(it.entity_id) : null;
+}
 
 export function SyncIndicator() {
   const [open, setOpen] = useState(false);
@@ -94,6 +119,13 @@ export function SyncIndicator() {
             </DialogDescription>
           </DialogHeader>
           <SyncDetail status={data} />
+          <StuckItemsList
+            items={data?.queue_stuck_items}
+            onOpenEntity={(route) => {
+              setOpen(false);
+              navigate(route);
+            }}
+          />
           {level === "auth" && (
             <DialogFooter>
               <Button
@@ -140,6 +172,59 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     <div className="flex justify-between gap-4">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="font-medium text-right">{children}</dd>
+    </div>
+  );
+}
+
+// Detalle por fila de los cambios que la nube rechazó. Para rechazos por
+// duplicado sobre tipos renombrables (planes, productos) ofrece la salida
+// directa: abrir el registro para renombrarlo. El resto queda visible con
+// su motivo — nunca un "2 cambios rechazados" opaco. Exportada para test.
+export function StuckItemsList({
+  items,
+  onOpenEntity,
+}: {
+  items?: QueueStuckItem[];
+  onOpenEntity: (route: string) => void;
+}) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <h3 className="text-sm font-medium text-muted-foreground">{shell.sync.stuckItemsTitle}</h3>
+      <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
+        {items.map((it) => {
+          const editRoute = stuckEditRoute(it);
+          const typeName = shell.sync.entityNames[it.entity_type] ?? it.entity_type;
+          return (
+            <li
+              key={it.queue_id}
+              className="rounded-md border border-border bg-muted/30 p-3 space-y-1.5"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium truncate">
+                  {typeName}
+                  {it.entity_label ? `: ${it.entity_label}` : ""}
+                </span>
+                <span className="text-xs text-muted-foreground shrink-0">
+                  {shell.sync.stuckRetryCount(it.retry_count)}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground break-words">{it.message}</p>
+              {editRoute && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-7 mt-1"
+                  onClick={() => onOpenEntity(editRoute)}
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                  {shell.sync.openToRename}
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }
