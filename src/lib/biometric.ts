@@ -97,6 +97,31 @@ declare global {
 let sdkPromise: Promise<FingerprintNamespace> | null = null;
 let readerInstance: FingerprintReader | null = null;
 
+// activeAcquisitions cuenta los acquisitions vivos sobre el canal
+// compartido (el stream del provider y el captureOnePng del enroll). La
+// sonda isReaderConnected lo consulta para NO redialear mientras alguien
+// adquiere: el canal es compartido, y un redial (disconnect + WebApi
+// nuevo) le cierra el socket al acquisition vivo por la espalda. Regresión
+// vista en campo: la primera huella leía y la segunda ya no — la sonda de
+// 4s pegaba un enumerate transitoriamente fallido justo tras el sample,
+// redialeaba "con éxito" y dejaba el stream sordo con TODOS los
+// indicadores en verde (el redial exitoso nunca flipeaba readerConnected,
+// así que nadie rearrancaba nada).
+let activeAcquisitions = 0;
+
+// beginAcquisition sube el contador y devuelve un release idempotente —
+// los caminos de salida de un acquisition (stop normal, finish del enroll,
+// error) pueden solaparse y el contador no debe quedar negativo.
+function beginAcquisition(): () => void {
+  activeAcquisitions++;
+  let ended = false;
+  return () => {
+    if (ended) return;
+    ended = true;
+    activeAcquisitions = Math.max(0, activeAcquisitions - 1);
+  };
+}
+
 function loadScript(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
     // Reuse an already-injected tag if the wrapper was reset mid-session
@@ -314,12 +339,17 @@ export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<{ png
   // entre capturas sin fabricar sockets zombie) — ver readyReader().
   const { ns, reader, devices } = await readyReader();
 
+  // Guard del canal compartido: mientras este acquisition viva, la sonda
+  // isReaderConnected no puede redialear (ver beginAcquisition).
+  const endAcquisition = beginAcquisition();
+
   return new Promise<{ png: Uint8Array<ArrayBuffer>; sdkQuality: number }>((resolve, reject) => {
     let lastQuality = 0;
     let settled = false;
     const finish = (value: { png: Uint8Array<ArrayBuffer>; sdkQuality: number } | BiometricError) => {
       if (settled) return;
       settled = true;
+      endAcquisition();
       reader.off("QualityReported", onQuality);
       reader.off("SamplesAcquired", onSamples);
       reader.off("ErrorOccurred", onError);
@@ -461,8 +491,13 @@ export async function startCaptureStream(
     throw classify(err);
   }
 
+  // Guard del canal compartido: mientras este stream viva, la sonda
+  // isReaderConnected no puede redialear (ver beginAcquisition).
+  const endAcquisition = beginAcquisition();
+
   return {
     async stop() {
+      endAcquisition();
       reader.off("QualityReported", onStreamQuality);
       reader.off("SamplesAcquired", onSamples);
       reader.off("DeviceConnected", onConnect);
@@ -484,10 +519,26 @@ export async function startCaptureStream(
  * to events.
  */
 export async function isReaderConnected(): Promise<boolean> {
+  // Con un acquisition activo la sonda es SOLO LECTURA: enumerate sobre el
+  // canal actual, false si falla, sin reset ni redial. El canal es
+  // compartido y un redial aquí le cierra el socket al stream vivo por la
+  // espalda (y si el redial "triunfa", ningún indicador flipea y nadie
+  // rearranca el acquisition → lector sordo permanente). La muerte real
+  // del canal mid-stream la detecta el dueño: CommunicationFailed →
+  // restart del provider con backoff.
+  if (activeAcquisitions > 0) {
+    try {
+      const reader = await getReader();
+      const devices = await reader.enumerateDevices();
+      return devices.length > 0;
+    } catch {
+      return false;
+    }
+  }
+  // Sin acquisition activo el canal no tiene dueño que proteger:
+  // readyReader redialea una vez si murió (cerrando el socket viejo), así
+  // que el gate del kiosko se auto-cura dentro del mismo poll.
   try {
-    // readyReader ya redialea una vez si el canal murió (y deja el estado
-    // reseteado si tampoco eso funcionó), así que el gate del kiosko se
-    // auto-cura dentro del mismo poll en vez de esperar al siguiente.
     await readyReader();
     return true;
   } catch {
