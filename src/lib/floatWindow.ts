@@ -116,6 +116,10 @@ export async function openCheckinFloatWindow(): Promise<OpenFloatWindowResult> {
 
   const existing = await WebviewWindow.getByLabel(CHECKIN_FLOAT_WINDOW_LABEL);
   if (existing) {
+    // unminimize antes de show/focus — show() no des-minimiza en Tauri v2
+    // y una flotante minimizada quedaba "abierta" pero irrecuperable.
+    // Mismo fix que openKioskWindow (caso de campo jul-2026).
+    await existing.unminimize().catch(() => undefined);
     await existing.show();
     await existing.setFocus();
     return "focused";
@@ -127,7 +131,7 @@ export async function openCheckinFloatWindow(): Promise<OpenFloatWindowResult> {
   // ventana la tape justo cuando el socio apoya el dedo, y fuera del
   // taskbar — es una superficie de feedback, no una "app" más que alternar.
   // No se auto-abre al arrancar la app: opt-in por sesión (v1).
-  new WebviewWindow(CHECKIN_FLOAT_WINDOW_LABEL, {
+  const win = new WebviewWindow(CHECKIN_FLOAT_WINDOW_LABEL, {
     url: "/checkin-float",
     title: t.float.windowTitle,
     width: FLOAT_WINDOW_WIDTH,
@@ -140,6 +144,11 @@ export async function openCheckinFloatWindow(): Promise<OpenFloatWindowResult> {
     skipTaskbar: true,
     focus: true,
     ...(pos ? { x: pos.x, y: pos.y } : {}),
+  });
+  // Fallos de creación llegan por tauri://error, no como excepción —
+  // mismo manejo que openKioskWindow.
+  void win.once("tauri://error", () => {
+    toast.error(t.float.floatOpenError);
   });
   return "created";
 }

@@ -92,6 +92,8 @@ export const checkin = {
     kioskActiveBody: "Cierra el kiosko para usar el check-in flotante.",
     blockedByKiosk: "El kiosko está activo. Ciérralo para abrir el check-in flotante.",
     kioskBlockedByFloat: "El check-in flotante está activo. Ciérralo para abrir el kiosko.",
+    kioskOpenError: "No se pudo abrir la ventana del kiosko. Intenta de nuevo.",
+    floatOpenError: "No se pudo abrir el check-in flotante. Intenta de nuevo.",
     noMatchTitle: "No reconocimos la huella",
     closeAria: "Cerrar check-in flotante",
     lastResultAt: (time: string) => `Hoy ${time}`,

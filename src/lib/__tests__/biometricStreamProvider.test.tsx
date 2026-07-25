@@ -176,6 +176,47 @@ describe("BiometricStreamProvider", () => {
     expect(startCaptureStreamMock).toHaveBeenCalledTimes(1);
   });
 
+  it("watchdog: CommunicationFailed mid-stream suelta el stream muerto y re-arranca con backoff", async () => {
+    renderHook(
+      () => useBiometricSubscription({ enabled: true, onSample: vi.fn() }),
+      { wrapper },
+    );
+    await vi.waitFor(() => expect(startCaptureStreamMock).toHaveBeenCalledTimes(1));
+
+    vi.useFakeTimers();
+    // El canal murió con el stream "running" (agente reiniciado, socket
+    // caído). Antes esto era silencio: status verde y lector sordo.
+    act(() => {
+      lastStreamHandlers?.onError?.({ code: "lite_client_unreachable" });
+    });
+    expect(stopMock).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_100);
+    });
+    expect(startCaptureStreamMock).toHaveBeenCalledTimes(2);
+    vi.useRealTimers();
+  });
+
+  it("watchdog: errores no fatales (sdk_error) NO reinician el stream", async () => {
+    renderHook(
+      () => useBiometricSubscription({ enabled: true, onSample: vi.fn() }),
+      { wrapper },
+    );
+    await vi.waitFor(() => expect(startCaptureStreamMock).toHaveBeenCalledTimes(1));
+
+    vi.useFakeTimers();
+    act(() => {
+      lastStreamHandlers?.onError?.({ code: "sdk_error" });
+    });
+    expect(stopMock).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2_100);
+    });
+    expect(startCaptureStreamMock).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
+  });
+
   it("alwaysOn mantiene el stream encendido sin subscribers", async () => {
     renderHook(() => useBiometricStreamStatus(), { wrapper: wrapperAlwaysOn });
     await vi.waitFor(() => {

@@ -242,6 +242,23 @@ export function BiometricStreamProvider({
           },
           onError: (err) => {
             for (const s of [...subscribersRef.current]) s.onError?.(err.code);
+            // Watchdog de muerte mid-stream: CommunicationFailed significa
+            // que el canal murió con el stream en "running" (agente
+            // reiniciado, socket caído, redial externo). Antes esto era
+            // silencio total — status verde, acquisition muerto, nadie lo
+            // reiniciaba jamás. Lo tratamos igual que un arranque fallido:
+            // soltar el stream y re-entrar por el mismo backoff.
+            if (err.code !== "lite_client_unreachable" || cancelled) return;
+            const dead = stream;
+            stream = null;
+            dead?.stop().catch(() => undefined);
+            setStatus("error");
+            if (retryTimer === undefined) {
+              retryTimer = window.setTimeout(() => {
+                retryTimer = undefined;
+                if (!cancelled) startOnce();
+              }, RETRY_BACKOFF_MS);
+            }
           },
         });
         if (cancelled) {
@@ -258,7 +275,10 @@ export function BiometricStreamProvider({
         // Backoff antes de reintentar. Si el lector está desconectado el
         // siguiente intento también va a fallar y va a re-tirar el error;
         // el subscriber ya sabe y muestra banner — no es una catástrofe.
+        // retryTimer vuelve a undefined al disparar para que el watchdog
+        // de onError pueda razonar "¿ya hay un retry en vuelo?".
         retryTimer = window.setTimeout(() => {
+          retryTimer = undefined;
           if (!cancelled) startOnce();
         }, RETRY_BACKOFF_MS);
       }

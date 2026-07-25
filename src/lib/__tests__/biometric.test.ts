@@ -155,6 +155,45 @@ describe("canal persistente al Lite Client", () => {
     expect(instances[0].webChannel.disconnect).not.toHaveBeenCalled();
   });
 
+  it("sonda con acquisition activo: NO redialea aunque enumerate falle (el canal es del stream)", async () => {
+    const bio = await importBiometric();
+    const stream = await bio.startCaptureStream({ onSample: () => undefined });
+    // El canal empieza a fallar transitoriamente (agente ocupado justo
+    // tras un sample). Regresión de campo: la sonda de 4s redialeaba
+    // "con éxito", cerraba el socket vivo del stream y dejaba el lector
+    // sordo con todos los indicadores en verde.
+    instances[0].enumerateImpl = async () => {
+      throw new Error("communication failure");
+    };
+    await expect(bio.isReaderConnected()).resolves.toBe(false);
+    // Cero asesinato: mismo WebApi, socket intacto.
+    expect(instances).toHaveLength(1);
+    expect(instances[0].webChannel.disconnect).not.toHaveBeenCalled();
+    await stream.stop();
+  });
+
+  it("sonda con acquisition activo y canal sano: true sin side effects", async () => {
+    const bio = await importBiometric();
+    const stream = await bio.startCaptureStream({ onSample: () => undefined });
+    await expect(bio.isReaderConnected()).resolves.toBe(true);
+    expect(instances).toHaveLength(1);
+    expect(instances[0].webChannel.disconnect).not.toHaveBeenCalled();
+    await stream.stop();
+  });
+
+  it("tras stop() la sonda recupera el derecho a redialear", async () => {
+    const bio = await importBiometric();
+    const stream = await bio.startCaptureStream({ onSample: () => undefined });
+    await stream.stop();
+    instances[0].enumerateImpl = async () => {
+      throw new Error("websocket closed");
+    };
+    // Sin acquisition activo, el canal muerto se redialea en el mismo poll.
+    await expect(bio.isReaderConnected()).resolves.toBe(true);
+    expect(instances).toHaveLength(2);
+    expect(instances[0].webChannel.disconnect).toHaveBeenCalledTimes(1);
+  });
+
   it("isReaderConnected se auto-cura en el mismo poll tras canal muerto", async () => {
     enumerateScript = [
       async () => {

@@ -40,6 +40,14 @@ export async function openKioskWindow(): Promise<OpenKioskWindowResult> {
 
   const existing = await WebviewWindow.getByLabel(KIOSK_WINDOW_LABEL);
   if (existing) {
+    // unminimize ANTES de show/focus: en Tauri v2 show() NO des-minimiza
+    // y setFocus() tampoco restaura una ventana minimizada — una kiosko
+    // que Windows minimizó/escondió quedaba "abierta" pero irrecuperable
+    // (el launcher decía que ya estaba abierta y nada aparecía). Los tres
+    // son no-op si la ventana ya está visible. Caso de campo: jul-2026,
+    // kiosko que "se abrió y cerró de inmediato" al abrirlo por primera
+    // vez y ya no se podía traer de vuelta.
+    await existing.unminimize().catch(() => undefined);
     await existing.show();
     await existing.setFocus();
     return "focused";
@@ -50,7 +58,7 @@ export async function openKioskWindow(): Promise<OpenKioskWindowResult> {
   // ON para que el operador pueda moverla a un segundo monitor o ajustar
   // tamaño según el espacio del mostrador. Nada de modo "appliance
   // bloqueado" hasta que tengamos un caso de uso real que lo justifique.
-  new WebviewWindow(KIOSK_WINDOW_LABEL, {
+  const win = new WebviewWindow(KIOSK_WINDOW_LABEL, {
     url: "/kiosk",
     title: "Tinta · Kiosko",
     fullscreen: false,
@@ -60,6 +68,13 @@ export async function openKioskWindow(): Promise<OpenKioskWindowResult> {
     skipTaskbar: false,
     alwaysOnTop: false,
     focus: true,
+  });
+  // La creación es async y sus fallos NO tiran excepción — llegan por el
+  // evento tauri://error (p.ej. label duplicado en una carrera de doble
+  // click, o el webview que no pudo crearse). Sin listener el fallo era
+  // invisible: ni ventana ni mensaje.
+  void win.once("tauri://error", () => {
+    toast.error(t.float.kioskOpenError);
   });
   return "created";
 }

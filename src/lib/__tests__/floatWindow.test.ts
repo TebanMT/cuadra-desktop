@@ -13,6 +13,8 @@ interface FakeWindow {
   label: string;
   show: ReturnType<typeof vi.fn>;
   setFocus: ReturnType<typeof vi.fn>;
+  unminimize: ReturnType<typeof vi.fn>;
+  once: ReturnType<typeof vi.fn>;
   close: ReturnType<typeof vi.fn>;
 }
 
@@ -29,11 +31,15 @@ vi.mock("@tauri-apps/api/webviewWindow", () => {
     label: string;
     show: ReturnType<typeof vi.fn>;
     setFocus: ReturnType<typeof vi.fn>;
+    unminimize: ReturnType<typeof vi.fn>;
+    once: ReturnType<typeof vi.fn>;
     close: ReturnType<typeof vi.fn>;
     constructor(label: string, options: Record<string, unknown>) {
       this.label = label;
       this.show = vi.fn(async () => {});
       this.setFocus = vi.fn(async () => {});
+      this.unminimize = vi.fn(async () => {});
+      this.once = vi.fn(async () => () => {});
       this.close = vi.fn(async () => {});
       state.constructorCalls.push({ label, options });
       state.byLabel.set(label, this as unknown as FakeWindow);
@@ -60,6 +66,8 @@ function pretendWindowExists(label: string) {
     label,
     show: vi.fn(async () => {}),
     setFocus: vi.fn(async () => {}),
+    unminimize: vi.fn(async () => {}),
+    once: vi.fn(async () => () => {}),
     close: vi.fn(async () => {}),
   });
 }
