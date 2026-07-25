@@ -64,6 +64,11 @@ interface FingerprintReader {
   stopAcquisition(deviceUid?: string): Promise<void>;
   on(event: string, handler: (e: unknown) => void): FingerprintReader;
   off(event?: string, handler?: (e: unknown) => void): FingerprintReader;
+  // El canal WebSocket subyacente al agente. El d.ts del SDK lo declara
+  // private, pero existe en runtime y WebChannelClient expone disconnect()
+  // público — lo usamos en resetWebSdkSession() para cerrar el socket de
+  // verdad en lugar de abandonarlo abierto (ver comentario ahí).
+  webChannel?: { disconnect(): void };
 }
 interface FingerprintNamespace {
   WebApi: new () => FingerprintReader;
@@ -154,8 +159,22 @@ async function getReader(): Promise<FingerprintReader> {
   return readerInstance;
 }
 
-// resetWebSdkSession drops the cached WebSDK connection state so the next
-// capture re-bootstraps against the agent's live data port.
+// resetWebSdkSession tears down the current channel to the agent and drops
+// the cached WebSDK connection state so the next getReader() re-bootstraps
+// against the agent's live data port.
+//
+// SOLO se llama en caminos de FALLO (canal muerto, puerto stale). Antes se
+// llamaba incondicionalmente al inicio de cada startCaptureStream /
+// captureOnePng, y eso fabricaba sockets zombie: cada arranque abandonaba
+// el WebSocket anterior ABIERTO (stop() sólo hace stopAcquisition, nunca
+// cerraba el canal) y abría uno nuevo. El agente del Lite Client puede
+// dejar la entrega de SamplesAcquired amarrada al socket viejo — la página
+// queda "viva pero sorda": enumerate/startAcquisition responden OK por el
+// canal nuevo pero los dedazos nunca llegan, sin ningún error. Se
+// reproducía con logout→login (el único flujo que apaga y re-prende el
+// stream de la ventana main) y sólo lo curaba reiniciar la app. Ver
+// readyReader() para la política actual: un canal persistente por página,
+// redial únicamente cuando el canario falla.
 //
 // The @digitalpersona/websdk Configurator caches the agent's *ephemeral*
 // data port + SRP keys in two places: sessionStorage ("websdk" /
@@ -171,9 +190,17 @@ async function getReader(): Promise<FingerprintReader> {
 // "communication failure". Clearing *only* sessionStorage is not enough,
 // because the singleton still holds the dead port in memory. We must also
 // null the singleton's in-memory fields so `ensureLoaded()` re-runs the
-// `/get_connection` bootstrap and every capture session dials the live
+// `/get_connection` bootstrap and the next capture session dials the live
 // port.
 function resetWebSdkSession(): void {
+  try {
+    // Cerrar el socket viejo DE VERDAD antes de soltar la referencia. Un
+    // disconnect sobre un canal ya muerto es no-op; sobre uno vivo evita
+    // que el agente lo siga considerando dueño de los eventos del lector.
+    readerInstance?.webChannel?.disconnect();
+  } catch {
+    // best effort — el campo es privado del SDK y podría renombrarse.
+  }
   try {
     window.sessionStorage.removeItem("websdk");
     window.sessionStorage.removeItem("websdk.sessionId");
@@ -195,6 +222,39 @@ function resetWebSdkSession(): void {
     // effort. The sessionStorage clear above still helps on a fresh page.
   }
   readerInstance = null;
+}
+
+// readyReader devuelve el reader del canal persistente con el lector ya
+// enumerado. El canal es UNO por página y vive mientras funcione — NO se
+// re-bootstrapa en cada arranque de stream/captura (eso fabricaba zombies,
+// ver resetWebSdkSession). enumerateDevices() actúa de canario sobre el
+// canal existente: es un round-trip real al agente, así que un socket
+// muerto o un puerto stale lo hacen fallar. Sólo entonces reseteamos
+// (cerrando el socket viejo) y redialeamos UNA vez; si el redial también
+// falla, el error clasificado sube al caller (el provider reintenta con
+// backoff, el poll de isReaderConnected reintenta al siguiente tick).
+async function readyReader(): Promise<{
+  ns: FingerprintNamespace;
+  reader: FingerprintReader;
+  devices: string[];
+}> {
+  const ns = await ensureSdk();
+  let reader = await getReader();
+  let devices: string[];
+  try {
+    devices = await reader.enumerateDevices();
+  } catch {
+    resetWebSdkSession();
+    reader = await getReader();
+    devices = await reader.enumerateDevices().catch((e) => {
+      throw classify(e);
+    });
+  }
+  if (!devices || devices.length === 0) {
+    // Canal sano, lector desenchufado — no hay nada que redialear.
+    throw new BiometricError("no_device", "no scanner plugged in");
+  }
+  return { ns, reader, devices };
 }
 
 // Decode the SDK's sample payload into PNG bytes. `SamplesAcquired.samples`
@@ -250,18 +310,9 @@ interface CaptureOneOptions {
  */
 export async function captureOnePng(opts: CaptureOneOptions = {}): Promise<{ png: Uint8Array<ArrayBuffer>; sdkQuality: number }> {
   const timeoutMs = opts.timeoutMs ?? 30_000;
-  // Force a fresh /get_connection bootstrap — the cached agent port goes
-  // stale between captures and causes "communication failure".
-  resetWebSdkSession();
-  const ns = await ensureSdk();
-  const reader = await getReader();
-
-  const devices = await reader.enumerateDevices().catch((e) => {
-    throw classify(e);
-  });
-  if (!devices || devices.length === 0) {
-    throw new BiometricError("no_device", "no scanner plugged in");
-  }
+  // Canal persistente + canario con redial-en-fallo (cubre el puerto stale
+  // entre capturas sin fabricar sockets zombie) — ver readyReader().
+  const { ns, reader, devices } = await readyReader();
 
   return new Promise<{ png: Uint8Array<ArrayBuffer>; sdkQuality: number }>((resolve, reject) => {
     let lastQuality = 0;
@@ -359,19 +410,10 @@ export interface CaptureStream {
 export async function startCaptureStream(
   handlers: CaptureStreamHandlers,
 ): Promise<CaptureStream> {
-  // Fresh bootstrap before the stream — see resetWebSdkSession().
-  resetWebSdkSession();
-  const ns = await ensureSdk();
-  const reader = await getReader();
-
-  // Resolve the real device UID — the all-zeros "default device" GUID is
-  // rejected with E_INVALIDARG by the U.are.U Legacy driver.
-  const devices = await reader.enumerateDevices().catch((e) => {
-    throw classify(e);
-  });
-  if (!devices || devices.length === 0) {
-    throw new BiometricError("no_device", "no scanner plugged in");
-  }
+  // Canal persistente + canario con redial-en-fallo — ver readyReader().
+  // devices trae el UID real: el GUID all-zeros "default device" lo
+  // rechaza el driver U.are.U Legacy con E_INVALIDARG.
+  const { ns, reader, devices } = await readyReader();
 
   let streamLastQuality = 0;
   const onStreamQuality = (e: unknown) => {
@@ -443,16 +485,12 @@ export async function startCaptureStream(
  */
 export async function isReaderConnected(): Promise<boolean> {
   try {
-    const reader = await getReader();
-    const devices = await reader.enumerateDevices();
-    return devices.length > 0;
+    // readyReader ya redialea una vez si el canal murió (y deja el estado
+    // reseteado si tampoco eso funcionó), así que el gate del kiosko se
+    // auto-cura dentro del mismo poll en vez de esperar al siguiente.
+    await readyReader();
+    return true;
   } catch {
-    // Probe failed — most likely a stale WebSDK session (the cached agent
-    // port went dead). Reset so the NEXT poll re-bootstraps against the
-    // live port: the kiosk's reader-connected gate self-heals within one
-    // poll interval instead of staying stuck "disconnected" forever (which
-    // would keep useBiometricCheckinLoop disabled and the kiosk blind).
-    resetWebSdkSession();
     return false;
   }
 }
