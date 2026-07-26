@@ -13,9 +13,12 @@
 #      DISTINTO a este, así que el GITHUB_TOKEN del runner no alcanza — se
 #      usa el PAT TINTA_CORE_TOKEN (el mismo del checkout del sidecar).
 #   3. Tauri lo empaqueta vía `bundle.resources` (tauri.windows.conf.json)
-#      con destino `./` → aterriza al lado de Tinta.exe y del sidecar en el
-#      install dir. A diferencia de externalBin, resources NO exige sufijo
-#      de target triple, así que el .exe conserva su nombre real.
+#      con destino `tinta-bio.exe` (ruta destino COMPLETA con nombre — para
+#      un archivo suelto el map usa el valor verbatim; un destino "./" se
+#      normaliza a vacío y el bundler NSIS panickea en target.parent()) →
+#      aterriza al lado de Tinta.exe y del sidecar en el install dir. A
+#      diferencia de externalBin, resources NO exige sufijo de target
+#      triple, así que el .exe conserva su nombre real.
 #   4. El sidecar Go (shared/biometric/engine.go resolvePath) lo encuentra
 #      junto a su propio .exe y lo spawnea como proceso hijo (NDJSON stdio).
 #
