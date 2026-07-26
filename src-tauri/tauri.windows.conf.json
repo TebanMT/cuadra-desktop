@@ -1,11 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "bundle": {
-    "externalBin": [
-      "tinta-sidecar",
-      "binaries/nbis/mindtct",
-      "binaries/nbis/bozorth3"
-    ],
+    "resources": {
+      "binaries/tinta-bio/tinta-bio.exe": "./"
+    },
     "windows": {
       "nsis": {
         "installerHooks": "./windows/installer-hooks.nsh",
@@ -14,4 +12,3 @@
     }
   }
 }
-

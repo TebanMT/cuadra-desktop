@@ -60,15 +60,15 @@ env:
   # acá un tag de core (ej. v1.0.0) antes de taggear, o pásalo en el input
   # core_ref. "main" = último commit (no reproducible). El SHA bundleado queda
   # en el log del step "Checkout tinta-core".
-  TINTA_CORE_REF: v1.0.14
+  TINTA_CORE_REF: v1.0.15
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
-  # Release tag de cuadra-core con los binarios NBIS Windows (mindtct.exe +
-  # bozorth3.exe) que el sidecar invoca como subprocess. Se publica desde
-  # cuadra-core/.github/workflows/build-nbis-windows.yml. Bumpear acá sólo
-  # cuando se publique un release nuevo — los binarios cambian rara vez.
-  NBIS_VERSION: nbis-v1
+  # Release tag de cuadra-core con el motor biométrico tinta-bio.exe (helper
+  # C#/.NET 8 que el sidecar spawnea). Se publica desde
+  # cuadra-core/.github/workflows/build-tinta-bio-windows.yml (tag
+  # `tinta-bio-v*`). Bumpear acá cuando salga release nuevo del helper.
+  TINTA_BIO_RELEASE_TAG: tinta-bio-v0.1.0
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
@@ -268,26 +268,24 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
-      - name: Download NBIS binaries (mindtct.exe + bozorth3.exe)
-        # Los baja del release `${NBIS_VERSION}` de este mismo repo a
-        # src-tauri/binaries/nbis/ con el sufijo del target triple que
-        # externalBin exige (mindtct-x86_64-pc-windows-msvc.exe). Tauri los
-        # bundlea via externalBin al lado del .exe principal, donde el
-        # sidecar los resuelve via filepath.Dir(os.Executable()).
-        # GITHUB_TOKEN (auto-inyectado por Actions) alcanza porque el
-        # release vive en el mismo repo — sin necesidad de PAT extra.
+      - name: Download tinta-bio (motor biométrico)
+        # Lo baja del release `${TINTA_BIO_RELEASE_TAG}` de cuadra-core (repo
+        # privado DISTINTO → el GITHUB_TOKEN del runner no lo lee; se reusa el
+        # PAT TINTA_CORE_TOKEN del checkout del sidecar) a
+        # src-tauri/binaries/tinta-bio/. Tauri lo bundlea via bundle.resources
+        # (overlay tauri.windows.conf.json) al lado del .exe principal, donde
+        # el sidecar lo resuelve via filepath.Dir(os.Executable()).
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NBIS_VERSION: ${{ env.NBIS_VERSION }}
+          GH_TOKEN: ${{ secrets.TINTA_CORE_TOKEN }}
+          TINTA_BIO_RELEASE_TAG: ${{ env.TINTA_BIO_RELEASE_TAG }}
         shell: bash
-        run: bash scripts/prepare-nbis-windows.sh
+        run: bash scripts/prepare-tinta-bio-windows.sh
 
       - name: Build Tauri
         # `--config src-tauri/tauri.windows.conf.json` merge un overlay
-        # Windows-only sobre el config base — extiende `bundle.externalBin`
-        # con los binarios NBIS sin contaminar el bundle macOS (que no tiene
-        # ni necesita esos .exe). El merge de Tauri 2 (JSON Merge Patch)
-        # reemplaza arrays enteros, por eso el overlay re-lista tinta-sidecar.
+        # Windows-only sobre el config base — agrega tinta-bio.exe vía
+        # `bundle.resources` sin contaminar el bundle macOS (que no tiene ni
+        # necesita ese .exe; sin lector en mac el sidecar cae a PIN/manual).
         run: pnpm tauri build --target x86_64-pc-windows-msvc --config src-tauri/tauri.windows.conf.json
 
       - name: Upload Windows installer (NSIS .exe)

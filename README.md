@@ -76,23 +76,38 @@ Ver `IMPLEMENTATION_NOTES.md` para detalle. Resumen:
 
 ## Lector de huella en Windows
 
-El installer Windows de Tinta integra dos componentes que el lector U.are.U
-4500 necesita para funcionar:
+Desde ADR-004-quater el subsistema biométrico es el **motor nativo
+tinta-bio** (dos componentes, dos rutas de distribución):
 
-1. **HID Authentication Device Client** (antes "DigitalPersona Lite Client") —
-   el agente que la app del browser usa por WebSocket para hablar con el reader.
-2. **Driver Legacy del U.are.U 4500** (`dPersona_x64.inf`, versión 4.1.1.221) —
-   el driver kernel que liga el hardware USB al sistema. Sin esto, Device
-   Manager muestra "Code 28: The drivers for this device are not installed".
+1. **`tinta-bio.exe`** — helper C#/.NET 8 (cuadra-core `tools/tinta-bio`)
+   que captura, extrae e identifica con FingerJet. Viaja DENTRO del bundle
+   (`bundle.resources` en `tauri.windows.conf.json`, staging vía
+   `scripts/prepare-tinta-bio-windows.sh`) y aterriza junto al sidecar, que
+   lo spawnea por NDJSON stdio. El EULA del Biometric SDK §1.1(c) permite
+   redistribuirlo dentro de la app.
+2. **RTE del DigitalPersona Biometric SDK 3.6.1** — el runtime nativo
+   (dpfpdd/dpfj y su capa de soporte) **más el driver** del U.are.U 4500.
+   Lo instala el hook NSIS en silent desde el mirror R2
+   (`dl.entinta.app/vendor/hid/dp-bio-rte-*.zip`, SHA256 pineado).
+
+**REGLA anti-sombra:** el RTE es la ÚNICA fuente del runtime nativo. Jamás
+copiar DLLs del SDK junto a los exes — un subconjunto le hace sombra al
+runtime instalado y el lector muere en `no_device` silencioso.
+
+Ya NO existen el HID Authentication Device Client ("Lite Client") ni el
+paso separado del driver: el hook los RETIRA — en PCs que actualizan desde
+Tinta ≤ v1.0.15 desinstala el Lite Client (o detiene + deshabilita su
+servicio DpHost) porque su sesión con el lector bloquea el open EXCLUSIVE
+del motor nuevo (DEVICE_BUSY).
 
 La integración vive en `src-tauri/windows/installer-hooks.nsh` y se conecta
 vía `bundle.windows.nsis.installerHooks` en `tauri.windows.conf.json`.
 
 ### Plataforma soportada
 
-**Windows 10/11 x86_64 únicamente.** El driver del U.are.U 4500 que HID
-publica es x86_64-only — no existen builds ARM64 (kernel drivers no
-emulan en Windows on ARM). Implicaciones:
+**Windows 10/11 x86_64 únicamente.** El RTE que bundleamos es el build
+x64 del SDK y el driver del U.are.U 4500 es x86_64-only — no existen
+builds ARM64 (kernel drivers no emulan en Windows on ARM). Implicaciones:
 
 - **Para testing local en Mac Apple Silicon:** las VMs nativas (Parallels,
   VMware Fusion, UTM ARM) corren Windows 11 ARM64 y NO van a poder cargar
@@ -152,83 +167,67 @@ flujo biométrico incluido), UTM con emulación QEMU es la única ruta:
 - **Si el USB passthrough se cuelga:** Devices → USB → unmark y remark
   el reader. UTM a veces pierde el binding cuando suspendes la VM.
 
-Si el hook detecta que la instalación del driver falla (típicamente
-porque la máquina es ARM64), Tinta queda instalada y funcional sin
-biometría; el `MessageBox` apunta al operador a instalar el driver
-manualmente desde la página de HID.
+Si el hook detecta que la instalación del RTE falla (típicamente porque
+la máquina es ARM64 o no hay internet), Tinta queda instalada y funcional
+sin biometría; el `MessageBox` apunta al operador a la instalación manual
+(descargar el zip del mirror, descomprimir, `setup.exe`).
 
 ### Cómo funciona
 
-1. El `.exe` de Tinta-Setup NO bundlea ningún binario de HID. El EULA
-   prohíbe redistribuirlos (ver `../adr/ADR-004-ter-installer-bundling.md`).
-2. Después de copiar los archivos de Tinta, el hook NSIS hace **dos chequeos
-   independientes en secuencia**:
-   - **Lite Client (agente):** registry 5.x, registry legacy 4.x, o
-     `C:\Program Files\DigitalPersona\Bin\dpcagnt.exe`.
-   - **Driver:** `pnputil /enum-drivers` filtrado por `dPersona`/`U.are.U`.
-3. Para cada uno, si ya está → skip silencioso. Si falta:
-   - **Lite Client:** descarga el setup oficial desde
-     `https://crossmatch.hid.gl/lite-client/store/5.2.0/...`, verifica
-     SHA256 publicado por HID, ejecuta silent (`/s /v"/qn"`). 1 UAC.
-   - **Driver:** descarga el ZIP del Legacy 4.1.1.221 desde
-     `https://www.hidglobal.com/sites/default/files/drivers/...`,
-     extrae con `Expand-Archive`, llama `pnputil /add-driver
-     dPersona_x64.inf /install` con `-Verb RunAs`. 1 UAC adicional.
-4. Si cualquiera de las dos descargas o instalaciones falla (sin internet,
-   URL stale, hash mismatch, ARM64 incompatible, etc.) → `MessageBox`
-   claro en español + (para el driver) abre el browser a la página oficial
-   de HID. Tinta sigue arrancable; la app muestra el banner "lector
-   desconectado" en la UI hasta que el operador complete la instalación
-   manual.
+1. El `.exe` de Tinta-Setup bundlea `tinta-bio.exe` (permitido: EULA
+   §1.1(c), redistribución en object code dentro de la app) pero NO el
+   runtime nativo — ese lo instala el hook. Ver
+   `../adr/ADR-004-quater-motor-nativo.md`.
+2. Después de copiar los archivos de Tinta, el hook NSIS corre **cuatro
+   pasos en secuencia**:
+   - **Migración:** si existe el servicio `DpHost` (Lite Client, Tinta
+     ≤ v1.0.15), lo desinstala vía `msiexec /x <ProductCode del registro>`;
+     si falla, detiene + deshabilita el servicio. Sin esto el motor nuevo
+     recibe DEVICE_BUSY al abrir el lector en EXCLUSIVE.
+   - **¿RTE ya instalado?** ProductCode del MSI 3.6.1
+     (`{7FC7AAC6-...}`) o `dpfpdd.dll` + `dpfj.dll` en
+     `Program Files\DigitalPersona\Bin` (runtime funcional por otra vía,
+     p.ej. el SDK de dev) → skip.
+   - **Pre-check de conflicto:** DigitalPersona viejo (One Touch /
+     U.are.U SDK 4.x — típico en PCs que migran de HDLEON) → aviso
+     accionable, sin instalar encima.
+   - **Descarga + install:** baja el zip del RTE (~175 MB) del mirror R2,
+     verifica SHA256 pineado, extrae y corre el InstallShield en silent
+     (`setup.exe /s /v"/qn /norestart /l*v <log>"` — los flags del
+     `InstallOnly.bat` oficial del SDK). El RTE instala runtime + driver.
+3. Si cualquier paso falla (sin internet, hash mismatch, ARM64, MSI
+   1603...) → `MessageBox` claro en español con la ruta manual. Tinta
+   sigue arrancable; la app muestra el aviso de lector en la UI.
 
-Total UACs en la primera instalación: **2 (Lite Client + driver)**.
-En instalaciones donde alguno ya está presente: 1 o 0.
+Total UACs en la primera instalación: **1** (la elevación perMachine del
+installer cubre msiexec y el setup del RTE — ver header del `.nsh`).
 
 ### Requisito: internet en el momento de instalar
 
 Si la PC del gym no tiene internet cuando se corre `Tinta-Setup.exe`, el
 hook cae en los branches "instálalo manual" — la app queda instalada pero
-el lector queda inactivo hasta que el dueño corra los setups por su
+el lector queda inactivo hasta que el dueño corra el setup del RTE por su
 cuenta. Trade-off documentado y aceptado: el primer handshake desktop↔cloud
 también requiere internet (ver memoria `project_first_handshake.md`), así que
 no es una regresión vs el offline-first del producto en operación normal.
 
-### Versión del Lite Client (pin manual)
+### Versión del RTE (pin manual)
 
-La URL y el hash SHA256 están hardcodeados en `installer-hooks.nsh`. Para
-bumpear:
+URL, SHA256 y ProductCode están hardcodeados en `installer-hooks.nsh`.
+Para bumpear cuando HID publique un Biometric SDK nuevo:
 
-1. Validar la nueva versión en una VM Windows 10/11 limpia x86_64 (sin DP
-   previo).
-2. Confirmar que `@digitalpersona/fingerprint` sigue conectando con la nueva
-   versión del agente sin cambios al FE.
-3. Actualizar `TINTA_DP_URL` y `TINTA_DP_SHA256` en el `.nsh`.
-4. Cortar release de Tinta.
+1. Zipear la carpeta `RTE/x64` del SDK nuevo y subirla a R2 con nombre
+   versionado (`vendor/hid/dp-bio-rte-X.Y.Z-x64.zip`, cache immutable).
+2. Actualizar `TINTA_RTE_URL`, `TINTA_RTE_SHA256` y
+   `TINTA_RTE_PRODUCT_KEY` (el ProductCode sale del `Setup.ini` del RTE).
+3. Rebuildear `tinta-bio.exe` contra el SDK nuevo si cambió el API
+   (release `tinta-bio-v*` en cuadra-core + bump de
+   `TINTA_BIO_RELEASE_TAG` en los workflows).
+4. Validar en VM Windows 10/11 x86_64 limpia + PC con la versión anterior
+   (upgrade path). Cortar release de Tinta.
 
-NO apuntar a "latest" — HID podría publicar una versión rota y se
-distribuiría instantáneamente a todo gym nuevo.
-
-### Versión del driver (pin manual)
-
-`TINTA_DP_DRIVER_URL` en el `.nsh` es **best-guess** del path estable de
-HID, basada en el patrón observado en otros SFW (ej.
-`sfw-01357_reve_dtc1500_...zip`). HID no publica un endpoint estable
-oficial, solo la página landing (`/drivers/49061`). Si HID rota el path:
-
-- La descarga retorna 404.
-- El hook cae al branch `tinta_drv_download_fail` y abre el browser a la
-  página oficial con instrucciones claras en español.
-- Cero impacto en la app instalada — Tinta sigue arrancable; biometría
-  queda diferida hasta que el operador instale el driver a mano.
-
-Para bumpear (cuando HID publique una versión nueva o rote la URL):
-
-1. Bajar el ZIP desde [hidglobal.com/drivers/49061](https://www.hidglobal.com/drivers/49061)
-   y capturar la URL real del download (DevTools → Network al click).
-2. Validar el INF en una VM Windows 10/11 x86_64 limpia.
-3. Actualizar `TINTA_DP_DRIVER_URL` en el `.nsh`.
-4. NO hace falta hash — el `.cat` embebido en el ZIP está firmado WHQL
-   por Microsoft, validado por Windows al hacer `pnputil /add-driver`.
+NO apuntar a "latest" ni reusar el nombre del zip en R2 — el pin SHA256 y
+el cache immutable dependen de que cada versión sea un objeto nuevo.
 
 ### Cómo probarlo en VM Windows x86_64 limpia
 
@@ -237,33 +236,41 @@ Para bumpear (cuando HID publique una versión nueva o rote la URL):
 > Intel/AMD físico.
 
 ```powershell
-# 1. Verificar que no hay DP previo (Lite Client + driver)
-Get-ItemProperty 'HKLM:\SOFTWARE\HID Global\HID Authentication Device Client' -ErrorAction SilentlyContinue
-Get-ItemProperty 'HKLM:\SOFTWARE\DigitalPersona\Bin' -ErrorAction SilentlyContinue
-Test-Path 'C:\Program Files\DigitalPersona\Bin\dpcagnt.exe'
-pnputil /enum-drivers | Select-String -Pattern 'dPersona|U\.are\.U'   # debe estar vacío
+# 1. Verificar que no hay DP previo (runtime, Lite Client, One Touch)
+Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{7FC7AAC6-4A7E-4DA4-92ED-D37FB6BDCA18}' -ErrorAction SilentlyContinue
+Test-Path 'C:\Program Files\DigitalPersona\Bin\dpfpdd.dll'
+Test-Path 'C:\Program Files\DigitalPersona\Bin\dpfj.dll'
+Get-Service -Name 'DpHost' -ErrorAction SilentlyContinue   # debe estar vacío
 
-# 2. Correr Tinta-Setup_X.Y.Z_x64-setup.exe
-# Observar:
-#   - Barra de progreso "Descargando soporte (~50 MB)" + 1 UAC del Lite Client
-#   - "Verificando driver del lector de huella..." + 2do UAC del pnputil
-#   - DetailPrint "Driver del lector instalado en el driver store"
+# 2. Correr Tinta-Setup_X.Y.Z_x64-setup.exe (1 solo UAC)
+# Observar en el detalle del installer:
+#   - "Verificando el runtime del lector de huella..."
+#   - "Runtime del lector no detectado. Descargando (~175 MB)."
+#   - "Instalando el runtime del lector de huella..."
+#   - "Runtime del lector de huella instalado correctamente."
 
 # 3. Confirmar post-install
-Get-Service -Name 'DpHost' -ErrorAction SilentlyContinue   # agente como servicio (Running)
-Test-Path 'C:\Program Files\DigitalPersona\Bin\dpcagnt.exe'  # binario del agente
-pnputil /enum-drivers | Select-String -Pattern 'dPersona|U\.are\.U'  # driver registrado
+Get-ItemProperty 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{7FC7AAC6-4A7E-4DA4-92ED-D37FB6BDCA18}' | Select DisplayName, DisplayVersion
+Test-Path 'C:\Program Files\DigitalPersona\Bin\dpfpdd.dll'   # True
+Test-Path 'C:\Program Files\DigitalPersona\Bin\dpfj.dll'     # True
+Test-Path "$env:ProgramFiles\Tinta\tinta-bio.exe"            # True (bundleado)
 Get-PnpDevice -InstanceId 'USB\VID_05BA*' -ErrorAction SilentlyContinue | Format-Table FriendlyName, Status
 
 # 4. Conectar el U.are.U 4500 al USB de la VM (passthrough). Esperado:
 #    Get-PnpDevice debe mostrar Status: OK. Si Class está vacío con Status
 #    Unknown → probablemente la VM es ARM64 (ver sección "Plataforma soportada").
 
-# 5. Abrir Tinta → ir a Ajustes → biometría → debería ver el reader.
+# 5. Abrir Tinta → Ajustes → biometría → debería ver el reader (vía el
+#    SSE del sidecar; ya no hay agente ni WebSocket).
 ```
 
 Para test del modo "sin internet": desconectar la VM antes de correr el
 setup, observar que el `MessageBox` claro aparece y que Tinta arranca igual.
+
+Para test del **upgrade path** (migración del Lite Client): instalar
+primero un Tinta ≤ v1.0.15 (deja el ADC + DpHost), luego el nuevo setup.
+Esperado: "Retirando el soporte anterior del lector..." y al final
+`Get-Service DpHost` vacío (desinstalado) o `Stopped`+`Disabled`.
 
 ## Branding y UI
 
