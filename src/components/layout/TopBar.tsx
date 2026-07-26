@@ -28,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useLogout } from "@/hooks/useAuth";
-import { useBiometricStatus } from "@/hooks/useBiometric";
+import { useReaderMissing } from "@/hooks/useBiometric";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useTheme } from "@/hooks/useTheme";
 import { useAttentionRequired } from "@/hooks/useReports";
@@ -91,11 +91,12 @@ export function TopBar() {
   const user = useAuthStore((s) => s.user);
   const readOnly = useAuthStore((s) => s.readOnly);
   const logout = useLogout();
-  const bio = useBiometricStatus();
   const { resolved, toggle } = useTheme();
   const attention = useAttentionRequired();
   const money = useMoneyVisibility();
-  const readerDisconnected = bio.data?.available === true && !bio.data?.connected;
+  // Aviso gateado por "esta PC ya tuvo lector": un gym que opera por
+  // número no ve un badge ámbar eterno. Ver useReaderMissing.
+  const readerDisconnected = useReaderMissing();
 
   // Exclusión mutua kiosko ↔ check-in flotante: son modos para
   // configuraciones físicas distintas (pantalla dedicada vs compartida) y

@@ -8,6 +8,9 @@ import type { CheckinEvent } from "@/hooks/useCheckin";
 export type FeedbackKind =
   | "idle"
   | "processing"
+  // sample_rejected del sidecar: el dedazo no se leyó bien — "vuelve a
+  // apoyar", tono warning. No es un rechazo de acceso.
+  | "sample_rejected"
   | "success_active"
   | "success_expiring_soon"
   | "denied_expired"
@@ -55,6 +58,7 @@ export function feedbackTone(kind: FeedbackKind): FeedbackTone {
       return "neutral";
     case "success_active":
       return "success";
+    case "sample_rejected":
     case "success_expiring_soon":
       return "warning";
     case "denied_expired":
@@ -72,6 +76,8 @@ export function feedbackTone(kind: FeedbackKind): FeedbackTone {
 export function feedbackDetail(state: FeedbackState): string {
   const days = state.daysUntilExpiry ?? 0;
   switch (state.kind) {
+    case "sample_rejected":
+      return t.feedback.sampleRejected;
     case "success_active":
       return t.feedback.successActive(days);
     case "success_expiring_soon":

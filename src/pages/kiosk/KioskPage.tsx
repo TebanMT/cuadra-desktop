@@ -12,15 +12,11 @@ import {
   useCheckinMethods,
 } from "@/hooks/useCheckin";
 import {
-  useBiometricCheckinLoop,
+  useBiometricCheckinFeed,
   useBiometricStatus,
-  useReaderConnected,
+  useReaderMissing,
 } from "@/hooks/useBiometric";
 import { useSyncStatus, levelOf } from "@/hooks/useSyncStatus";
-import {
-  emitCheckinResult,
-  useCheckinResultRelay,
-} from "@/hooks/useCheckinResultRelay";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { cn } from "@/lib/utils";
 import { closeCurrentWindow, isCurrentWindowKiosk } from "@/lib/kioskWindow";
@@ -49,11 +45,10 @@ const KioskClock = memo(function KioskClock({ now }: { now: Date }) {
 
 export default function KioskPage() {
   const navigate = useNavigate();
-  // Matcher (sidecar) availability — does the BE have NBIS binaries + a
-  // gym keyed in? Separate from physical scanner presence (Lite Client +
-  // USB), which the JS SDK reports via useReaderConnected.
+  // Estado del subsistema biométrico directo del sidecar: connected = lector
+  // físico (vía helper tinta-bio), available = listo para operar.
   const bio = useBiometricStatus();
-  const readerConnected = useReaderConnected();
+  const readerMissing = useReaderMissing();
   const methods = useCheckinMethods();
   const sync = useSyncStatus();
   const count = useCheckinCountToday();
@@ -66,11 +61,9 @@ export default function KioskPage() {
   // precisión al minuto. Reduce wakeups + repaints en el OS host.
   const [now, setNow] = useState(() => new Date());
 
-  // "available" = sidecar matcher is ready AND physical scanner is plugged
-  // in (the SDK can talk to the Lite Client + sees a device). The pre-ADR
-  // flow only checked the sidecar; now we need both.
-  const fingerprintAvailable =
-    !!bio.data?.available && readerConnected === true;
+  // available = helper vivo + lector conectado; el sidecar es la única
+  // fuente (ya no hay probe del JS SDK por separado).
+  const fingerprintAvailable = !!bio.data?.available;
   const numberAvailable = methods.data?.number_available ?? false;
 
   // Clock tick al cambio de minuto. El primer setTimeout calcula los ms
@@ -141,51 +134,28 @@ export default function KioskPage() {
     else if (tone === "denied") playCheckinTone("denied", volume);
   }
 
-  // Capture vive en el frontend per ADR-004-bis. El JS SDK habla con el
-  // Lite Client local; cada huella detectada POST-ea a /biometric/checkin
-  // y el backend ejecuta UC-029 contra la galería del gym activo.
-  //
-  // Ojo: el Lite Client entrega los samples a la ventana CON FOCO, así que
-  // este loop sólo recibe cuando el kiosko está enfocado. Cada resultado
-  // propio se relaya a la main (toast del operador); y a la inversa, el
-  // listener de abajo pinta aquí los check-ins que la main procesó
-  // mientras tenía el foco — sin eso el socio frente al kiosko no vería
-  // nada. Ver useCheckinResultRelay.
-  useBiometricCheckinLoop({
-    enabled: fingerprintAvailable,
+  // La captura y la identificación viven en el sidecar (motor tinta-bio);
+  // aquí sólo llegan los eventos por SSE — a TODAS las ventanas por igual,
+  // ya no hay ruteo-por-foco ni relay entre ventanas. El kiosko es la
+  // superficie del socio: pinta el veredicto en grande Y pone el tono (la
+  // main, sabiendo que el kiosko está abierto, sólo toastea).
+  useBiometricCheckinFeed({
     onAttempt: () => setFeedback({ kind: "processing" }),
     onCheckin: (ev) => {
       const fb = eventToFeedback(ev);
       setFeedback(fb);
       announceTone(fb);
-      void emitCheckinResult({ kind: "checkin", event: ev });
     },
     onNoMatch: () => {
       const fb: FeedbackState = { kind: "denied_not_found" };
       setFeedback(fb);
       announceTone(fb);
-      void emitCheckinResult({ kind: "no_match" });
     },
+    onSampleRejected: () => setFeedback({ kind: "sample_rejected" }),
     onError: () => {
-      // SDK / matcher failure mid-stream. El banner ya refleja el estado
-      // del lector vía useReaderConnected; no duplicamos aquí.
-    },
-  });
-
-  // Resultados procesados por OTRA ventana (la main con el foco): se
-  // pintan igual que los propios, con tono — esta es la superficie del
-  // socio y la main toastea sin tono cuando el kiosko existe. El relay
-  // descarta el echo de los emits propios.
-  useCheckinResultRelay({
-    onCheckin: (ev) => {
-      const fb = eventToFeedback(ev);
-      setFeedback(fb);
-      announceTone(fb);
-    },
-    onNoMatch: () => {
-      const fb: FeedbackState = { kind: "denied_not_found" };
-      setFeedback(fb);
-      announceTone(fb);
+      // Fallo operacional del sidecar (helper caído a media identificación).
+      // El banner de lector ya refleja el estado vía /biometric/status; no
+      // duplicamos aquí.
     },
   });
 
@@ -307,7 +277,7 @@ export default function KioskPage() {
           >
             {t.page.todayCount(count.data?.count_today ?? 0)}
           </div>
-          {readerConnected === false && (
+          {readerMissing && (
             <div className="text-xs text-warning bg-warning/10 px-2 py-1 rounded-md font-medium">
               {t.reader.disconnectedBanner}
             </div>

@@ -193,6 +193,8 @@ function CaptureStep({
               ? t.fingerprint.errorReader
               : error === "capture"
               ? t.fingerprint.errorCapture
+              : error === "timeout"
+              ? t.fingerprint.errorTimeout
               : t.fingerprint.errorGeneric}
           </AlertDescription>
         </Alert>
@@ -229,9 +231,8 @@ function CaptureStep({
             ? ""
             : t.fingerprint.instruction}
         </p>
-        {/* Counter is meaningful only when the flow does multi-sample
-            averaging (>1 placement). The current single-shot enroll
-            hides it to avoid the awkward "Capturas: 1 de 1" line. */}
+        {/* La sesión de enroll del sidecar pide `required_samples`
+            dedazos (hoy 3); con total 1 el contador sería ruido. */}
         {total > 1 && (
           <p className="text-2xl font-bold tabular-nums">{t.fingerprint.capturesLabel(done, total)}</p>
         )}

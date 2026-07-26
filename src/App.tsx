@@ -14,7 +14,7 @@ import { router } from "@/routes";
 import { queryClient } from "@/lib/queryClient";
 import { setOnPlanRequired, setOnSubscriptionInactive } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { BiometricStreamProvider } from "@/lib/biometricStreamProvider";
+import { BiometricEventsProvider } from "@/lib/biometricEventsProvider";
 
 function Bootstrapped() {
   useHydrateAuth();
@@ -69,16 +69,15 @@ export default function App() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          {/* BiometricStreamProvider: owner único del stream del lector
-              en esta ventana. alwaysOn se infiere por window label
-              (kiosk → true; main → false, sólo cuando hay subscribers).
-              Vivir aquí (por encima del router) hace que el stream
-              sobreviva navegación entre rutas. */}
-          <BiometricStreamProvider>
+          {/* BiometricEventsProvider: la conexión SSE a /biometric/events
+              de esta ventana (el sidecar es dueño del lector; el FE sólo
+              escucha). Vivir aquí (por encima del router) hace que el
+              stream sobreviva navegación entre rutas. */}
+          <BiometricEventsProvider>
             <DevModeBanner />
             {state === "ready" ? <Bootstrapped /> : <SidecarFailed state={state} />}
             <Toaster />
-          </BiometricStreamProvider>
+          </BiometricEventsProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ErrorBoundary>

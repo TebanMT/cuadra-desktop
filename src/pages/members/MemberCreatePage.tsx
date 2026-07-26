@@ -212,10 +212,10 @@ export default function MemberCreatePage() {
 }
 
 // FingerprintStage — captura inline de huella tras inscribir un socio.
-// Reusa useRegisterFingerprint del detail flow (mismo polling, mismo
-// AbortController). Sin paso de consent — decisión explícita: el flujo
-// post-inscripción debe ser rápido y sin fricción adicional. El operador
-// siempre puede saltar.
+// Reusa useRegisterFingerprint del detail flow (misma sesión de enroll del
+// sidecar + progreso por SSE). Sin paso de consent — decisión explícita: el
+// flujo post-inscripción debe ser rápido y sin fricción adicional. El
+// operador siempre puede saltar.
 //
 // Caso "lector desconectado": no escondemos el stage; mostramos un hint
 // para que el operador conecte el cable. El status de biometric se
@@ -315,6 +315,8 @@ function FingerprintStage({ memberId, memberName, number, dispatch, onDone }: Fi
               ? ct.fingerprint.errorReader
               : progress.error === "capture"
               ? ct.fingerprint.errorCapture
+              : progress.error === "timeout"
+              ? ct.fingerprint.errorTimeout
               : ct.fingerprint.errorGeneric}
           </AlertDescription>
         </Alert>
@@ -346,7 +348,7 @@ function FingerprintStage({ memberId, memberName, number, dispatch, onDone }: Fi
           {noReader
             ? ct.fingerprint.errorReader
             : progress.status === "capturing"
-            ? ct.fingerprint.capturing(progress.captures_done + 1)
+            ? ct.fingerprint.processing
             : progress.status === "waiting"
             ? ct.fingerprint.waitingPlace
             : success

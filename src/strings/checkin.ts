@@ -38,6 +38,9 @@ export const checkin = {
     deniedInactive: "Socio inactivo. Pasa con recepción.",
     deniedNoMembership: "Sin membresía activa. Pasa con recepción.",
     deniedNotFound: "No encontré a este socio. Vuelve a intentar.",
+    // Dedazo de mala calidad (sample_rejected del sidecar): no es un
+    // rechazo de acceso, sólo "inténtalo de nuevo".
+    sampleRejected: "No se leyó bien la huella. Vuelve a apoyar el dedo.",
     overrideBadge: "Permitido por operador",
     expiryPill: (date: string) => `Vence: ${date}`,
   },
@@ -124,6 +127,9 @@ export const checkin = {
     autoStartHint: "Empezará automáticamente cuando conectes el lector.",
     errorReader: "No detecto el lector de huella. Conéctalo y vuelve a intentar.",
     errorCapture: "No pude leer bien tu huella. Intenta otra vez.",
+    // La sesión de enroll del sidecar expira a los 60s sin completar las
+    // lecturas — distinto de una lectura fallida.
+    errorTimeout: "Se acabó el tiempo para capturar la huella. Vuelve a intentar.",
     errorGeneric: "No pudimos registrar la huella. Vuelve a intentar.",
     errorCollision: (name: string) => `Esta huella ya está registrada para ${name}.`,
     seeExisting: (name: string) => `Ver perfil de ${name}`,
