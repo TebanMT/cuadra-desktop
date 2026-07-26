@@ -11,10 +11,13 @@ misma política ahora).
 
 - [ ] **Tag de core v1.0.15** sobre main (el merge de PR #29, paso 3 del
       sidecar — commit `3863c19`). `TINTA_CORE_REF` ya lo pinea en los
-      workflows; sin el tag, el checkout del sidecar falla.
+      workflows; sin el tag, el checkout del sidecar falla. El tag ya
+      está creado LOCALMENTE (26-jul); falta el push — **ojo:** el
+      release.yml de cuadra-core se dispara con tags `v*`, así que el
+      push también DESPLIEGA el cloud con todo lo mergeado desde v1.0.14.
 
       ```bash
-      cd ../cuadra-core && git tag v1.0.15 3863c19 && git push origin v1.0.15
+      cd ../cuadra-core && git push origin v1.0.15
       ```
 
 - [x] Release `tinta-bio-v0.1.0` publicado en cuadra-core con
@@ -22,12 +25,13 @@ misma política ahora).
 - [x] RTE en R2: `https://dl.entinta.app/vendor/hid/dp-bio-rte-3.6.1-x64.zip`
       (SHA256 `C9B35841…D978F` verificado end-to-end contra el dominio
       público; pineado en `installer-hooks.nsh`).
-- [ ] PR de esta rama (`feat/installer-tinta-bio`) mergeado.
+- [x] PR de esta rama (`feat/installer-tinta-bio`) mergeado (PR #17,
+      main `e80d294`).
 
 ## 1. Build SIN publicar el update (validar antes de que nadie actualice)
 
 **NO pushear el tag `v1.1.0` directo**: el push del tag registra el
-manifest con rollout 100 y TODOS los gyms en 1.0.15 actualizan en
+manifest con rollout 100 y TODOS los gyms en ≤1.0.16 actualizan en
 minutos, antes de validar. Para esta migración (installer radicalmente
 distinto) el orden es:
 
@@ -47,7 +51,7 @@ distinto) el orden es:
 
 La PC de recepción que se comió toda la saga del Lite Client (el install
 rodado atrás 7336428 + registro huérfano + DpHostW). Es a la vez el mejor
-test del **upgrade path** (tiene Tinta 1.0.15 + ADC instalados) y del
+test del **upgrade path** (tiene Tinta ≤1.0.16 + ADC instalados) y del
 retiro del stack viejo.
 
 ### 2.1 Instalación / migración
@@ -139,10 +143,10 @@ sin internet).
 
 ## 4. Rollback (si la prueba de fuego falla)
 
-- Instalar `https://dl.entinta.app/desktop/v1.0.15/Tinta-Setup.exe`
+- Instalar `https://dl.entinta.app/desktop/v1.0.16/Tinta-Setup.exe`
   encima (downgrade limpio: el installer viejo re-instala el Lite Client
   que este hook retiró; el registro del manifest de 1.1.0 aún no existe,
   así que ningún otro gym se entera).
-- Los FMDs enrolados con 1.1.0 NO sirven en 1.0.15 (formato
+- Los FMDs enrolados con 1.1.0 NO sirven en 1.0.16 (formato
   `fmd_xml_b64` vs template NBIS) — en el gym piloto hoy no hay
   enrolados en producción, por eso el clean break es ahora.

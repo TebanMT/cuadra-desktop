@@ -76,7 +76,7 @@
 !define TINTA_RTE_TEMP_PS1 "$TEMP\tinta-dp-rte-fetch.ps1"
 !define TINTA_RTE_MSI_LOG "$TEMP\tinta-dp-rte-msi.log"
 
-; ─── Migración: retiro del Lite Client (Tinta ≤ v1.0.15) ────────────────────
+; ─── Migración: retiro del Lite Client (Tinta ≤ v1.0.16) ────────────────────
 ; Las PCs que actualizan desde el stack viejo tienen el HID Authentication
 ; Device Client instalado y su servicio DpHost puede quedar corriendo con
 ; una sesión abierta al lector — eso bloquea el open EXCLUSIVE del motor

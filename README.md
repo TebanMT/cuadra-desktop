@@ -96,7 +96,7 @@ runtime instalado y el lector muere en `no_device` silencioso.
 
 Ya NO existen el HID Authentication Device Client ("Lite Client") ni el
 paso separado del driver: el hook los RETIRA — en PCs que actualizan desde
-Tinta ≤ v1.0.15 desinstala el Lite Client (o detiene + deshabilita su
+Tinta ≤ v1.0.16 desinstala el Lite Client (o detiene + deshabilita su
 servicio DpHost) porque su sesión con el lector bloquea el open EXCLUSIVE
 del motor nuevo (DEVICE_BUSY).
 
@@ -181,7 +181,7 @@ sin biometría; el `MessageBox` apunta al operador a la instalación manual
 2. Después de copiar los archivos de Tinta, el hook NSIS corre **cuatro
    pasos en secuencia**:
    - **Migración:** si existe el servicio `DpHost` (Lite Client, Tinta
-     ≤ v1.0.15), lo desinstala vía `msiexec /x <ProductCode del registro>`;
+     ≤ v1.0.16), lo desinstala vía `msiexec /x <ProductCode del registro>`;
      si falla, detiene + deshabilita el servicio. Sin esto el motor nuevo
      recibe DEVICE_BUSY al abrir el lector en EXCLUSIVE.
    - **¿RTE ya instalado?** ProductCode del MSI 3.6.1
@@ -268,7 +268,7 @@ Para test del modo "sin internet": desconectar la VM antes de correr el
 setup, observar que el `MessageBox` claro aparece y que Tinta arranca igual.
 
 Para test del **upgrade path** (migración del Lite Client): instalar
-primero un Tinta ≤ v1.0.15 (deja el ADC + DpHost), luego el nuevo setup.
+primero un Tinta ≤ v1.0.16 (deja el ADC + DpHost), luego el nuevo setup.
 Esperado: "Retirando el soporte anterior del lector..." y al final
 `Get-Service DpHost` vacío (desinstalado) o `Stopped`+`Disabled`.
 
