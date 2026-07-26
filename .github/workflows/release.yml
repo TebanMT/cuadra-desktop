@@ -7,7 +7,7 @@
 #
 # Flujo (un tag `v1.2.3` dispara todo):
 #   1. release-windows  → build firmado ed25519 (sidecar de core pineado +
-#                         NBIS) → .sig de los bundles → artifacts.
+#                         tinta-bio) → .sig de los bundles → artifacts.
 #   2. build-macos      → DMG arm64 + x86_64 (SOLO para descarga; NO entra al
 #                         manifest del updater — mac deferido, ADR-005 §3.2).
 #   3. publish          → sube TODO a R2 (dl.entinta.app) + registra el manifest
@@ -99,14 +99,15 @@ env:
   # el desktop, o pásalo en el input core_ref del workflow_dispatch. "main" =
   # siempre el último commit (cómodo, pero NO reproducible). El SHA exacto que
   # se bundlee queda en el log del step "Checkout tinta-core".
-  TINTA_CORE_REF: v1.0.14
+  TINTA_CORE_REF: v1.0.15
   GO_VERSION: "1.25"
   NODE_VERSION: "20"
   RUST_TOOLCHAIN: "stable"
-  # Release tag de cuadra-core con los binarios NBIS Windows (mindtct.exe +
-  # bozorth3.exe) que el sidecar invoca como subprocess. Bumpear sólo cuando se
-  # publique un release NBIS nuevo — cambian rara vez.
-  NBIS_VERSION: nbis-v1
+  # Release tag de cuadra-core con el motor biométrico tinta-bio.exe (helper
+  # C#/.NET 8 que el sidecar spawnea — protocolo NDJSON stdio). Se publica
+  # desde cuadra-core/.github/workflows/build-tinta-bio-windows.yml al pushear
+  # un tag `tinta-bio-v*`. Bumpear acá cuando salga release nuevo del helper.
+  TINTA_BIO_RELEASE_TAG: tinta-bio-v0.1.0
 
 jobs:
   # ─────────────────────────────────────────────────────────────────────
@@ -195,12 +196,17 @@ jobs:
       - name: Install frontend deps
         run: pnpm install --frozen-lockfile
 
-      - name: Download NBIS binaries
+      - name: Download tinta-bio (motor biométrico)
+        # El release vive en cuadra-core (repo privado DISTINTO) → el
+        # GITHUB_TOKEN del runner no lo lee; se reusa el PAT TINTA_CORE_TOKEN
+        # del checkout del sidecar. Tauri lo bundlea vía bundle.resources
+        # (overlay tauri.windows.conf.json) al lado del sidecar, donde
+        # engine.resolvePath lo spawnea.
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NBIS_VERSION: ${{ env.NBIS_VERSION }}
+          GH_TOKEN: ${{ secrets.TINTA_CORE_TOKEN }}
+          TINTA_BIO_RELEASE_TAG: ${{ env.TINTA_BIO_RELEASE_TAG }}
         shell: bash
-        run: bash scripts/prepare-nbis-windows.sh
+        run: bash scripts/prepare-tinta-bio-windows.sh
 
       # ───────────────────────────────────────────────────────────────────
       # Authenticode (firma del SO, anti-SmartScreen) — OPCIONAL y deferido.
@@ -222,7 +228,7 @@ jobs:
         # cuando TAURI_SIGNING_PRIVATE_KEY está en env Y
         # bundle.createUpdaterArtifacts=true en tauri.conf.json. Esa firma es lo
         # que el manifest del cloud distribuye y el plugin updater verifica.
-        # El overlay tauri.windows.conf.json agrega los externalBin de NBIS.
+        # El overlay tauri.windows.conf.json agrega tinta-bio.exe como resource.
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

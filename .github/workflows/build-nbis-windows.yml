@@ -1,3 +1,10 @@
+# ⚠️ ARCHIVADO (jul-2026, ADR-004-quater) — SIN CONSUMIDORES.
+# El matcher NBIS fue reemplazado por el motor nativo tinta-bio (FingerJet,
+# cuadra-core tools/tinta-bio). prepare-nbis-windows.sh ya no existe y ningún
+# workflow consume los releases `nbis-v*`. Se conserva sólo como referencia
+# histórica del build MSYS2/MinGW; borrable cuando el rollout del motor
+# nativo esté consolidado.
+#
 # Compila los binarios NBIS (mindtct + bozorth3) para Windows x86_64 y los
 # publica como release artifacts de este mismo repo (cuadra-desktop). El
 # sidecar Go del desktop los invoca como subprocess (ADR-004-bis): mindtct

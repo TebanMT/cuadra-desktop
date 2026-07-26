@@ -16,7 +16,7 @@ src-tauri/target
 src-tauri/tinta-sidecar-*
 src-tauri/cuadra-sidecar-*
 src-tauri/binaries/*sidecar*
-src-tauri/binaries/nbis/
+src-tauri/binaries/tinta-bio/
 src-tauri/Cargo.lock
 
 # Logs
