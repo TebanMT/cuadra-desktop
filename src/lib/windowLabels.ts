@@ -11,8 +11,8 @@
 //                   operador sigue trabajando en la main.
 //
 // kiosk y checkin-float son mutuamente excluyentes (configuraciones
-// físicas distintas); ambos corren su stream biométrico alwaysOn — la
-// inferencia por label vive en biometricStreamProvider.tsx.
+// físicas distintas): ambos son superficies del socio que pintan y suenan
+// los resultados de check-in que llegan por SSE del sidecar.
 export const MAIN_WINDOW_LABEL = "main";
 export const KIOSK_WINDOW_LABEL = "kiosk";
 export const CHECKIN_FLOAT_WINDOW_LABEL = "checkin-float";

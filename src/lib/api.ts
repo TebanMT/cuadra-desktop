@@ -126,11 +126,26 @@ export function setOnPlanRequired(
   onPlanRequired = handler;
 }
 
+// getAuthedRequestContext expone base URL + headers de auth para consumidores
+// que hablan con el sidecar FUERA de rawRequest — hoy, el cliente SSE de
+// biometricEvents.ts (fetch+ReadableStream, porque EventSource no puede
+// mandar Authorization). Mismo Bearer + X-Local-Token que el resto de la API.
+export async function getAuthedRequestContext(): Promise<{
+  baseUrl: string;
+  headers: Record<string, string>;
+}> {
+  const { baseUrl, localToken } = await boot();
+  const headers: Record<string, string> = { "X-Local-Token": localToken };
+  const token = await getAccessToken();
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  return { baseUrl, headers };
+}
+
 // refreshInFlight coalesces concurrent refresh attempts so a burst of 401s
 // only triggers one POST /auth/refresh.
 let refreshInFlight: Promise<string | null> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
+export async function refreshAccessToken(): Promise<string | null> {
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     const refresh = await secureStorageGet(REFRESH_TOKEN_KEY);

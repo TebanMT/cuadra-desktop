@@ -17,17 +17,19 @@ import {
   type CheckinEvent,
 } from "@/hooks/useCheckin";
 import {
-  useBiometricCheckinLoop,
+  useBiometricCheckinFeed,
   useBiometricStatus,
-  useReaderConnected,
+  useReaderMissing,
 } from "@/hooks/useBiometric";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { openKioskWindow } from "@/lib/kioskWindow";
 import { openCheckinFloatWindow } from "@/lib/floatWindow";
 import { useWindowPresence } from "@/hooks/useWindowPresence";
-import { emitCheckinResult } from "@/hooks/useCheckinResultRelay";
-import { KIOSK_WINDOW_LABEL } from "@/lib/windowLabels";
+import {
+  CHECKIN_FLOAT_WINDOW_LABEL,
+  KIOSK_WINDOW_LABEL,
+} from "@/lib/windowLabels";
 import { useCheckinFeedbackSettings } from "@/hooks/useGym";
 import { checkin as t } from "@/strings/checkin";
 
@@ -36,14 +38,15 @@ type Method = "fingerprint" | "number" | "manual";
 export default function CheckinPage() {
   const operator = useAuthStore((s) => s.user);
   const kioskOpen = useWindowPresence(KIOSK_WINDOW_LABEL);
+  const floatOpen = useWindowPresence(CHECKIN_FLOAT_WINDOW_LABEL);
   const bio = useBiometricStatus();
-  const readerConnected = useReaderConnected();
+  const readerMissing = useReaderMissing();
   const methods = useCheckinMethods();
   const recents = useRecentCheckins();
 
-  // Sidecar matcher ready + physical scanner plugged in. Mirror del kiosk.
-  const fingerprintAvailable =
-    !!bio.data?.available && readerConnected === true;
+  // available = helper tinta-bio vivo + lector conectado, directo del
+  // sidecar (dueño único del hardware). Ya no hay probe del JS SDK.
+  const fingerprintAvailable = !!bio.data?.available;
   const numberAvailable = methods.data?.number_available ?? false;
 
   const initialMethod: Method = fingerprintAvailable ? "fingerprint" : numberAvailable ? "number" : "manual";
@@ -85,11 +88,18 @@ export default function CheckinPage() {
   // auto-fade after a result is shown
   useAutoFade(feedback, { ttlMs, onExpire: reset });
 
-  function announce(ev: CheckinEvent) {
+  // Con kiosko o flotante abiertos, el TONO del resultado de huella lo pone
+  // esa superficie (el SSE le llega igual que a nosotros) — aquí sólo se
+  // pinta. Manual y número no viajan por SSE, así que conservan su tono
+  // siempre (la superficie dedicada no se entera de ellos).
+  const dedicatedSurfaceOpen = kioskOpen || floatOpen;
+
+  function announce(ev: CheckinEvent, withTone = true) {
     const fb = eventToFeedback(ev);
     setFeedback(fb);
     setLastEvent(ev);
     recents.prepend(ev);
+    if (!withTone) return;
     const tone = feedbackTone(fb.kind);
     if (tone === "success") playCheckinTone("success", volume);
     else if (tone === "warning") playCheckinTone("warning", volume);
@@ -99,28 +109,18 @@ export default function CheckinPage() {
   const checkinManual = useCheckinManual();
   const checkinByNumber = useCheckinByNumber();
 
-  // Fingerprint capture vive en el frontend (ADR-004-bis). El JS SDK fire
-  // un sample por dedazo; el hook lo POST-ea a /biometric/checkin y
-  // devuelve el match real (announce) o un no-match (feedback denied sin
-  // tocar la lista de recientes).
-  //
-  // En esta ruta ESTA página es dueña del loop de la ventana main — el
-  // GlobalCheckinScanner se apaga en /checkin para que la misma huella no
-  // registre dos check-ins (el provider multiplexa samples a todos los
-  // subscribers de la ventana). Cada resultado de huella se emite al relay
-  // para que la flotante/kiosko lo pinten al socio si están abiertos.
-  useBiometricCheckinLoop({
-    enabled: fingerprintAvailable,
+  // La captura vive en el sidecar (motor tinta-bio): cada dedazo se
+  // identifica y registra allá, y el resultado llega por SSE. Esta página
+  // sólo pinta. El GlobalCheckinScanner se apaga en /checkin para que el
+  // mismo evento no salga además como toast en esta misma ventana.
+  useBiometricCheckinFeed({
     onAttempt: () => setFeedback({ kind: "processing" }),
-    onCheckin: (ev) => {
-      announce(ev);
-      void emitCheckinResult({ kind: "checkin", event: ev });
-    },
+    onCheckin: (ev) => announce(ev, !dedicatedSurfaceOpen),
     onNoMatch: () => {
       setFeedback({ kind: "denied_not_found" });
-      playCheckinTone("denied", volume);
-      void emitCheckinResult({ kind: "no_match" });
+      if (!dedicatedSurfaceOpen) playCheckinTone("denied", volume);
     },
+    onSampleRejected: () => setFeedback({ kind: "sample_rejected" }),
   });
 
   async function handleManualSelect(memberId: string) {
@@ -275,7 +275,7 @@ export default function CheckinPage() {
 
       <footer className="border-t border-border px-6 py-2 flex items-center justify-between text-xs text-muted-foreground">
         <span>{operator?.full_name ? t.page.operator(operator.full_name) : ""}</span>
-        {bio.data && !bio.data.connected && (
+        {readerMissing && (
           <span className="text-warning">{t.reader.disconnectedBanner}</span>
         )}
       </footer>

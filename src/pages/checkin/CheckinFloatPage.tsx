@@ -11,14 +11,15 @@ import {
   type FeedbackTone,
 } from "@/components/checkin/CheckinFeedback";
 import {
-  useBiometricCheckinLoop,
+  useBiometricCheckinFeed,
   useBiometricStatus,
-  useReaderConnected,
 } from "@/hooks/useBiometric";
-import { useCheckinResultRelay } from "@/hooks/useCheckinResultRelay";
 import { useWindowPresence } from "@/hooks/useWindowPresence";
 import { useCheckinFeedbackSettings } from "@/hooks/useGym";
-import { useBiometricStreamStatus } from "@/lib/biometricStreamProvider";
+import {
+  useBiometricEnrolling,
+  useBiometricLive,
+} from "@/lib/biometricEventsProvider";
 import { playCheckinTone, unlockAudio } from "@/lib/audio";
 import { closeCurrentWindow } from "@/lib/kioskWindow";
 import { saveFloatWindowPosition } from "@/lib/floatWindow";
@@ -36,12 +37,10 @@ import type { CheckinEvent } from "@/hooks/useCheckin";
 // veredicto aunque el operador esté a media venta en la ventana principal.
 //
 // Decisiones clave:
-//   - El Lite Client entrega los samples a la ventana CON FOCO (verificado
-//     en gym piloto, 6-jul-2026). Como el operador casi siempre tiene el
-//     foco en la main, es la MAIN quien procesa el check-in y nos lo relaya
-//     (useCheckinResultRelay); esta ventana lo pinta y pone el tono. El
-//     loop propio existe para el caso en que ESTA ventana tenga el foco
-//     (recién abierta, o el operador la movió) — ahí procesamos nosotros.
+//   - Los resultados llegan por SSE del sidecar (motor tinta-bio) a TODAS
+//     las ventanas por igual — ya no existe el ruteo-por-foco del Lite
+//     Client ni el relay entre ventanas. Esta ventana pinta y pone el tono;
+//     la main, sabiendo que estamos abiertos, sólo toastea.
 //   - El resultado queda visible y luego REGRESA a "Esperando huella…" —
 //     sin el regreso a idle, el siguiente socio se acercaba al mostrador y
 //     veía el veredicto del anterior (feedback del piloto, 6-jul-2026). La
@@ -52,10 +51,10 @@ import type { CheckinEvent } from "@/hooks/useCheckin";
 //     teclado físico al operador a media venta (los dígitos del socio
 //     caerían en el formulario que el operador tenga abierto). El número
 //     de socio sigue viviendo en CheckinPage y en el kiosko.
-//   - paused_by_enroll se muestra explícito: durante un registro de huella
-//     el provider pausa el stream; sin este estado la ventana se vería
-//     congelada justo frente al socio. La reanudación es sola (backoff del
-//     provider) — no hay botón de reconectar.
+//   - "Registrando huella…" se muestra explícito: durante una sesión de
+//     enroll el sidecar pausa el check-in; sin este estado la ventana se
+//     vería congelada justo frente al socio. La reanudación es sola (el
+//     enroll termina o expira) — no hay botón de reconectar.
 
 // Tinte de fondo por tono — versión compacta de la semántica del kiosko.
 // El socio lee el color desde lejos antes que el texto.
@@ -89,12 +88,12 @@ interface LastResult {
 
 export default function CheckinFloatPage() {
   const bio = useBiometricStatus();
-  const readerConnected = useReaderConnected();
-  const streamStatus = useBiometricStreamStatus();
+  const live = useBiometricLive();
+  const enrolling = useBiometricEnrolling();
   const kioskPresent = useWindowPresence(KIOSK_WINDOW_LABEL);
 
-  const fingerprintAvailable =
-    !!bio.data?.available && readerConnected === true;
+  // available = helper tinta-bio vivo + lector conectado, según el sidecar.
+  const fingerprintAvailable = !!bio.data?.available;
 
   // Duración del veredicto + volumen del tono — knobs del dueño en
   // Ajustes → Perfil del gym, compartidos con el kiosko.
@@ -102,6 +101,9 @@ export default function CheckinFloatPage() {
 
   const [processing, setProcessing] = useState(false);
   const [last, setLast] = useState<LastResult | null>(null);
+  // Hint transitorio de "vuelve a apoyar el dedo" (sample_rejected del
+  // sidecar). Se limpia solo; cualquier intento/resultado nuevo lo pisa.
+  const [sampleHint, setSampleHint] = useState(false);
 
   // Regreso a idle tras el TTL configurado. Cada resultado nuevo re-arma
   // el timer (dependencia en `last`); al expirar vuelve la animación de
@@ -111,6 +113,13 @@ export default function CheckinFloatPage() {
     const id = window.setTimeout(() => setLast(null), ttlMs);
     return () => window.clearTimeout(id);
   }, [last, ttlMs]);
+
+  // El hint de sample_rejected caduca con el mismo knob del veredicto.
+  useEffect(() => {
+    if (!sampleHint) return;
+    const id = window.setTimeout(() => setSampleHint(false), ttlMs);
+    return () => window.clearTimeout(id);
+  }, [sampleHint, ttlMs]);
 
   // Lock de scroll — misma razón que el kiosko: la ventana es un appliance,
   // no una página.
@@ -172,9 +181,8 @@ export default function CheckinFloatPage() {
     else if (tone === "denied") playCheckinTone("denied", volume);
   }
 
-  // Pintar un resultado + tono — mismo camino para los check-ins que esta
-  // ventana procesó (loop propio, cuando tuvo el foco) y para los que la
-  // main procesó y nos relaya. El socio no distingue quién posteó.
+  // Pintar un resultado + tono. Esta es la superficie del socio: el tono lo
+  // pone ella (la main, sabiendo que estamos abiertos, sólo toastea).
   function showCheckin(ev: CheckinEvent) {
     const fb = eventToFeedback(ev);
     const when = new Date(ev.created_at);
@@ -184,6 +192,7 @@ export default function CheckinFloatPage() {
       at: format(Number.isNaN(when.getTime()) ? new Date() : when, "HH:mm"),
     });
     setProcessing(false);
+    setSampleHint(false);
     announceTone(fb);
   }
 
@@ -191,36 +200,35 @@ export default function CheckinFloatPage() {
     const fb: FeedbackState = { kind: "denied_not_found" };
     setLast({ feedback: fb, memberId: null, at: format(new Date(), "HH:mm") });
     setProcessing(false);
+    setSampleHint(false);
     announceTone(fb);
   }
 
-  // Loop propio — sólo recibe samples cuando ESTA ventana tiene el foco
-  // (enrutamiento por foco del Lite Client). Se apaga si el kiosko está
-  // abierto (exclusión mutua) o si no hay lector utilizable.
-  useBiometricCheckinLoop({
-    enabled: fingerprintAvailable && !kioskPresent,
-    onAttempt: () => setProcessing(true),
+  // Feed SSE del sidecar — todas las ventanas reciben todo; nos callamos
+  // sólo si el kiosko está abierto (exclusión mutua: él es la superficie
+  // del socio y pone tono — dos superficies sonando sería doble feedback).
+  useBiometricCheckinFeed({
+    enabled: !kioskPresent,
+    onAttempt: () => {
+      setSampleHint(false);
+      setProcessing(true);
+    },
     onCheckin: showCheckin,
     onNoMatch: showNoMatch,
+    onSampleRejected: () => {
+      setProcessing(false);
+      setSampleHint(true);
+    },
     onError: () => {
       // El header ya refleja el estado del lector vía el dot + el estado
-      // "lector desconectado" del body; un sample fallido no borra el
+      // "lector desconectado" del body; un fallo puntual no borra el
       // último resultado.
       setProcessing(false);
     },
   });
 
-  // Resultados procesados por la main (o el kiosko) — el camino NORMAL en
-  // operación real: el operador tiene el foco en la main, la main postea y
-  // esta ventana sólo exhibe. Esta ventana no emite nada (vive en la misma
-  // pantalla del operador), así que no hay echo que filtrar aquí, pero el
-  // hook lo hace de todos modos por si eso cambia.
-  useCheckinResultRelay({
-    onCheckin: showCheckin,
-    onNoMatch: showNoMatch,
-  });
-
-  const readerDotOn = streamStatus === "running";
+  // Dot verde = stream SSE vivo Y lector conectado según el sidecar.
+  const readerDotOn = live && !!bio.data?.connected;
 
   return (
     // unlockAudio en pointer/keydown: el AudioContext del webview puede
@@ -267,9 +275,10 @@ export default function CheckinFloatPage() {
       <main className="min-h-0 flex-1">
         <FloatBody
           kioskPresent={kioskPresent}
-          pausedByEnroll={streamStatus === "paused_by_enroll"}
+          pausedByEnroll={enrolling}
           fingerprintAvailable={fingerprintAvailable}
           processing={processing}
+          sampleHint={sampleHint}
           last={last}
         />
       </main>
@@ -278,21 +287,23 @@ export default function CheckinFloatPage() {
 }
 
 // Estado del cuerpo por prioridad: kiosko activo > pausa por enroll >
-// lector caído > identificando > último resultado > esperando huella.
-// La pausa por enroll gana sobre el resultado viejo a propósito: es el
-// estado que evita que la ventana se vea "congelada" frente al socio
-// mientras recepción registra una huella nueva.
+// lector caído > identificando > vuelve-a-apoyar > último resultado >
+// esperando huella. La pausa por enroll gana sobre el resultado viejo a
+// propósito: es el estado que evita que la ventana se vea "congelada"
+// frente al socio mientras recepción registra una huella nueva.
 function FloatBody({
   kioskPresent,
   pausedByEnroll,
   fingerprintAvailable,
   processing,
+  sampleHint,
   last,
 }: {
   kioskPresent: boolean;
   pausedByEnroll: boolean;
   fingerprintAvailable: boolean;
   processing: boolean;
+  sampleHint: boolean;
   last: LastResult | null;
 }) {
   if (kioskPresent) {
@@ -332,6 +343,15 @@ function FloatBody({
       <CenteredState
         icon={<Loader2 className="h-9 w-9 animate-spin" />}
         title={t.feedback.processing}
+      />
+    );
+  }
+  if (sampleHint) {
+    return (
+      <CenteredState
+        tone="warning"
+        icon={<Fingerprint className="h-9 w-9" strokeWidth={1.4} />}
+        title={t.feedback.sampleRejected}
       />
     );
   }

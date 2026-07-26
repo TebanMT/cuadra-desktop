@@ -3,23 +3,33 @@ import { render, screen, act } from "@testing-library/react";
 import type { CheckinEvent } from "@/hooks/useCheckin";
 
 // ── mocks de todo el I/O: la página se prueba como máquina de estados ──
-interface LoopOpts {
-  enabled: boolean;
+interface FeedOpts {
+  enabled?: boolean;
   onAttempt?(): void;
   onCheckin(ev: CheckinEvent): void;
   onNoMatch?(): void;
-  onError?(code: string): void;
+  onSampleRejected?(): void;
+  onError?(message?: string): void;
 }
-let loopOpts: LoopOpts | null = null;
+let feedOpts: FeedOpts | null = null;
 let bioAvailable = true;
-let readerConnected: boolean | null = true;
+let bioConnected = true;
 
 vi.mock("@/hooks/useBiometric", () => ({
-  useBiometricStatus: () => ({ data: { available: bioAvailable, connected: true } }),
-  useReaderConnected: () => readerConnected,
-  useBiometricCheckinLoop: (opts: LoopOpts) => {
-    loopOpts = opts;
+  useBiometricStatus: () => ({
+    data: { available: bioAvailable, connected: bioConnected },
+  }),
+  useBiometricCheckinFeed: (opts: FeedOpts) => {
+    feedOpts = opts;
   },
+}));
+
+// Estado del provider SSE — dot del header + pausa por enroll.
+let sseLive = true;
+let enrolling = false;
+vi.mock("@/lib/biometricEventsProvider", () => ({
+  useBiometricLive: () => sseLive,
+  useBiometricEnrolling: () => enrolling,
 }));
 
 let kioskPresent = false;
@@ -34,26 +44,6 @@ let mockTtlMs = 10_000;
 let mockVolume = 0.8;
 vi.mock("@/hooks/useGym", () => ({
   useCheckinFeedbackSettings: () => ({ ttlMs: mockTtlMs, volume: mockVolume }),
-}));
-
-// Relay entre ventanas — capturamos los handlers para simular resultados
-// que la main procesó (el camino normal: el Lite Client enruta el sample
-// a la ventana con foco, que casi siempre es la main).
-interface RelayOpts {
-  onCheckin(ev: CheckinEvent): void;
-  onNoMatch(): void;
-}
-let relayOpts: RelayOpts | null = null;
-vi.mock("@/hooks/useCheckinResultRelay", () => ({
-  useCheckinResultRelay: (opts: RelayOpts) => {
-    relayOpts = opts;
-  },
-  emitCheckinResult: vi.fn(async () => {}),
-}));
-
-let streamStatus = "running";
-vi.mock("@/lib/biometricStreamProvider", () => ({
-  useBiometricStreamStatus: () => streamStatus,
 }));
 
 const playCheckinTone = vi.fn();
@@ -93,49 +83,49 @@ function makeEvent(overrides: Partial<CheckinEvent> = {}): CheckinEvent {
 
 describe("CheckinFloatPage", () => {
   beforeEach(() => {
-    loopOpts = null;
-    relayOpts = null;
+    feedOpts = null;
     mockTtlMs = 10_000;
     mockVolume = 0.8;
     bioAvailable = true;
-    readerConnected = true;
+    bioConnected = true;
+    sseLive = true;
+    enrolling = false;
     kioskPresent = false;
-    streamStatus = "running";
     playCheckinTone.mockClear();
     closeCurrentWindow.mockClear();
   });
 
-  it("en idle muestra 'Esperando huella…' con el loop habilitado", () => {
+  it("en idle muestra 'Esperando huella…' con el feed habilitado", () => {
     render(<CheckinFloatPage />);
     expect(screen.getByText(t.float.waiting)).toBeInTheDocument();
-    expect(loopOpts?.enabled).toBe(true);
+    expect(feedOpts?.enabled).toBe(true);
   });
 
-  it("con el kiosko abierto se bloquea y APAGA su loop (exclusión mutua)", () => {
+  it("con el kiosko abierto se bloquea y APAGA su feed (exclusión mutua)", () => {
     kioskPresent = true;
     render(<CheckinFloatPage />);
     expect(screen.getByText(t.float.kioskActiveTitle)).toBeInTheDocument();
     expect(screen.getByText(t.float.kioskActiveBody)).toBeInTheDocument();
-    expect(loopOpts?.enabled).toBe(false);
+    expect(feedOpts?.enabled).toBe(false);
   });
 
   it("muestra la pausa por enroll de forma explícita (no ventana 'congelada')", () => {
-    streamStatus = "paused_by_enroll";
+    enrolling = true;
     render(<CheckinFloatPage />);
     expect(screen.getByText(t.float.enrollPauseTitle)).toBeInTheDocument();
     expect(screen.getByText(t.float.enrollPauseBody)).toBeInTheDocument();
   });
 
   it("sin lector utilizable avisa 'lector desconectado'", () => {
-    readerConnected = false;
+    bioAvailable = false;
+    bioConnected = false;
     render(<CheckinFloatPage />);
     expect(screen.getByText(t.float.readerDisconnected)).toBeInTheDocument();
-    expect(loopOpts?.enabled).toBe(false);
   });
 
   it("un check-in permitido pinta nombre + detalle en verde y suena success", () => {
     render(<CheckinFloatPage />);
-    act(() => loopOpts!.onCheckin(makeEvent()));
+    act(() => feedOpts!.onCheckin(makeEvent()));
     expect(screen.getByText("Ana López")).toBeInTheDocument();
     expect(screen.getByText(t.feedback.successActive(26))).toBeInTheDocument();
     expect(playCheckinTone).toHaveBeenCalledWith("success", 0.8);
@@ -144,7 +134,7 @@ describe("CheckinFloatPage", () => {
   it("membresía vencida pinta el detalle de denegado y suena denied", () => {
     render(<CheckinFloatPage />);
     act(() =>
-      loopOpts!.onCheckin(
+      feedOpts!.onCheckin(
         makeEvent({ result: "denied_expired", days_until_expiry: -3 }),
       ),
     );
@@ -156,7 +146,7 @@ describe("CheckinFloatPage", () => {
   it("por vencer pinta el detalle ámbar y suena warning", () => {
     render(<CheckinFloatPage />);
     act(() =>
-      loopOpts!.onCheckin(
+      feedOpts!.onCheckin(
         makeEvent({ result: "allowed_expiring_soon", days_until_expiry: 2 }),
       ),
     );
@@ -166,17 +156,44 @@ describe("CheckinFloatPage", () => {
 
   it("huella no reconocida muestra el no-match sin nombre", () => {
     render(<CheckinFloatPage />);
-    act(() => loopOpts!.onNoMatch!());
+    act(() => feedOpts!.onNoMatch!());
     expect(screen.getByText(t.float.noMatchTitle)).toBeInTheDocument();
     expect(screen.getByText(t.feedback.deniedNotFound)).toBeInTheDocument();
     expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
+  });
+
+  it("sample_rejected muestra 'vuelve a apoyar el dedo' SIN tono y expira solo", () => {
+    vi.useFakeTimers();
+    try {
+      render(<CheckinFloatPage />);
+      act(() => feedOpts!.onSampleRejected!());
+      expect(screen.getByText(t.feedback.sampleRejected)).toBeInTheDocument();
+      expect(playCheckinTone).not.toHaveBeenCalled();
+
+      act(() => {
+        vi.advanceTimersByTime(mockTtlMs + 500);
+      });
+      expect(screen.queryByText(t.feedback.sampleRejected)).not.toBeInTheDocument();
+      expect(screen.getByText(t.float.waiting)).toBeInTheDocument();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("un intento nuevo (attempt) limpia el hint de sample_rejected", () => {
+    render(<CheckinFloatPage />);
+    act(() => feedOpts!.onSampleRejected!());
+    expect(screen.getByText(t.feedback.sampleRejected)).toBeInTheDocument();
+    act(() => feedOpts!.onAttempt!());
+    expect(screen.queryByText(t.feedback.sampleRejected)).not.toBeInTheDocument();
+    expect(screen.getByText(t.feedback.processing)).toBeInTheDocument();
   });
 
   it("el resultado dura lo configurado y REGRESA a 'Esperando huella…'", async () => {
     vi.useFakeTimers();
     try {
       render(<CheckinFloatPage />);
-      act(() => loopOpts!.onCheckin(makeEvent()));
+      act(() => feedOpts!.onCheckin(makeEvent()));
 
       // Pasado el auto-fade del kiosko (3.5s) sigue visible — el punto de
       // la feature: el toast muere bajo modales, esta superficie no.
@@ -201,13 +218,13 @@ describe("CheckinFloatPage", () => {
     vi.useFakeTimers();
     try {
       render(<CheckinFloatPage />);
-      act(() => loopOpts!.onCheckin(makeEvent()));
+      act(() => feedOpts!.onCheckin(makeEvent()));
       act(() => {
         vi.advanceTimersByTime(8_000);
       });
       // Segundo socio antes de que expire el primero.
       act(() =>
-        loopOpts!.onCheckin(
+        feedOpts!.onCheckin(
           makeEvent({ member_id: "m-2", member_name: "Luis Ramos" }),
         ),
       );
@@ -235,7 +252,7 @@ describe("CheckinFloatPage", () => {
     vi.useFakeTimers();
     try {
       render(<CheckinFloatPage />);
-      act(() => loopOpts!.onCheckin(makeEvent()));
+      act(() => feedOpts!.onCheckin(makeEvent()));
       expect(screen.getByText("Ana López")).toBeInTheDocument();
 
       act(() => {
@@ -246,23 +263,6 @@ describe("CheckinFloatPage", () => {
     } finally {
       vi.useRealTimers();
     }
-  });
-
-  it("pinta con tono un resultado RELAYADO desde la main (el camino normal sin foco)", () => {
-    render(<CheckinFloatPage />);
-    act(() => relayOpts!.onCheckin(makeEvent()));
-
-    expect(screen.getByText("Ana López")).toBeInTheDocument();
-    expect(screen.getByText(t.feedback.successActive(26))).toBeInTheDocument();
-    expect(playCheckinTone).toHaveBeenCalledWith("success", 0.8);
-  });
-
-  it("pinta un no-match relayado desde la main", () => {
-    render(<CheckinFloatPage />);
-    act(() => relayOpts!.onNoMatch());
-
-    expect(screen.getByText(t.float.noMatchTitle)).toBeInTheDocument();
-    expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
   });
 
   it("el botón de cerrar propio cierra la ventana (no hay chrome del OS)", () => {

@@ -10,20 +10,16 @@ import {
 // ── mocks de todo el I/O: el scanner se prueba como wiring puro ────────
 // CheckinFeedback (eventToFeedback / feedbackTone / feedbackDetail) va SIN
 // mock a propósito: el toast debe decir exactamente lo mismo que el kiosko.
-interface LoopOpts {
-  enabled: boolean;
+interface FeedOpts {
+  enabled?: boolean;
   onCheckin(ev: CheckinEvent): void;
   onNoMatch?(): void;
 }
-let loopOpts: LoopOpts | null = null;
-let bioAvailable = true;
-let readerConnected: boolean | null = true;
+let feedOpts: FeedOpts | null = null;
 
 vi.mock("@/hooks/useBiometric", () => ({
-  useBiometricStatus: () => ({ data: { available: bioAvailable, connected: true } }),
-  useReaderConnected: () => readerConnected,
-  useBiometricCheckinLoop: (opts: LoopOpts) => {
-    loopOpts = opts;
+  useBiometricCheckinFeed: (opts: FeedOpts) => {
+    feedOpts = opts;
   },
 }));
 
@@ -37,19 +33,6 @@ vi.mock("@/hooks/useWindowPresence", () => ({
 // Knobs del dueño (Ajustes → Perfil del gym) — el scanner usa el volumen.
 vi.mock("@/hooks/useGym", () => ({
   useCheckinFeedbackSettings: () => ({ ttlMs: 4000, volume: 0.8 }),
-}));
-
-interface RelayOpts {
-  onCheckin(ev: CheckinEvent): void;
-  onNoMatch(): void;
-}
-let relayOpts: RelayOpts | null = null;
-const emitCheckinResult = vi.fn(async (_payload: unknown) => {});
-vi.mock("@/hooks/useCheckinResultRelay", () => ({
-  useCheckinResultRelay: (opts: RelayOpts) => {
-    relayOpts = opts;
-  },
-  emitCheckinResult: (payload: unknown) => emitCheckinResult(payload),
 }));
 
 const toastSuccess = vi.fn();
@@ -86,7 +69,7 @@ function makeEvent(overrides: Partial<CheckinEvent> = {}): CheckinEvent {
   };
 }
 
-// El scanner lee la ruta actual (en /checkin la página es dueña del loop).
+// El scanner lee la ruta actual (en /checkin la página es dueña del feedback).
 function renderAt(path = "/") {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -97,40 +80,30 @@ function renderAt(path = "/") {
 
 describe("GlobalCheckinScanner", () => {
   beforeEach(() => {
-    loopOpts = null;
-    relayOpts = null;
-    bioAvailable = true;
-    readerConnected = true;
+    feedOpts = null;
     floatPresent = false;
     kioskPresent = false;
     toastSuccess.mockClear();
     toastWarning.mockClear();
     toastError.mockClear();
     playCheckinTone.mockClear();
-    emitCheckinResult.mockClear();
   });
 
-  describe("gating del loop", () => {
+  describe("gating del feed", () => {
     it("corre habilitado en cualquier ruta normal", () => {
       renderAt("/sales");
-      expect(loopOpts?.enabled).toBe(true);
+      expect(feedOpts?.enabled).toBe(true);
     });
 
-    it("en /checkin se apaga: CheckinPage es dueña del loop de la ventana (anti doble-POST intra-ventana)", () => {
+    it("en /checkin se apaga: CheckinPage pinta en la MISMA ventana (anti doble-feedback)", () => {
       renderAt("/checkin");
-      expect(loopOpts?.enabled).toBe(false);
+      expect(feedOpts?.enabled).toBe(false);
     });
 
-    it("sigue habilitado con la flotante o el kiosko abiertos (el foco decide quién recibe)", () => {
+    it("sigue habilitado con la flotante o el kiosko abiertos (todas las ventanas reciben el SSE)", () => {
       floatPresent = true;
       renderAt("/");
-      expect(loopOpts?.enabled).toBe(true);
-    });
-
-    it("sin lector utilizable apaga el loop", () => {
-      readerConnected = false;
-      renderAt("/");
-      expect(loopOpts?.enabled).toBe(false);
+      expect(feedOpts?.enabled).toBe(true);
     });
 
     // Sanity de los labels que el mock de useWindowPresence hardcodea.
@@ -140,25 +113,21 @@ describe("GlobalCheckinScanner", () => {
     });
   });
 
-  describe("resultados propios sin superficie dedicada — toast CON tono + relay", () => {
-    it("permitido: toast success con el detalle canónico, tono y emit al relay", () => {
+  describe("resultados sin superficie dedicada — toast CON tono", () => {
+    it("permitido: toast success con el detalle canónico y tono", () => {
       renderAt("/");
-      act(() => loopOpts!.onCheckin(makeEvent()));
+      act(() => feedOpts!.onCheckin(makeEvent()));
 
       expect(toastSuccess).toHaveBeenCalledWith("✓ Ana López ingresó", {
         description: t.feedback.successActive(26),
       });
       expect(playCheckinTone).toHaveBeenCalledWith("success", 0.8);
-      expect(emitCheckinResult).toHaveBeenCalledWith({
-        kind: "checkin",
-        event: expect.objectContaining({ id: "chk-1" }),
-      });
     });
 
     it("por vencer: toast warning y tono warning", () => {
       renderAt("/");
       act(() =>
-        loopOpts!.onCheckin(
+        feedOpts!.onCheckin(
           makeEvent({ result: "allowed_expiring_soon", days_until_expiry: 2 }),
         ),
       );
@@ -172,7 +141,7 @@ describe("GlobalCheckinScanner", () => {
     it("vencido: toast error y tono denied", () => {
       renderAt("/");
       act(() =>
-        loopOpts!.onCheckin(
+        feedOpts!.onCheckin(
           makeEvent({ result: "denied_expired", days_until_expiry: -3 }),
         ),
       );
@@ -183,61 +152,44 @@ describe("GlobalCheckinScanner", () => {
       expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
     });
 
-    it("no-match: toast error, tono denied y emit al relay", () => {
+    it("no-match: toast error y tono denied", () => {
       renderAt("/");
-      act(() => loopOpts!.onNoMatch!());
+      act(() => feedOpts!.onNoMatch!());
 
       expect(toastError).toHaveBeenCalledWith(
         "No reconocimos la huella",
         expect.objectContaining({ description: expect.any(String) }),
       );
       expect(playCheckinTone).toHaveBeenCalledWith("denied", 0.8);
-      expect(emitCheckinResult).toHaveBeenCalledWith({ kind: "no_match" });
     });
   });
 
-  describe("resultados propios CON superficie dedicada abierta — toast SIN tono (la superficie suena)", () => {
-    it("con la flotante abierta: toastea pero no suena, y emite el relay para que la flotante pinte", () => {
+  describe("resultados CON superficie dedicada abierta — toast SIN tono (la superficie suena)", () => {
+    it("con la flotante abierta: toastea pero no suena", () => {
       floatPresent = true;
       renderAt("/");
-      act(() => loopOpts!.onCheckin(makeEvent()));
-
-      expect(toastSuccess).toHaveBeenCalled();
-      expect(playCheckinTone).not.toHaveBeenCalled();
-      expect(emitCheckinResult).toHaveBeenCalledWith({
-        kind: "checkin",
-        event: expect.objectContaining({ id: "chk-1" }),
-      });
-    });
-
-    it("con el kiosko abierto: ídem", () => {
-      kioskPresent = true;
-      renderAt("/");
-      act(() => loopOpts!.onNoMatch!());
-
-      expect(toastError).toHaveBeenCalled();
-      expect(playCheckinTone).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("resultados relayados de otra ventana — toast SIN tono y sin re-emitir", () => {
-    it("permitido relayado: mismo toast, cero tono (la otra ventana ya sonó)", () => {
-      kioskPresent = true;
-      renderAt("/");
-      act(() => relayOpts!.onCheckin(makeEvent()));
+      act(() => feedOpts!.onCheckin(makeEvent()));
 
       expect(toastSuccess).toHaveBeenCalledWith("✓ Ana López ingresó", {
         description: t.feedback.successActive(26),
       });
       expect(playCheckinTone).not.toHaveBeenCalled();
-      expect(emitCheckinResult).not.toHaveBeenCalled();
     });
 
-    it("denegado relayado: toast error sin tono", () => {
+    it("con el kiosko abierto: ídem para el no-match", () => {
+      kioskPresent = true;
+      renderAt("/");
+      act(() => feedOpts!.onNoMatch!());
+
+      expect(toastError).toHaveBeenCalled();
+      expect(playCheckinTone).not.toHaveBeenCalled();
+    });
+
+    it("denegado con kiosko abierto: toast error sin tono", () => {
       kioskPresent = true;
       renderAt("/");
       act(() =>
-        relayOpts!.onCheckin(
+        feedOpts!.onCheckin(
           makeEvent({ result: "denied_no_membership", days_until_expiry: null }),
         ),
       );
@@ -246,19 +198,6 @@ describe("GlobalCheckinScanner", () => {
         description: t.feedback.deniedNoMembership,
       });
       expect(playCheckinTone).not.toHaveBeenCalled();
-    });
-
-    it("no-match relayado: toast error sin tono", () => {
-      kioskPresent = true;
-      renderAt("/");
-      act(() => relayOpts!.onNoMatch());
-
-      expect(toastError).toHaveBeenCalledWith(
-        "No reconocimos la huella",
-        expect.objectContaining({ description: expect.any(String) }),
-      );
-      expect(playCheckinTone).not.toHaveBeenCalled();
-      expect(emitCheckinResult).not.toHaveBeenCalled();
     });
   });
 });

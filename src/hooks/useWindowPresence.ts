@@ -4,17 +4,16 @@ import { isTauri } from "@/lib/utils";
 // useWindowPresence — ¿existe ahora mismo una WebviewWindow con este label?
 //
 // Lo usan dos superficies:
-//   - GlobalCheckinScanner (main): silenciarse mientras el kiosko o la
-//     flotante de check-in están abiertos (anti doble-feedback /
-//     doble-POST).
+//   - GlobalCheckinScanner y CheckinPage (main): con kiosko o flotante
+//     abiertos, el tono del resultado lo pone esa superficie y la main
+//     sólo pinta (anti doble-feedback).
 //   - TopBar: deshabilitar el launcher del kiosko cuando la flotante está
 //     abierta y viceversa (exclusión mutua).
 //
 // Mecánica: poll de getByLabel como fuente de verdad + listeners de
 // tauri://window-created / window-destroyed para reaccionar rápido. El poll
 // existe porque los eventos de lifecycle no están garantizados si esta
-// ventana estaba en background cuando se emitieron (mismo razonamiento que
-// el re-query en focus del biometricStreamProvider); con el poll, un evento
+// ventana estaba en background cuando se emitieron; con el poll, un evento
 // perdido se corrige solo en ≤ pollMs en lugar de dejar estado colgado.
 //
 // Fuera de Tauri (vite dev / vitest) devuelve siempre false — no hay
