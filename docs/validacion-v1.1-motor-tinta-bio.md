@@ -1,6 +1,6 @@
 # Validación manual v1.1.x — motor tinta-bio (prueba de fuego)
 
-> Versión vigente: **1.1.3** (1.1.0–1.1.2 quedaron quemadas en la
+> Versión vigente: **1.1.4** (1.1.0–1.1.3 quedaron quemadas en la
 > iteración de validación; ver nota abajo).
 
 Checklist para el release que reemplaza el stack biométrico completo
@@ -35,15 +35,15 @@ misma política ahora).
 
 ## 1. Build SIN publicar el update (validar antes de que nadie actualice)
 
-**NO pushear el tag `v1.1.3` directo**: el push del tag registra el
+**NO pushear el tag `v1.1.4` directo**: el push del tag registra el
 manifest con rollout 100 y TODOS los gyms en ≤1.0.16 actualizan en
 minutos, antes de validar. Para esta migración (installer radicalmente
 distinto) el orden es:
 
 - [ ] Correr `release.yml` por **workflow_dispatch** con:
-      `tag=1.1.3`, `skip_manifest=true` (y `skip_macos=true` si quieres
+      `tag=1.1.4`, `skip_manifest=true` (y `skip_macos=true` si quieres
       iterar rápido). Esto buildea firmado, sube a R2
-      (`desktop/v1.1.3/Tinta-Setup.exe`) y **NO** toca el manifest.
+      (`desktop/v1.1.4/Tinta-Setup.exe`) y **NO** toca el manifest.
       *Nota:* también actualiza `desktop/latest/` (el CTA del landing
       servirá 1.1.0 a instalaciones nuevas — aceptable, hoy las controlas
       tú).
@@ -61,7 +61,7 @@ retiro del stack viejo.
 
 ### 2.1 Instalación / migración
 
-- [ ] Descargar `https://dl.entinta.app/desktop/v1.1.3/Tinta-Setup.exe`
+- [ ] Descargar `https://dl.entinta.app/desktop/v1.1.4/Tinta-Setup.exe`
       y correrlo (doble click, 1 UAC).
 - [ ] Observar en el detalle del installer:
       - "Retirando el soporte anterior del lector (Lite Client)..." →
@@ -106,6 +106,14 @@ retiro del stack viejo.
       servicio que haya que "levantar").
 - [ ] **Sanity no-biométrico**: check-in manual, una venta, sync en verde
       (`/sync/status` sin atoradas).
+- [ ] **Offline REAL (adaptador apagado, no sólo el módem)**: deshabilitar
+      el adaptador de red de la PC → el banner "todo queda guardado en
+      esta computadora" aparece; búsqueda de socios funciona; alta de
+      socio completa (planes y cobros visibles) y UNA sola vez; huella
+      sigue reconociendo. Reconectar → push limpio, sin duplicados.
+      (Regresión del networkMode de React Query: con el default, el FE
+      entero se pausaba con navigator.onLine=false y las mutations
+      encoladas disparaban al reconectar — así se duplicó un socio.)
 
 ### 2.3 (Recomendado) VM x86_64 limpia — install fresco
 
@@ -123,14 +131,14 @@ sin internet).
         -H "Authorization: Bearer $RELEASES_ADMIN_TOKEN" \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg sig "$NSIS_SIG" '{
-          version: "1.1.3", target_platform: "windows", channel: "stable",
-          url: "https://dl.entinta.app/desktop/v1.1.3/Tinta-Setup.exe",
+          version: "1.1.4", target_platform: "windows", channel: "stable",
+          url: "https://dl.entinta.app/desktop/v1.1.4/Tinta-Setup.exe",
           signature_ed25519: $sig,
-          notes: "Tinta 1.1.3 — nuevo motor del lector de huella.",
+          notes: "Tinta 1.1.4 — nuevo motor del lector de huella.",
           rollout_percent: 100, force_immediate: false }')"
       ```
 
-- [ ] Pushear el tag `v1.1.3` para el bookkeeping (GitHub Release de
+- [ ] Pushear el tag `v1.1.4` para el bookkeeping (GitHub Release de
       respaldo). El re-run del manifest choca contra el UNIQUE y no pisa
       nada; los binarios de R2 sí se re-suben (bytes nuevos ≠ validados)
       — si quieres conservar EXACTAMENTE lo validado, crea el GitHub
