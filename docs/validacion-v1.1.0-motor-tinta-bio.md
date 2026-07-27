@@ -9,20 +9,21 @@ misma política ahora).
 
 ## 0. Pre-requisitos del release (una vez, antes de buildear)
 
-- [ ] **Tag de core v1.0.16** sobre main con el fix biométrico de la
-      validación del 26-jul (enroll a 4 capturas — FingerJet exige 4;
+- [ ] **Tag de core v1.0.17** sobre main con los fixes biométricos de la
+      validación del 26-jul (probe de colisión del primer enroll vs
+      galería vacía; enroll a 4 capturas — FingerJet exige 4;
       enroll_failed terminal — la sesión zombie se tragaba los dedazos
       del check-in; no_match honesto con galería vacía). `TINTA_CORE_REF`
-      ya pinea v1.0.16; sin el tag, el checkout del sidecar falla.
+      ya pinea v1.0.17; sin el tag, el checkout del sidecar falla.
       **Ojo:** el release.yml de cuadra-core corre en tags `v*` → el push
       del tag también DESPLIEGA el cloud.
 
       ```bash
-      cd ../cuadra-core && git tag v1.0.16 && git push origin v1.0.16
+      cd ../cuadra-core && git tag v1.0.17 && git push origin v1.0.17
       ```
 
-      (v1.0.15 ya está pusheado/desplegado; v1.0.16 se taggea DESPUÉS de
-      mergear el PR del fix, sobre main.)
+      (v1.0.15/v1.0.16 ya desplegados; v1.0.17 se taggea DESPUÉS de mergear
+      el PR del fix de colisión, sobre main.)
 
 - [x] Release `tinta-bio-v0.1.0` publicado en cuadra-core con
       `tinta-bio-win-x64.zip` (ya existe, validado en hardware 27-jul).
