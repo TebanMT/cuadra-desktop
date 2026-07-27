@@ -18,22 +18,12 @@ misma política ahora).
 
 ## 0. Pre-requisitos del release (una vez, antes de buildear)
 
-- [ ] **Tag de core v1.0.18** sobre main con los fixes de la validación
-      del 26-jul (password_hash NULL tumbaba el grid de operadores y el
-      login-pin del owner; probe de colisión del primer enroll vs
-      galería vacía; enroll a 4 capturas — FingerJet exige 4;
-      enroll_failed terminal — la sesión zombie se tragaba los dedazos
-      del check-in; no_match honesto con galería vacía). `TINTA_CORE_REF`
-      ya pinea v1.0.18; sin el tag, el checkout del sidecar falla.
-      **Ojo:** el release.yml de cuadra-core corre en tags `v*` → el push
-      del tag también DESPLIEGA el cloud.
-
-      ```bash
-      cd ../cuadra-core && git tag v1.0.18 && git push origin v1.0.18
-      ```
-
-      (v1.0.15–v1.0.17 ya desplegados; v1.0.18 se taggea DESPUÉS de
-      mergear el PR de users, sobre main.)
+- [x] **Tag de core v1.0.19** sobre main (incluye los fixes de la
+      validación del 26-jul Y el escrow de GMK, ADR-006 §2.2/§2.6).
+      `TINTA_CORE_REF` ya lo pinea. **Ojo escrow:** verificar que el
+      host del cloud tenga `TINTA_SMK_BASE64` — sin ella el endpoint
+      /sync/gmk responde 503 y los sidecars siguen con llave local
+      (nada se rompe, pero el vault queda apagado).
 
 - [x] Release `tinta-bio-v0.1.0` publicado en cuadra-core con
       `tinta-bio-win-x64.zip` (ya existe, validado en hardware 27-jul).
