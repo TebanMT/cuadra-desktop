@@ -138,8 +138,9 @@ export function useBiometricCheckinFeed(opts: UseBiometricCheckinFeedOptions) {
 }
 
 // ---------------------------------------------------------------------------
-// Enroll — sesión del sidecar (3 dedazos acumulados allá); aquí sólo el
-// start/cancel HTTP y el progreso que llega por SSE.
+// Enroll — sesión del sidecar (4 dedazos acumulados allá — FingerJet exige
+// 4 FMDs de pre-enroll); aquí sólo el start/cancel HTTP y el progreso que
+// llega por SSE.
 // ---------------------------------------------------------------------------
 
 export interface CollisionMember {
@@ -172,8 +173,9 @@ interface UseRegisterFingerprintOptions {
 }
 
 // El sidecar manda required_samples en el 202; este default sólo pinta los
-// dots antes de que la respuesta llegue.
-const DEFAULT_REQUIRED_SAMPLES = 3;
+// dots antes de que la respuesta llegue. 4 = EnrollSamplesRequired del hub
+// (FingerJet arma el enrollment FMD con 4 capturas).
+const DEFAULT_REQUIRED_SAMPLES = 4;
 
 const IDLE_PROGRESS: FingerprintProgress = {
   status: "idle",
