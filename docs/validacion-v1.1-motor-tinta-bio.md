@@ -1,4 +1,7 @@
-# Validación manual v1.1.1 — motor tinta-bio (prueba de fuego)
+# Validación manual v1.1.x — motor tinta-bio (prueba de fuego)
+
+> Versión vigente: **1.1.2** (1.1.0 y 1.1.1 quedaron quemadas en la
+> iteración de validación; ver nota abajo).
 
 Checklist para el release que reemplaza el stack biométrico completo
 (ADR-004-quater): Lite Client + NBIS → tinta-bio.exe + RTE 3.6.1.
@@ -7,10 +10,11 @@ el motor nativo sólo se validan contra el .exe INSTALADO en hardware real
 (lección de mayo-2026: el WebSdk divergía entre `tauri dev` y WebView2;
 misma política ahora).
 
-> **Por qué 1.1.1 y no 1.1.0:** la 1.1.0 se buildeó/instaló durante la
-> iteración con el sidecar aún roto (enroll moría en el probe de colisión)
-> y quedó en R2 y en la VM. Renumerar deja al updater subir las máquinas
-> 1.1.0 → 1.1.1 sin ambigüedad de bytes.
+> **Por qué se saltaron 1.1.0 y 1.1.1:** ambas se buildearon/instalaron
+> durante la iteración de validación (1.1.0 con el enroll roto; 1.1.1 con
+> el copy de enroll heredado de NBIS que pedía inclinar el dedo). Cada
+> build instalado en una máquina quema su número: renumerar deja al
+> updater subir 1.1.x → vigente sin ambigüedad de bytes.
 
 ## 0. Pre-requisitos del release (una vez, antes de buildear)
 
@@ -40,15 +44,15 @@ misma política ahora).
 
 ## 1. Build SIN publicar el update (validar antes de que nadie actualice)
 
-**NO pushear el tag `v1.1.1` directo**: el push del tag registra el
+**NO pushear el tag `v1.1.2` directo**: el push del tag registra el
 manifest con rollout 100 y TODOS los gyms en ≤1.0.16 actualizan en
 minutos, antes de validar. Para esta migración (installer radicalmente
 distinto) el orden es:
 
 - [ ] Correr `release.yml` por **workflow_dispatch** con:
-      `tag=1.1.1`, `skip_manifest=true` (y `skip_macos=true` si quieres
+      `tag=1.1.2`, `skip_manifest=true` (y `skip_macos=true` si quieres
       iterar rápido). Esto buildea firmado, sube a R2
-      (`desktop/v1.1.1/Tinta-Setup.exe`) y **NO** toca el manifest.
+      (`desktop/v1.1.2/Tinta-Setup.exe`) y **NO** toca el manifest.
       *Nota:* también actualiza `desktop/latest/` (el CTA del landing
       servirá 1.1.0 a instalaciones nuevas — aceptable, hoy las controlas
       tú).
@@ -66,7 +70,7 @@ retiro del stack viejo.
 
 ### 2.1 Instalación / migración
 
-- [ ] Descargar `https://dl.entinta.app/desktop/v1.1.1/Tinta-Setup.exe`
+- [ ] Descargar `https://dl.entinta.app/desktop/v1.1.2/Tinta-Setup.exe`
       y correrlo (doble click, 1 UAC).
 - [ ] Observar en el detalle del installer:
       - "Retirando el soporte anterior del lector (Lite Client)..." →
@@ -128,14 +132,14 @@ sin internet).
         -H "Authorization: Bearer $RELEASES_ADMIN_TOKEN" \
         -H "Content-Type: application/json" \
         -d "$(jq -n --arg sig "$NSIS_SIG" '{
-          version: "1.1.1", target_platform: "windows", channel: "stable",
-          url: "https://dl.entinta.app/desktop/v1.1.1/Tinta-Setup.exe",
+          version: "1.1.2", target_platform: "windows", channel: "stable",
+          url: "https://dl.entinta.app/desktop/v1.1.2/Tinta-Setup.exe",
           signature_ed25519: $sig,
-          notes: "Tinta 1.1.1 — nuevo motor del lector de huella.",
+          notes: "Tinta 1.1.2 — nuevo motor del lector de huella.",
           rollout_percent: 100, force_immediate: false }')"
       ```
 
-- [ ] Pushear el tag `v1.1.1` para el bookkeeping (GitHub Release de
+- [ ] Pushear el tag `v1.1.2` para el bookkeeping (GitHub Release de
       respaldo). El re-run del manifest choca contra el UNIQUE y no pisa
       nada; los binarios de R2 sí se re-suben (bytes nuevos ≠ validados)
       — si quieres conservar EXACTAMENTE lo validado, crea el GitHub

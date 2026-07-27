@@ -126,7 +126,11 @@ export const checkin = {
       `${name} inscrito. Ahora registra su huella para que entre sin número ni nombre.`,
     autoStartHint: "Empezará automáticamente cuando conectes el lector.",
     errorReader: "No detecto el lector de huella. Conéctalo y vuelve a intentar.",
-    errorCapture: "No pude leer bien tu huella. Intenta otra vez.",
+    // enrollment_invalid del SDK: las capturas no coinciden ENTRE SÍ (dedo
+    // girado/movido entre lecturas), no una lectura borrosa — el mensaje
+    // dice qué hacer distinto.
+    errorCapture:
+      "Las lecturas no coincidieron entre sí. Apoya el mismo dedo en la misma posición las 4 veces, sin girarlo.",
     // La sesión de enroll del sidecar expira a los 60s sin completar las
     // lecturas — distinto de una lectura fallida.
     errorTimeout: "Se acabó el tiempo para capturar la huella. Vuelve a intentar.",
@@ -134,10 +138,16 @@ export const checkin = {
     errorCollision: (name: string) => `Esta huella ya está registrada para ${name}.`,
     seeExisting: (name: string) => `Ver perfil de ${name}`,
     collisionCancel: "Cancelar y saltar",
+    // FingerJet fusiona las 4 capturas en UN template y exige que sean
+    // consistentes: mismo dedo, misma posición natural. Las instrucciones
+    // viejas de inclinar el dedo eran del matcher NBIS (cubrían más área)
+    // y con el motor nuevo producían DP_ENROLLMENT_INVALID_SET — el
+    // operador fallaba el enroll POR seguir la UI (visto en validación).
     captureByIndex: [
-      "Coloca tu dedo centrado en el lector.",
-      "Inclínalo ligeramente hacia la izquierda.",
-      "Inclínalo ligeramente hacia la derecha.",
+      "Coloca tu dedo plano y centrado en el lector.",
+      "Levanta el dedo y vuelve a apoyarlo en la misma posición.",
+      "Otra vez: mismo dedo, misma posición, sin girarlo.",
+      "Última vez: apóyalo firme, igual que las anteriores.",
     ] as const,
     waitingPlace: "Esperando dedo en el lector…",
     capturing: (n: number) => `Captura ${n} en proceso…`,
