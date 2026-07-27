@@ -264,9 +264,13 @@
     FileWrite $2 'param([string]$$Url,[string]$$ZipPath,[string]$$ExtractDir,[string]$$Expected)$\r$\n'
     FileWrite $2 '$$ErrorActionPreference = $\"Stop$\"$\r$\n'
     FileWrite $2 '[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12$\r$\n'
-    ; TimeoutSec generoso: son ~175 MB y el internet de gym de barrio puede
-    ; ser lento; 900s aguanta ~1.6 Mbps sostenido.
-    FileWrite $2 'try { Invoke-WebRequest -Uri $$Url -OutFile $$ZipPath -UseBasicParsing -TimeoutSec 900 } catch { exit 1 }$\r$\n'
+    ; WebClient.DownloadFile y NO Invoke-WebRequest: el IWR de Windows
+    ; PowerShell 5.1 es lentísimo con archivos grandes (actualiza la progress
+    ; bar en cada read chico Y bufferea la respuesta COMPLETA en memoria
+    ; antes de escribir el -OutFile — 173 MB en RAM de una PC de gym).
+    ; WebClient streamea directo a disco a velocidad de línea. Mordió en la
+    ; primera validación real: la descarga "tardaba demasiado".
+    FileWrite $2 'try { (New-Object System.Net.WebClient).DownloadFile($$Url, $$ZipPath) } catch { exit 1 }$\r$\n'
     FileWrite $2 'if ((Get-FileHash $$ZipPath -Algorithm SHA256).Hash -ne $$Expected) { Remove-Item $$ZipPath -Force -ErrorAction SilentlyContinue; exit 4 }$\r$\n'
     FileWrite $2 'try { if (Test-Path $$ExtractDir) { Remove-Item $$ExtractDir -Recurse -Force } } catch {}$\r$\n'
     FileWrite $2 'try { Expand-Archive -Path $$ZipPath -DestinationPath $$ExtractDir -Force } catch { exit 2 }$\r$\n'
