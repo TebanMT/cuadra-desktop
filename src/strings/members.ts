@@ -144,6 +144,7 @@ export const members = {
     fields: {
       name: "Nombre completo",
       phone: "Teléfono",
+      noPhone: "Sin teléfono",
       email: "Email",
       birthdate: "Fecha de nacimiento",
       photo: "Foto",
@@ -194,6 +195,10 @@ export const members = {
       seeExisting: "Ver socio existente",
       createAnyway: "Crear de todos modos",
     },
+    // Aviso bajo el check "Sin teléfono": deja claro qué se pierde (los
+    // avisos de WhatsApp) para que sea decisión informada, no default cómodo.
+    noPhoneHint:
+      "Este socio no recibirá avisos por WhatsApp (bienvenida, recordatorios de pago).",
     success: {
       created: (name: string, expiry: string) => `${name} agregado. Vence ${expiry}.`,
       updated: "Cambios guardados.",

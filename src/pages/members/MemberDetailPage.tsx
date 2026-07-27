@@ -264,10 +264,12 @@ export default function MemberDetailPage() {
                 {member.full_name}
               </h1>
               <div className="text-sm text-muted-foreground space-y-0.5 mt-1">
-                <div className="flex items-center gap-1.5">
-                  <Phone className="h-3.5 w-3.5" />
-                  {member.phone}
-                </div>
+                {member.phone && (
+                  <div className="flex items-center gap-1.5">
+                    <Phone className="h-3.5 w-3.5" />
+                    {member.phone}
+                  </div>
+                )}
                 {member.email && (
                   <div className="flex items-center gap-1.5">
                     <Mail className="h-3.5 w-3.5" />

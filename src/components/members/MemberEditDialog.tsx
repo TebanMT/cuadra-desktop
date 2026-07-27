@@ -35,7 +35,9 @@ export function MemberEditDialog({ memberId, initial, open, onOpenChange }: Prop
       // formatE164). Antes hacíamos slice(-10) para forzar 10 dígitos MX,
       // pero eso descartaba el código de país de números argentinos /
       // españoles / etc. que el selector ya admite.
-      phone: v.phone,
+      // Con el check "sin teléfono", "" explícito = QUITAR el teléfono
+      // (el PATCH del BE trata *phone=="" como remoción).
+      phone: v.no_phone ? "" : v.phone,
       email: v.email.trim(),
       birthdate: v.birthdate,
       photo_url: v.photo_url,
@@ -71,6 +73,9 @@ export function MemberEditDialog({ memberId, initial, open, onOpenChange }: Prop
           initial={{
             full_name: initial.full_name,
             phone: initial.phone,
+            // Socio ya sin teléfono → el check llega pre-marcado; quitarlo
+            // exige capturar un número (la validación vuelve a exigir E.164).
+            no_phone: !initial.phone,
             email: initial.email ?? "",
             birthdate: initial.birthdate ?? "",
             photo_url: initial.photo_url ?? "",

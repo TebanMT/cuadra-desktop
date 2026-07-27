@@ -86,6 +86,10 @@ export interface ListMembersInput {
 export interface CreateMemberInput {
   full_name: string;
   phone: string;
+  // Alta explícita sin teléfono (check del form). Con el flag, phone viaja
+  // "" — el BE rebota un phone vacío sin el flag para que "sin teléfono"
+  // nunca sea un accidente.
+  no_phone?: boolean;
   email?: string;
   birthdate?: string;
   photo_url?: string;

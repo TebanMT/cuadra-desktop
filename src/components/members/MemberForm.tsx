@@ -45,6 +45,12 @@ export type GenderFormValue = "" | "hombre" | "mujer" | "no_especificado";
 export interface MemberFormValues {
   full_name: string;
   phone: string;
+  // Alta/edición EXPLÍCITA sin teléfono. El operador debe marcar el check
+  // "Sin teléfono" — un campo vacío a secas sigue siendo error, para que
+  // el socio sin contacto sea una decisión y no un olvido. Con el check
+  // activo `phone` viaja "" (el BE guarda "" = sin teléfono y las
+  // notificaciones de WhatsApp lo saltan con razón explícita).
+  no_phone: boolean;
   email: string;
   birthdate: string;
   photo_url: string;
@@ -97,9 +103,10 @@ const PHONE_E164 = /^\+[1-9]\d{9,14}$/;
 const baseSchema = z.object({
   full_name: z.string().trim().min(3, t.form.errors.nameLength).max(100, t.form.errors.nameLength),
   // `phone` ya llega en E.164 (formatE164 del PhoneInput, con código de país).
-  // Validamos ese formato directo en vez de recortar a 10 dígitos — recortar
-  // era MX-only y rechazaba números de otros países (nacional ≠ 10 dígitos).
-  phone: z.string().refine((s) => PHONE_E164.test(s), { message: t.form.errors.phoneInvalid }),
+  // La requiredness es condicional al check "sin teléfono" — vive en
+  // `phoneRule` (superRefine), no aquí, porque depende de otro campo.
+  phone: z.string(),
+  no_phone: z.boolean().default(false),
   email: z
     .string()
     .trim()
@@ -113,20 +120,35 @@ const baseSchema = z.object({
   gender: z.enum(["", "hombre", "mujer", "no_especificado"]).default(""),
 });
 
-const createSchema = baseSchema.extend({
-  membership_type_id: z.string().min(1, t.form.errors.typeRequired),
-  start_date: z.string().min(1, t.form.errors.startDateInvalid),
-  charge_first_payment: z.boolean(),
-  charge_enrollment: z.boolean(),
-  charge_maintenance: z.boolean(),
-  payment_method: z.string(),
-});
+// Requiredness condicional del teléfono: sin el check "sin teléfono", el
+// E.164 es obligatorio; con el check, el campo viaja vacío.
+function phoneRule(vals: { phone: string; no_phone: boolean }, ctx: z.RefinementCtx) {
+  if (!vals.no_phone && !PHONE_E164.test(vals.phone)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: t.form.errors.phoneInvalid,
+      path: ["phone"],
+    });
+  }
+}
 
-const editSchema = baseSchema;
+const createSchema = baseSchema
+  .extend({
+    membership_type_id: z.string().min(1, t.form.errors.typeRequired),
+    start_date: z.string().min(1, t.form.errors.startDateInvalid),
+    charge_first_payment: z.boolean(),
+    charge_enrollment: z.boolean(),
+    charge_maintenance: z.boolean(),
+    payment_method: z.string(),
+  })
+  .superRefine(phoneRule);
+
+const editSchema = baseSchema.superRefine(phoneRule);
 
 const emptyValues: MemberFormValues = {
   full_name: "",
   phone: "",
+  no_phone: false,
   email: "",
   birthdate: "",
   photo_url: "",
@@ -279,11 +301,11 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
   // dígito cuando el usuario tipea rápido (el componente del input está
   // controlled por phoneNumber; values.phone se deriva).
   useEffect(() => {
-    const e164 = formatE164(phoneDialCode, phoneNumber);
+    const e164 = values.no_phone ? "" : formatE164(phoneDialCode, phoneNumber);
     if (e164 !== values.phone) {
       setValues((v) => ({ ...v, phone: e164 }));
     }
-  }, [phoneDialCode, phoneNumber, values.phone]);
+  }, [phoneDialCode, phoneNumber, values.phone, values.no_phone]);
 
   const types = useMembershipTypes(false);
   const activeTypes = useMemo(() => (types.data ?? []).filter((p) => p.active), [types.data]);
@@ -461,14 +483,35 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="m-phone">{t.form.fields.phone} *</Label>
+          <Label htmlFor="m-phone">
+            {t.form.fields.phone}
+            {!values.no_phone && " *"}
+          </Label>
           <PhoneInput
             id="m-phone"
             dialCode={phoneDialCode}
             number={phoneNumber}
             onDialCodeChange={setPhoneDialCode}
             onNumberChange={setPhoneNumber}
+            disabled={values.no_phone}
           />
+          <div className="flex items-center gap-2">
+            <Checkbox
+              id="m-no-phone"
+              checked={values.no_phone}
+              onCheckedChange={(checked) => {
+                const on = checked === true;
+                setValues((v) => ({ ...v, no_phone: on }));
+                if (on) setPhoneNumber("");
+              }}
+            />
+            <Label htmlFor="m-no-phone" className="font-normal text-muted-foreground">
+              {t.form.fields.noPhone}
+            </Label>
+          </div>
+          {values.no_phone && (
+            <p className="text-xs text-muted-foreground">{t.form.noPhoneHint}</p>
+          )}
         </div>
 
         <div className="flex flex-wrap gap-3">

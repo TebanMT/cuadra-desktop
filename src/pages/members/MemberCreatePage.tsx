@@ -56,7 +56,10 @@ export default function MemberCreatePage() {
       // v.phone ya viene en E.164 desde MemberForm. El slice(-10) viejo
       // descartaba el código de país de socios internacionales que el
       // selector ya admite (PhoneInput soporta LATAM + US + España).
-      phone: v.phone,
+      // Con el check "sin teléfono", phone viaja vacío + el flag explícito
+      // no_phone (el BE rebota un phone vacío SIN el flag).
+      phone: v.no_phone ? "" : v.phone,
+      no_phone: v.no_phone || undefined,
       email: v.email.trim() || undefined,
       birthdate: v.birthdate || undefined,
       photo_url: v.photo_url || undefined,
