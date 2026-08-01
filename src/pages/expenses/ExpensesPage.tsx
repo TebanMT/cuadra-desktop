@@ -47,7 +47,7 @@ import { useDebounce } from "@/hooks/useDebounce";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { fmtDate } from "@/lib/dates";
+import { fmtDate, fmtIso, todayIso } from "@/lib/dates";
 import {
   useCreateExpense,
   useDeleteExpense,
@@ -70,16 +70,12 @@ import { ExpenseForm, type ExpenseFormSubmitPayload } from "@/components/expense
 
 const PAGE_SIZE = 50;
 
-// firstOfMonth / today — defaults para el filtro de rango. La página
-// arranca enseñando el mes en curso porque es el caso 90% del dueño
-// "cuánto llevo gastado este mes".
+// firstOfMonth — default del filtro de rango. La página arranca enseñando
+// el mes en curso porque es el caso 90% del dueño "cuánto llevo gastado
+// este mes". El "hoy" viene de todayIso (lib/dates) — un solo helper.
 function firstOfMonth(): string {
   const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
-}
-function todayStr(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return fmtIso(new Date(d.getFullYear(), d.getMonth(), 1));
 }
 
 function SortableHeader({
@@ -127,7 +123,7 @@ export default function ExpensesPage() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const [from, setFrom] = useState<string>(firstOfMonth());
-  const [to, setTo] = useState<string>(todayStr());
+  const [to, setTo] = useState<string>(todayIso());
   const [category, setCategory] = useState<ExpenseCategory | "">("");
   const [method, setMethod] = useState<ExpensePaymentMethod | "">("");
   const [page, setPage] = useState(1);
@@ -158,7 +154,7 @@ export default function ExpensesPage() {
   // curso, sin categoría/método/búsqueda). Si todo está en default no
   // mostramos el chip "Limpiar filtros".
   const defaultFrom = firstOfMonth();
-  const defaultTo = todayStr();
+  const defaultTo = todayIso();
   const hasActiveFilters =
     !!debouncedSearch ||
     !!category ||

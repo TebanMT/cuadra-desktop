@@ -58,7 +58,7 @@ import {
 } from "@/hooks/useReports";
 import { fmtMoney, useGymPayments, type PaymentMethod } from "@/hooks/useBilling";
 import { useMoneyVisibility, MASKED_MONEY } from "@/hooks/useMoneyVisibility";
-import { fmtDate } from "@/lib/dates";
+import { fmtDate, fmtIso, todayIso } from "@/lib/dates";
 import { api } from "@/lib/api";
 import { useQuery } from "@tanstack/react-query";
 import { saveBlob } from "@/lib/tauri-bridge";
@@ -105,14 +105,6 @@ const TOOLTIP_STYLE = {
   color: "hsl(var(--popover-foreground))",
 };
 
-// Helper to compute "today" YYYY-MM-DD for default custom range values.
-function todayIso() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
-    d.getDate(),
-  ).padStart(2, "0")}`;
-}
-
 export default function ReportsPage() {
   const [period, setPeriod] = useState<ReportPeriod>("month");
   // Custom range — only consulted when period === "custom". Defaults to a
@@ -120,7 +112,7 @@ export default function ReportsPage() {
   const [customFrom, setCustomFrom] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 13);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    return fmtIso(d);
   });
   const [customTo, setCustomTo] = useState<string>(() => todayIso());
 
@@ -644,7 +636,11 @@ function ReportsContent({
                 {data.inventory_costs.map((m) => (
                   <DataTableRow key={m.movement_id}>
                     <DataTableCell className="pl-6 tabular text-muted-foreground">
-                      {fmtDate(m.occurred_at.slice(0, 10))}
+                      {/* occurred_at es un instante RFC3339: fmtDate lo
+                          formatea en día LOCAL. El slice(0,10) anterior
+                          tomaba el día UTC y un restock de la tarde se
+                          listaba con fecha de mañana. */}
+                      {fmtDate(m.occurred_at)}
                     </DataTableCell>
                     <DataTableCell>
                       <span className="font-semibold text-foreground">{m.product_name}</span>

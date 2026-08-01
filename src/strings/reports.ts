@@ -26,7 +26,7 @@ export const reports = {
   },
   kpis: {
     net: "Utilidad del período",
-    netHint: "Ingresos − mercancía − gastos",
+    netHint: "Ingresos − mercancía − gastos − devoluciones",
     income: "Ingresos",
     newMembers: "Socios nuevos",
     checkins: "Check-ins",

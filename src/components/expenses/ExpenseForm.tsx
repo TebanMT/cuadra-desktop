@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { todayIso } from "@/lib/dates";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -49,15 +50,8 @@ const schema = z.object({
   description: z.string().max(200, t.form.errors.descriptionTooLong),
 });
 
-function todayYYYYMMDD(): string {
-  const d = new Date();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${m}-${day}`;
-}
-
 const emptyValues: ExpenseFormValues = {
-  expense_date: todayYYYYMMDD(),
+  expense_date: todayIso(),
   amount: "",
   category: "renta",
   payment_method: "cash",

@@ -58,7 +58,7 @@ import {
 } from "@/hooks/useBilling";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useMember } from "@/hooks/useMembers";
-import { todayIso } from "@/lib/dates";
+import { parseDate, todayIso } from "@/lib/dates";
 import { billing as t } from "@/strings/billing";
 import { cn } from "@/lib/utils";
 
@@ -130,12 +130,12 @@ function fmtTime(value: string): string {
 }
 
 function fmtDay(value: string): string {
-  try {
-    const d = parseISO(value);
-    return format(d, "d MMM", { locale: es });
-  } catch {
-    return "—";
-  }
+  // parseDate del lib: date-only → medianoche LOCAL. parseISO a pelo era
+  // frágil — si payment_date algún día trae hora, el instante se pintaría
+  // un día antes.
+  const d = parseDate(value);
+  if (!d) return "—";
+  return format(d, "d MMM", { locale: es });
 }
 
 function conceptLabel(c: PaymentConcept): string {

@@ -46,7 +46,7 @@ import {
   useUpdateChallenge,
 } from "@/hooks/useChallenges";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { fmtDate } from "@/lib/dates";
+import { daysFromToday, fmtDayGrain } from "@/lib/dates";
 import {
   challengeIsEditable,
   challengeStatusLabel,
@@ -103,10 +103,10 @@ export default function ChallengeDetailPage() {
   const allParticipants = participants.data?.items ?? [];
   const participantsActive = allParticipants.filter((p) => p.status === "active").length;
   const t0Pending = Math.max(0, allParticipants.length - detail.data.t0_captured);
-  const daysToT1 = Math.max(
-    0,
-    Math.floor((new Date(ch.measurement_t1_start).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-  );
+  // Diferencia en días CALENDARIO sobre la parte de fecha (el wire codifica
+  // el date-grain como medianoche UTC): el floor de milisegundos daba
+  // off-by-one según la hora del día.
+  const daysToT1 = Math.max(0, daysFromToday(ch.measurement_t1_start.slice(0, 10)) ?? 0);
 
   const phase: MeasurementMoment = ch.status === "measuring_t1" ? "t1" : "t0";
 
@@ -137,10 +137,10 @@ export default function ChallengeDetailPage() {
           <div className="flex items-center gap-3 flex-wrap tabular">
             <ChallengeStatusBadge status={ch.status} />
             <span>
-              T₀ hasta {fmtDate(ch.measurement_t0_deadline)} · T₁ desde{" "}
-              {fmtDate(ch.measurement_t1_start)}
+              T₀ hasta {fmtDayGrain(ch.measurement_t0_deadline)} · T₁ desde{" "}
+              {fmtDayGrain(ch.measurement_t1_start)}
             </span>
-            <span>Cierra {fmtDate(ch.ends_at)}</span>
+            <span>Cierra {fmtDayGrain(ch.ends_at)}</span>
           </div>
         }
         actions={

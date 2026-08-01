@@ -16,8 +16,25 @@ export function fmtDate(value: string | Date | null | undefined): string {
   return format(d, DATE_FMT_SHORT, { locale: es });
 }
 
+// fmtDayMonth — etiqueta corta "d MMM" para listas densas y ejes de charts.
+// Mismo parseo defensivo que parseDate (date-only → medianoche LOCAL).
+export function fmtDayMonth(value: string | null | undefined): string {
+  const d = parseDate(value);
+  if (!d) return "—";
+  return format(d, "d MMM", { locale: es });
+}
+
 export function fmtIso(date: Date): string {
   return format(date, "yyyy-MM-dd");
+}
+
+// fmtDayGrain — para campos date-grain que el wire codifica como instante a
+// medianoche UTC ("2026-08-01T00:00:00Z", p.ej. fechas de retos): toma la
+// parte de fecha y la formatea como día calendario. Pasarla por la zona
+// local (fmtDate del instante) la pintaba un día antes en CDMX.
+export function fmtDayGrain(value: string | null | undefined): string {
+  if (!value) return "—";
+  return fmtDate(value.slice(0, 10));
 }
 
 export function todayIso(): string {

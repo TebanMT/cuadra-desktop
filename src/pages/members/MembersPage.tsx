@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -38,7 +36,7 @@ import { useAttentionRequired } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { daysFromToday } from "@/lib/dates";
+import { daysFromToday, fmtDayMonth } from "@/lib/dates";
 import { members as t } from "@/strings/members";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/shared/StatCard";
@@ -84,12 +82,6 @@ function persistPageSize(size: number) {
 function fmtMoney(n: number | undefined): string {
   if (n === undefined || n === null) return "—";
   return `$${Number(n).toLocaleString("es-MX", { maximumFractionDigits: 0 })}`;
-}
-
-function fmtDayMonth(value: string | undefined): string {
-  if (!value) return "—";
-  const d = value.includes("T") ? parseISO(value) : parseISO(`${value}T00:00:00`);
-  return format(d, "d MMM", { locale: es });
 }
 
 // El color del avatar ya no depende del estado de membresía. Es hash

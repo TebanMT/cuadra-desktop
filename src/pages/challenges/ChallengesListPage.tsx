@@ -20,7 +20,7 @@ import { ChallengeStatusBadge } from "@/components/challenges/StatusBadge";
 import { NewChallengeDialog } from "@/components/challenges/NewChallengeDialog";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { canAccessPlusFeatures } from "@/hooks/useSubscription";
-import { fmtDate } from "@/lib/dates";
+import { fmtDayGrain } from "@/lib/dates";
 import type { Challenge } from "@/types/challenges";
 
 export default function ChallengesListPage() {
@@ -122,10 +122,10 @@ function ChallengeRow({ ch, onClick }: { ch: Challenge; onClick: () => void }) {
       </DataTableCell>
       <DataTableCell>
         <div className="text-sm text-foreground tabular">
-          {fmtDate(ch.measurement_t0_deadline)} → {fmtDate(ch.measurement_t1_start)}
+          {fmtDayGrain(ch.measurement_t0_deadline)} → {fmtDayGrain(ch.measurement_t1_start)}
         </div>
         <div className="text-xs text-muted-foreground mt-0.5 tabular">
-          Cierra {fmtDate(ch.ends_at)}
+          Cierra {fmtDayGrain(ch.ends_at)}
         </div>
       </DataTableCell>
       <DataTableCell>

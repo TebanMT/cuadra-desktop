@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { todayIso } from "@/lib/dates";
 import type { PaymentMethod } from "./useBilling";
 
 export type ReportPeriod =
@@ -208,11 +209,14 @@ export interface ExpenseRow {
   payment_method: string;
 }
 
+// Las keys incluyen el día LOCAL: un período nombrado ("month", "today")
+// resuelve a fechas distintas después de medianoche, y sin el día en la key
+// una pantalla abierta seguía sirviendo el "Hoy" de ayer.
 const KEYS = {
-  dashboard: () => ["reports", "dashboard"] as const,
-  attention: () => ["reports", "attention"] as const,
+  dashboard: () => ["reports", "dashboard", todayIso()] as const,
+  attention: () => ["reports", "attention", todayIso()] as const,
   range: (period: ReportPeriod, from?: string, to?: string) =>
-    ["reports", "range", period, from ?? "", to ?? ""] as const,
+    ["reports", "range", period, from ?? "", to ?? "", todayIso()] as const,
 };
 
 export function useDashboard() {

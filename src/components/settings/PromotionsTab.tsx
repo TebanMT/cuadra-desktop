@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ApiError } from "@/lib/api";
+import { todayIso } from "@/lib/dates";
 import {
   usePromotions,
   useCreatePromotion,
@@ -53,14 +54,10 @@ import { PromotionForm } from "./PromotionForm";
 // = active=false.
 type PromotionDisplayStatus = "active" | "future" | "expired" | "inactive";
 
-function todayISO(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 function displayStatus(p: Promotion): PromotionDisplayStatus {
   if (!p.active) return "inactive";
-  const today = todayISO();
+  const today = todayIso();
   if (p.valid_from && today < p.valid_from) return "future";
   if (p.valid_until && today > p.valid_until) return "expired";
   return "active";
