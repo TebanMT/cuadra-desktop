@@ -706,6 +706,7 @@ function CreateDialog({
         initial_stock: payload.values.initial_stock,
         stock_minimum: payload.values.stock_minimum,
         initial_cost: payload.values.initial_cost,
+        initial_is_purchase: payload.values.initial_is_purchase,
         image_url: payload.values.image_url,
       });
       toast.success(t.form.success.created(created.name));

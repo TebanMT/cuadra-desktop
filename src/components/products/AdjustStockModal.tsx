@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Switch } from "@/components/ui/switch";
 import { useAdjustStock, type Product, type StockMovementType } from "@/hooks/useProducts";
 import { ApiError } from "@/lib/api";
 import { products as t } from "@/strings/products";
@@ -24,6 +25,10 @@ export function AdjustStockModal({ product, open, onOpenChange }: Props) {
   const [quantity, setQuantity] = useState("");
   const [newStock, setNewStock] = useState("");
   const [cost, setCost] = useState("");
+  // ¿La llegada es una compra (salió dinero → egreso) o inventario que ya
+  // existía y apenas se registra? Default compra: el flujo normal de
+  // "Ajustar stock → llegada" es un resurtido de proveedor.
+  const [isPurchase, setIsPurchase] = useState(true);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
 
@@ -101,6 +106,7 @@ export function AdjustStockModal({ product, open, onOpenChange }: Props) {
             movement_type: "restock" as const,
             quantity: q,
             cost: cost ? parseFloat(cost) : undefined,
+            is_purchase: cost ? isPurchase : undefined,
             notes: notes.trim() || undefined,
           }
         : {
@@ -216,6 +222,17 @@ export function AdjustStockModal({ product, open, onOpenChange }: Props) {
                   <p className="text-xs text-muted-foreground">
                     {t.adjustStock.costHint}
                   </p>
+                  {cost && (
+                    <label className="flex items-start gap-2 pt-1">
+                      <Switch checked={isPurchase} onCheckedChange={(v) => setIsPurchase(!!v)} />
+                      <span className="text-sm leading-tight">
+                        {t.adjustStock.isPurchaseLabel}
+                        <span className="block text-xs text-muted-foreground mt-0.5">
+                          {t.adjustStock.isPurchaseHint}
+                        </span>
+                      </span>
+                    </label>
+                  )}
                 </div>
               )}
             </div>

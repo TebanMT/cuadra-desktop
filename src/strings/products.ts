@@ -70,7 +70,11 @@ export const products = {
     },
     photoHint: "Opcional. JPG, PNG o WEBP, máx. 2 MB.",
     minStockHint: "Te avisamos cuando llegue a este nivel.",
-    initialCostHint: "Opcional. Lo que pagaste por unidad. Queda en el historial de egresos.",
+    initialCostHint:
+      "Opcional. El costo por unidad — sirve para calcular tu ganancia.",
+    initialIsPurchase: "Lo compré ahora (salió dinero)",
+    initialIsPurchaseHint:
+      "Actívalo sólo si este stock lo acabas de comprar: contará como egreso del período. Si ya lo tenías y sólo lo estás registrando, déjalo apagado.",
     margin: {
       heading: "Margen por unidad",
       cost: "Costo prom",
@@ -121,6 +125,9 @@ export const products = {
     countLabel: "Stock real",
     costLabel: "Costo unitario (opcional)",
     costHint: "Lo que pagaste por unidad en esta llegada.",
+    isPurchaseLabel: "Es una compra (salió dinero)",
+    isPurchaseHint:
+      "Apágalo si es inventario que ya tenías y apenas lo estás registrando — no contará como egreso.",
     notesLabel: "Nota (opcional)",
     notesPlaceholder: "Ej. Proveedor Coca, factura #1234",
     submit: "Aplicar ajuste",

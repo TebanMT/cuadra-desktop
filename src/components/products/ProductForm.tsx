@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CameraCaptureModal } from "@/components/shared/CameraCaptureModal";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
@@ -33,6 +34,11 @@ export interface ProductFormValues {
   // campo análogo en update porque las llegadas posteriores se
   // registran por separado vía /adjust-stock.
   initial_cost: string;
+  // ¿El stock inicial es una COMPRA (salió dinero → egreso del período) o
+  // inventario que ya existía y apenas se registra? Default false: el alta
+  // típica es formalizar catálogo — la carga inicial del gym contaba como
+  // compra y el mes arrancaba con utilidad negativa.
+  initial_is_purchase: boolean;
   image_url: string;
 }
 
@@ -49,6 +55,7 @@ export interface ProductFormSubmitPayload {
     initial_stock: number;
     stock_minimum: number;
     initial_cost?: number;
+    initial_is_purchase?: boolean;
     image_url?: string;
   };
   addAnother: boolean;
@@ -88,6 +95,7 @@ const emptyValues: ProductFormValues = {
   stock: "0",
   stock_minimum: "0",
   initial_cost: "",
+  initial_is_purchase: false,
   image_url: "",
 };
 
@@ -208,6 +216,9 @@ export function ProductForm({
         initial_stock: parsed.data.stock,
         stock_minimum: parsed.data.stock_minimum,
         initial_cost,
+        // Sólo relevante cuando hay costo — sin costo el movimiento no
+        // entra a ningún número de dinero de todos modos.
+        initial_is_purchase: initial_cost !== undefined ? values.initial_is_purchase : undefined,
         image_url: values.image_url || undefined,
       },
       addAnother: mode === "create" ? addAnother : false,
@@ -288,6 +299,20 @@ export function ProductForm({
             onChange={(e) => update("initial_cost", e.target.value)}
           />
           <p className="text-xs text-muted-foreground">{t.form.initialCostHint}</p>
+          {values.initial_cost && (
+            <label className="flex items-start gap-2 pt-1">
+              <Switch
+                checked={values.initial_is_purchase}
+                onCheckedChange={(v) => update("initial_is_purchase", !!v)}
+              />
+              <span className="text-sm leading-tight">
+                {t.form.initialIsPurchase}
+                <span className="block text-xs text-muted-foreground mt-0.5">
+                  {t.form.initialIsPurchaseHint}
+                </span>
+              </span>
+            </label>
+          )}
         </div>
       )}
 

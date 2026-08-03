@@ -90,6 +90,9 @@ export interface CreateProductInput {
   initial_stock: number;
   stock_minimum: number;
   initial_cost?: number;
+  // false = inventario que ya existía (captura de catálogo): conserva el
+  // costo para el margen pero NO cuenta como egreso. Ausente = compra.
+  initial_is_purchase?: boolean;
   image_url?: string;
 }
 
@@ -111,6 +114,8 @@ export interface AdjustStockInput {
   quantity?: number;
   new_stock?: number;
   cost?: number;
+  // Sólo restock: false = inventario preexistente, no es egreso.
+  is_purchase?: boolean;
   notes?: string;
 }
 
@@ -247,6 +252,7 @@ interface AdjustStockWire {
   movement_type: "restock" | "shrinkage" | "count_correction";
   quantity: number;
   cost?: number;
+  is_purchase?: boolean;
   reason?: string;
 }
 
@@ -262,6 +268,7 @@ function toAdjustStockWire(input: AdjustStockInput): AdjustStockWire {
     movement_type: input.movement_type === "damage" ? "shrinkage" : "restock",
     quantity: input.quantity ?? 0,
     cost: input.cost,
+    is_purchase: input.is_purchase,
     reason: input.notes,
   };
 }
