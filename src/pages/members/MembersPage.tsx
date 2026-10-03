@@ -1,5 +1,7 @@
+import { memberView, type MemberView } from "@/lib/memberNavigation";
+import { MemberBalances } from "@/components/members/MemberBalances";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ChevronLeft,
@@ -27,7 +29,6 @@ import {
   useMembersList,
   useMemberStatusCounts,
   type MemberListItem,
-  type MemberStatusFilter,
   type MemberSort,
   type SortDir,
 } from "@/hooks/useMembers";
@@ -139,10 +140,18 @@ function statusInfo(item: MemberListItem): StatusInfo {
 }
 
 export default function MembersPage() {
-  const [search, setSearch] = useState("");
+  const [params, setParams] = useSearchParams();
+  const search = params.get("q") ?? "";
+  function setSearch(value: string) {
+    setParams(current => { const next = new URLSearchParams(current); if (value) next.set("q", value); else next.delete("q"); return next; }, { replace: true });
+  }
   const debouncedSearch = useDebounce(search, 300);
 
-  const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>("");
+  const statusFilter = memberView(params);
+  const balances = statusFilter === "balance";
+  function setStatusFilter(status: MemberView) {
+    setParams(current => { const next = new URLSearchParams(current); if (status) next.set("status", status); else next.delete("status"); return next; });
+  }
   const [planFilter, setPlanFilter] = useState<string>("");
   const [sortKey, setSortKey] = useState<SortKey>("expiry_asc");
   const [page, setPage] = useState(1);
@@ -160,18 +169,17 @@ export default function MembersPage() {
 
   const list = useMembersList({
     q: debouncedSearch || undefined,
-    status: statusFilter || undefined,
+    status: statusFilter === "balance" ? undefined : statusFilter || undefined,
     plan_id: planFilter || undefined,
     sort: sortCfg.sort,
     dir: sortCfg.dir,
     page,
     page_size: pageSize,
-  });
+  }, !balances);
 
   const counts = useMemberStatusCounts();
   const types = useMembershipTypes(false);
-  // Deuda por socio para el chip "Debe $X" de la fila. Sale de la lista
-  // de deudores de Atención requerida (completa, no paginada) — el
+  // Saldos completos del reporte compartido; el
   // listado de socios no trae este dato y agregarlo ahí cruzaría bounded
   // contexts (members consultando payments); el join se hace aquí.
   const attention = useAttentionRequired();
@@ -262,7 +270,7 @@ export default function MembersPage() {
           value={counts.data?.expired ?? "—"}
           icon={UserX}
           tone={counts.data && counts.data.expired > 0 ? "danger" : "neutral"}
-          hint="por recuperar"
+          hint="membresía vencida"
         />
       </div>
 
@@ -298,6 +306,8 @@ export default function MembersPage() {
           active={statusFilter === "inactive"}
           onClick={() => setStatusFilter("inactive")}
         />
+        <FilterPill label="Sin renovar · 60 días" active={statusFilter === "unrenewed"} onClick={() => setStatusFilter("unrenewed")} />
+        <FilterPill label="Con saldo" count={attention.data?.pending_balance.length} active={balances} onClick={() => setStatusFilter("balance")} />
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -306,13 +316,13 @@ export default function MembersPage() {
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por nombre, folio o teléfono…"
+            placeholder={balances ? "Buscar por nombre o teléfono…" : "Buscar por nombre, folio o teléfono…"}
             className="pl-9 h-10"
             aria-label="Buscar socio"
           />
         </div>
 
-        <Select value={planFilter || "_all"} onValueChange={(v) => setPlanFilter(v === "_all" ? "" : v)}>
+        {!balances && <Select value={planFilter || "_all"} onValueChange={(v) => setPlanFilter(v === "_all" ? "" : v)}>
           <SelectTrigger className="h-10 w-[180px]">
             <SelectValue placeholder="Todos los planes" />
           </SelectTrigger>
@@ -324,9 +334,9 @@ export default function MembersPage() {
               </SelectItem>
             ))}
           </SelectContent>
-        </Select>
+        </Select>}
 
-        <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+        {!balances && <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
           <SelectTrigger className="h-10 w-[200px]">
             <SelectValue />
           </SelectTrigger>
@@ -337,17 +347,16 @@ export default function MembersPage() {
               </SelectItem>
             ))}
           </SelectContent>
-        </Select>
+        </Select>}
       </div>
 
-      {list.error && (
+      {!balances && list.error && (
         <Alert variant="destructive">
           <AlertDescription>{t.errors.loadList}</AlertDescription>
         </Alert>
       )}
 
-      {/* Table */}
-      <SectionCard flush>
+      {balances ? <MemberBalances search={debouncedSearch} /> : <SectionCard flush>
         {list.isLoading && items.length === 0 ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -393,10 +402,10 @@ export default function MembersPage() {
             </DataTableBody>
           </DataTable>
         )}
-      </SectionCard>
+      </SectionCard>}
 
       {/* Pagination */}
-      {items.length > 0 && (
+      {!balances && items.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <Select value={String(pageSize)} onValueChange={(v) => changePageSize(parseInt(v, 10))}>

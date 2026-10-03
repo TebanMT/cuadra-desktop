@@ -52,15 +52,17 @@ export function SyncIndicator() {
   const [open, setOpen] = useState(false);
   const { data } = useSyncStatus();
   const trigger = useTriggerSync();
+  const syncing = trigger.isPending || data?.sync_in_progress === true;
   const navigate = useNavigate();
   const level = levelOf(data);
+  const hasPending = (data?.queue_pending_count ?? 0) > 0;
 
   // Un lugar por nivel. Disciplina de severidad (offline-first): sin
   // conexión NO es error — gris calmado con nube; ámbar sólo cuando
   // llevas DÍAS sin sincronizar (visibilidad, no pánico); el rojo queda
   // reservado para problemas reales (rechazos del servidor, app vieja).
   const LEVEL_UI = {
-    ok: { icon: CheckCircle2, color: "text-success", label: shell.sync.online },
+    ok: { icon: hasPending ? RefreshCw : CheckCircle2, color: hasPending ? "text-muted-foreground" : "text-success", label: hasPending ? shell.sync.pending : shell.sync.online },
     syncing: { icon: RefreshCw, color: "text-muted-foreground", label: shell.sync.syncing },
     offline: { icon: CloudOff, color: "text-muted-foreground", label: shell.sync.offline },
     offlineLong: { icon: AlertTriangle, color: "text-warning", label: shell.sync.offlineLong },
@@ -85,12 +87,13 @@ export function SyncIndicator() {
       </button>
       <button
         onClick={() => trigger.mutate()}
-        disabled={trigger.isPending}
+        disabled={syncing}
         className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
-        aria-label={shell.sync.triggerNow}
-        title={shell.sync.triggerNow}
+        aria-label={syncing ? shell.sync.syncing : shell.sync.triggerNow}
+        aria-busy={syncing}
+        title={syncing ? shell.sync.syncing : shell.sync.triggerNow}
       >
-        <RefreshCw className={cn("h-4 w-4", trigger.isPending && "animate-spin")} />
+        <RefreshCw className={cn("h-4 w-4 motion-reduce:animate-none", syncing && "animate-spin")} />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -160,9 +163,9 @@ function SyncDetail({ status }: { status?: SyncStatus | null }) {
       {(status?.queue_stuck_count ?? 0) > 0 && (
         <Row label={shell.sync.stuckPush}>{status?.queue_stuck_count}</Row>
       )}
-      <Row label={shell.sync.lastError}>
-        {status?.last_error || shell.sync.none}
-      </Row>
+      {status?.last_error && <div><dt className="sr-only">{shell.sync.lastError}</dt><dd>
+        <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Detalle para soporte</summary><p className="mt-2 whitespace-pre-wrap break-words">{status.last_error}</p></details>
+      </dd></div>}
     </dl>
   );
 }
@@ -194,7 +197,7 @@ export function StuckItemsList({
       <ul className="space-y-2 max-h-56 overflow-y-auto pr-1">
         {items.map((it) => {
           const editRoute = stuckEditRoute(it);
-          const typeName = shell.sync.entityNames[it.entity_type] ?? it.entity_type;
+          const typeName = shell.sync.entityNames[it.entity_type] ?? "Registro";
           return (
             <li
               key={it.queue_id}
@@ -209,7 +212,8 @@ export function StuckItemsList({
                   {shell.sync.stuckRetryCount(it.retry_count)}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground break-words">{it.message}</p>
+              <p className="text-xs text-muted-foreground">{it.kind === "duplicate" ? "Ya existe un registro con estos datos." : "No se pudo sincronizar este cambio. Comparte el detalle con soporte."}</p>
+              <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">Detalle para soporte</summary><p className="mt-2 break-words">{it.entity_type}: {it.message}</p></details>
               {editRoute && (
                 <Button
                   size="sm"

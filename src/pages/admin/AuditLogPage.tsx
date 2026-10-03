@@ -1,9 +1,10 @@
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { auditActionLabel, auditEntityLabel } from "@/strings/audit";
 import { useEffect, useMemo, useState } from "react";
 import { Eye, Loader2 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -153,24 +154,7 @@ export default function AuditLogPage() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label className="text-xs">{t.audit.filters.from}</Label>
-              <Input
-                type="date"
-                className="h-9"
-                value={from}
-                onChange={(e) => setFrom(e.target.value)}
-              />
-            </div>
-            <div>
-              <Label className="text-xs">{t.audit.filters.to}</Label>
-              <Input
-                type="date"
-                className="h-9"
-                value={to}
-                onChange={(e) => setTo(e.target.value)}
-              />
-            </div>
+            <div className="col-span-2 self-end"><DateRangePicker from={from} to={to} label="Filtrar por fecha" clearable onChange={(start, end) => { setFrom(start); setTo(end); }} /></div>
           </div>
           <div className="flex justify-end">
             <Button variant="ghost" size="sm" onClick={resetFilters}>
@@ -224,10 +208,10 @@ export default function AuditLogPage() {
                         {entry.actor_name ?? <span className="text-muted-foreground">sistema</span>}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline">{entry.action}</Badge>
+                        <Badge variant="outline">{auditActionLabel(entry.action)}</Badge>
                       </TableCell>
                       <TableCell className="text-sm">
-                        <span className="text-muted-foreground">{entry.entity_type}</span>
+                        <span className="text-muted-foreground">{auditEntityLabel(entry.entity_type)}</span>
                         {entry.entity_id && (
                           <span className="font-mono text-xs ml-2">
                             {entry.entity_id.slice(0, 8)}…
@@ -235,7 +219,7 @@ export default function AuditLogPage() {
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="icon">
+                        <Button variant="ghost" size="icon" aria-label={t.audit.actions.view}>
                           <Eye className="h-4 w-4" />
                         </Button>
                       </TableCell>
@@ -284,29 +268,30 @@ function DetailModal({ entry, onClose }: { entry: AuditLogEntry | null; onClose(
           <>
             <DialogHeader>
               <DialogTitle>{t.audit.detail.title}</DialogTitle>
-              <DialogDescription className="space-y-1">
+              <DialogDescription asChild><div className="space-y-1 text-sm text-muted-foreground">
                 <div>
-                  <span className="font-mono text-xs">{entry.action}</span> ·{" "}
+                  <span className="font-mono text-xs">{auditActionLabel(entry.action)}</span> ·{" "}
                   {format(parseISO(entry.created_at), "d MMM yyyy HH:mm:ss", { locale: es })}
                 </div>
                 <div>
                   {entry.actor_name && <>Por: <strong>{entry.actor_name}</strong> · </>}
-                  {entry.entity_type}
+                  {auditEntityLabel(entry.entity_type)}
                   {entry.entity_id && (
                     <span className="font-mono text-xs ml-2">{entry.entity_id}</span>
                   )}
                 </div>
-              </DialogDescription>
+              </div></DialogDescription>
             </DialogHeader>
             <div className="space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                {t.audit.detail.changes}
-              </p>
+              {typeof entry.changes?.reason === "string" && <p className="text-sm">Motivo: {entry.changes.reason}</p>}
+              {typeof entry.changes?.correction_reason === "string" && <p className="text-sm">Motivo: {entry.changes.correction_reason}</p>}
+              <details><summary className="cursor-pointer text-sm">Detalle del cambio</summary>
+              <p className="mt-2 text-xs text-muted-foreground">{entry.action} · {entry.entity_type}</p>
               <pre className="rounded-md border bg-muted/40 p-3 text-xs font-mono overflow-x-auto whitespace-pre-wrap">
                 {entry.changes
                   ? JSON.stringify(entry.changes, null, 2)
                   : t.audit.detail.empty}
-              </pre>
+              </pre></details>
             </div>
           </>
         )}

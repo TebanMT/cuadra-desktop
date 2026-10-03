@@ -13,7 +13,7 @@ export const messaging = {
     bodyPlaceholder:
       "Escribe el aviso… (ej. Promo 2x1 en inscripción este fin de semana)",
     bodyHelp:
-      "El saludo y el nombre de tu gym se agregan solos. Tú sólo escribes el aviso.",
+      "El saludo y el nombre del gym se agregan automáticamente.",
     previewLabel: "Así le llega al socio",
     // Esqueleto del template aprobado por Meta (broadcast_freeform). El nombre
     // del socio y el del gym los rellena WhatsApp; el dueño sólo pone el aviso.
@@ -32,14 +32,14 @@ export const messaging = {
       `Llegaste al máximo de ${limit} envíos este mes. Se renueva el día 1.`,
     overCap: (count: number, cap: number) =>
       `Tienes ${count} socios en este grupo, pero el máximo por envío es ${cap}. Usa un grupo más chico o mejora a Plus.`,
-    plusHint: "Standard: 2 envíos al mes, hasta 150 socios c/u. Plus levanta los topes.",
+    plusHint: "Standard: 2 envíos al mes, hasta 150 socios por envío. Plus: sin estos límites.",
     // Selección manual de socios (opción C)
     chooseSpecific: "Elegir socios específicos",
     adjustRecipients: (n: number) => `Ajustar destinatarios (${n})`,
     backToGroup: "Usar el grupo completo",
     pickerTitle: "Elegir destinatarios",
     pickerHint:
-      "Parten de tu grupo. Quita los que no quieras o busca para agregar otros.",
+      "Puedes quitar socios o buscar otros para agregarlos.",
     pickerSearch: "Buscar socio por nombre…",
     pickerNoResults: "Sin resultados.",
     pickerEmpty: "Aún no hay socios. Búscalos arriba para agregar.",
@@ -52,7 +52,7 @@ export const messaging = {
       title: (n: number) =>
         n === 1 ? "¿Enviar a 1 socio?" : `¿Enviar a ${n} socios?`,
       body:
-        "Se enviará por WhatsApp a todo el grupo. Esta acción no se puede deshacer.",
+        "Los destinatarios seleccionados recibirán el mensaje por WhatsApp. No podrás cancelar el envío.",
       cancel: "Cancelar",
       confirm: "Sí, enviar",
     },
@@ -60,9 +60,9 @@ export const messaging = {
     submitting: "Enviando…",
     success: (n: number) =>
       n === 1
-        ? "1 mensaje encolado para enviar."
-        : `${n} mensajes encolados para enviar.`,
-    error: "No pudimos enviar el broadcast.",
+        ? "1 mensaje pendiente de envío."
+        : `${n} mensajes pendientes de envío.`,
+    error: "No se pudo enviar el mensaje.",
     empty: "Escribe el mensaje.",
     tooLong: "Mensaje muy largo. Máximo 600 caracteres.",
     noAudience: "Selecciona el grupo destinatario.",
@@ -79,17 +79,17 @@ export const messaging = {
     filters: {
       entity: "Tipo",
       entityAll: "Todos",
-      actor: "Actor",
+      actor: "Quién",
       actorAll: "Cualquiera",
       from: "Desde",
       to: "Hasta",
       reset: "Limpiar filtros",
     },
     columns: {
-      when: "Cuándo",
+      when: "Fecha",
       who: "Quién",
-      what: "Qué",
-      entity: "Entidad",
+      what: "Cambio",
+      entity: "Tipo",
       actions: "",
     },
     actions: {
@@ -98,7 +98,7 @@ export const messaging = {
     detail: {
       title: "Detalle del registro",
       changes: "Cambios",
-      empty: "Sin cambios serializados.",
+      empty: "No hay detalle de cambios.",
       close: "Cerrar",
     },
     pagination: {

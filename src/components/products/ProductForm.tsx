@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CameraCaptureModal } from "@/components/shared/CameraCaptureModal";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
@@ -30,7 +29,7 @@ export interface ProductFormValues {
   stock_minimum: string;
   // Costo unitario al momento de crear el producto. Sólo se usa en
   // modo create — viaja como `initial_cost` al backend y se persiste
-  // en stock_movements (el movement_type='restock' inicial). No hay
+  // disponibles_movements (el movement_type='restock' inicial). No hay
   // campo análogo en update porque las llegadas posteriores se
   // registran por separado vía /adjust-stock.
   initial_cost: string;
@@ -216,9 +215,9 @@ export function ProductForm({
         initial_stock: parsed.data.stock,
         stock_minimum: parsed.data.stock_minimum,
         initial_cost,
-        // Sólo relevante cuando hay costo — sin costo el movimiento no
-        // entra a ningún número de dinero de todos modos.
-        initial_is_purchase: initial_cost !== undefined ? values.initial_is_purchase : undefined,
+        // El alta formaliza inventario que ya existía. Las compras reales se
+        // registran después en "Llegó mercancía", con fecha y origen de pago.
+        initial_is_purchase: false,
         image_url: values.image_url || undefined,
       },
       addAnother: mode === "create" ? addAnother : false,
@@ -246,8 +245,8 @@ export function ProductForm({
       {/* En modo edit, Stock NO es editable desde este form: el backend
           rechaza cambios de stock en PATCH /products/:id (ADR-002 /
           DA-24.1 — los ajustes pasan por /adjust-stock para que queden
-          trazados en stock_movements). El operador tiene el botón
-          "Ajustar stock" en la tabla que abre AdjustStockModal con las
+          trazados disponibles_movements). El operador tiene el botón
+          "Ajustar existencias" en la tabla que abre AdjustStockModal con las
           opciones correctas (llegada, merma, conteo). Mostrar un input
           aquí sería UX trampa: el cambio se descartaría silenciosamente. */}
       <div className={mode === "create" ? "grid grid-cols-2 gap-3" : ""}>
@@ -279,12 +278,9 @@ export function ProductForm({
         )}
       </div>
 
-      {/* Costo unitario — solo en create. Opcional: si el operador no
-          lo conoce, lo deja vacío y el stock_movement inicial queda
-          sin costo. El que sí lo escribe permite que el reporte de
-          egresos refleje cuánto desembolsó para llenar el inventario
-          de arranque. Llegadas posteriores capturan su costo vía
-          AdjustStockModal (movement_type='restock'). */}
+      {/* El costo inicial sirve para el margen, pero nunca crea una salida:
+          el alta formaliza inventario que el gym ya tenía. Una compra nueva
+          requiere fecha/origen y vive en "Llegó mercancía". */}
       {mode === "create" && (
         <div className="space-y-2">
           <Label htmlFor="p-cost">{t.form.fields.initialCost}</Label>
@@ -299,20 +295,6 @@ export function ProductForm({
             onChange={(e) => update("initial_cost", e.target.value)}
           />
           <p className="text-xs text-muted-foreground">{t.form.initialCostHint}</p>
-          {values.initial_cost && (
-            <label className="flex items-start gap-2 pt-1">
-              <Switch
-                checked={values.initial_is_purchase}
-                onCheckedChange={(v) => update("initial_is_purchase", !!v)}
-              />
-              <span className="text-sm leading-tight">
-                {t.form.initialIsPurchase}
-                <span className="block text-xs text-muted-foreground mt-0.5">
-                  {t.form.initialIsPurchaseHint}
-                </span>
-              </span>
-            </label>
-          )}
         </div>
       )}
 
@@ -460,4 +442,3 @@ export function ProductForm({
     </form>
   );
 }
-

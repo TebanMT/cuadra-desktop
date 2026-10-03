@@ -35,7 +35,7 @@ export function QuickPayModal({ open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle>¿A quién le vas a cobrar?</DialogTitle>
           <DialogDescription>
-            Busca por nombre o teléfono. Te llevo a su perfil con el modal de cobro listo.
+            Busca al socio por nombre o teléfono.
           </DialogDescription>
         </DialogHeader>
         <MemberSearchInput

@@ -2,16 +2,16 @@ import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   BarChart3,
-  Bell,
+  Calculator,
   CreditCard,
   LayoutDashboard,
   LogIn as Door,
   LogOut,
+  Lock,
   Package,
   Receipt,
   Settings,
   ShoppingCart,
-  Trophy,
   Users,
 } from "lucide-react";
 import { LogoIcon } from "@/components/shared/Logo";
@@ -24,9 +24,8 @@ import { useLogout } from "@/hooks/useAuth";
 import { canAccessPlusFeatures } from "@/hooks/useSubscription";
 
 // Sidebar agrupado por frecuencia de uso. Los items diarios (Inicio,
-// Check-in, Cobros, Venta rápida, Socios) van arriba en "Operación".
-// Atención queda al final del grupo: es lo que se revisa al terminar
-// el turno o al inicio del día, no la primera acción. El catálogo
+// Check-in, Ingresos, Venta rápida, Socios) van arriba en "Operación".
+// El catálogo
 // (planes, productos) es de set-up y revisión puntual. Programas
 // (Retos) es opcional según el gym. Reportes y Ajustes quedan abajo
 // porque son admin / mensual.
@@ -41,11 +40,15 @@ interface NavItem {
   // kbd: atajo global de una letra (useHotkeys en TopBar) que este item
   // publicita — chip sutil expandido, "(X)" en el title colapsado.
   kbd?: string;
-  // plusOnly: el item se OCULTA cuando el gym no es Plus. Mientras Plus
-  // siga sin venderse, mostrarlo con badge "Próximamente" contamina la
-  // experiencia Standard. Cuando Plus se libere, revertir a render con
-  // badge (ver `CUANDO PLUS SE LIBERE` en src/hooks/useSubscription.ts).
+  // plusOnly: el item se muestra con CANDADO cuando el gym no es Plus
+  // (decisión ago-2026: el candado es el vendedor de Plus); el click
+  // aterriza en el PlusFeatureLock de la página.
   plusOnly?: boolean;
+  // ownerOnly: el item se OCULTA para operadores (plan Reports-improve:
+  // "rol se oculta, Plus se encandada" — al operador no se le vende nada).
+  // La ruta además vive bajo OwnerOnlyRoute y el BE la gatea con
+  // RequireOwner; esto sólo limpia el sidebar.
+  ownerOnly?: boolean;
 }
 interface NavGroup {
   label: string;
@@ -58,9 +61,9 @@ const NAV_GROUPS: NavGroup[] = [
       { to: "/", icon: LayoutDashboard, label: shell.nav.dashboard, end: true, kbd: "I" },
       { to: "/checkin", icon: Door, label: shell.nav.checkin },
       { to: "/billing", icon: CreditCard, label: shell.nav.billing },
+      { to: "/reports/cash-close", icon: Calculator, label: shell.nav.cashClose },
       { to: "/sales", icon: ShoppingCart, label: shell.nav.sales },
       { to: "/members", icon: Users, label: shell.nav.members },
-      { to: "/attention-required", icon: Bell, label: shell.nav.attention },
     ],
   },
   {
@@ -71,18 +74,19 @@ const NAV_GROUPS: NavGroup[] = [
       // ventas, no merece estar enterrado.
       { to: "/settings/membership-types", icon: CreditCard, label: shell.nav.membershipTypes },
       { to: "/products", icon: Package, label: shell.nav.products },
-      // Gastos es feature Plus — oculto hasta que Plus se libere.
-      { to: "/expenses", icon: Receipt, label: shell.nav.expenses, plusOnly: true },
+      // Gastos básicos son Standard; recurrencias y análisis conservan gate Plus.
+      { to: "/expenses", icon: Receipt, label: shell.nav.expenses, ownerOnly: true },
     ],
   },
   {
-    label: shell.navGroups.programs,
-    // Retos también es Plus — oculto hasta que Plus se libere.
-    items: [{ to: "/retos", icon: Trophy, label: shell.nav.challenges, plusOnly: true }],
-  },
-  {
     label: shell.navGroups.reports,
-    items: [{ to: "/reports", icon: BarChart3, label: shell.nav.reports }],
+    items: [
+      { to: "/reports", icon: BarChart3, label: shell.nav.reports, ownerOnly: true, end: true },
+      // Corte de caja es tarea de cierre del OPERADOR — entrada propia
+      // porque el único acceso anterior era un link dentro de /reports,
+      // que ahora es owner-only. Grupo Reportes (no Operación) para
+      // respetar el cap de ≤6 items por grupo.
+    ],
   },
   {
     label: shell.navGroups.settings,
@@ -99,13 +103,17 @@ export function Sidebar() {
   const logout = useLogout();
   const navigate = useNavigate();
 
-  // Plus aún no se vende — ocultamos los items Plus en lugar de mostrarlos
-  // con badge "Próximamente". Cuando Plus se libere, revertir a render con
-  // `plusOnly` badge (ver git history de este archivo y comentario
-  // `CUANDO PLUS SE LIBERE` en src/hooks/useSubscription.ts).
-  const visibleGroups = NAV_GROUPS
-    .map((g) => ({ ...g, items: g.items.filter((i) => isPlus || !i.plusOnly) }))
-    .filter((g) => g.items.length > 0);
+  // Decisión ago-2026 (Esteban): los items Plus se MUESTRAN con candado en
+  // lugar de ocultarse — el candado es el vendedor de Plus. Al hacer click
+  // la página aterriza en su PlusFeatureLock (el upsell). El acceso real
+  // sigue gateado por canAccessPlusFeatures + PlanGate del backend.
+  // Los items ownerOnly en cambio se OCULTAN para operadores (rol se
+  // oculta, Plus se encandada); los grupos que quedan vacíos desaparecen.
+  const isOwner = user?.role === "owner";
+  const visibleGroups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((i) => !i.ownerOnly || isOwner),
+  })).filter((g) => g.items.length > 0);
 
   useEffect(() => {
     getAppVersion().then(setVersion).catch(() => undefined);
@@ -162,40 +170,55 @@ export function Sidebar() {
                   {group.label}
                 </div>
               )}
-              {group.items.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.end}
-                  title={!hovered ? (item.kbd ? `${item.label} (${item.kbd})` : item.label) : undefined}
-                  className={({ isActive }) =>
-                    cn(
-                      "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors h-10",
-                      isActive
-                        ? "bg-[hsl(var(--sidebar-active))] text-[hsl(var(--sidebar-active-foreground))]"
-                        : "text-ink-500 hover:bg-paper-200 hover:text-ink-700 dark:text-ink-300 dark:hover:bg-ink-700 dark:hover:text-paper-50"
-                    )
-                  }
-                >
-                  <item.icon
-                    className={cn("h-5 w-5 shrink-0", !hovered && "mx-auto")}
-                    strokeWidth={2}
-                  />
-                  <span
-                    className={cn(
-                      "whitespace-nowrap transition-opacity duration-200 flex-1",
-                      hovered ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
-                    )}
+              {group.items.map((item) => {
+                const locked = !isPlus && item.plusOnly;
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    title={
+                      !hovered
+                        ? locked
+                          ? `${item.label} · Plus`
+                          : item.kbd
+                            ? `${item.label} (${item.kbd})`
+                            : item.label
+                        : undefined
+                    }
+                    className={({ isActive }) =>
+                      cn(
+                        "group flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors h-10",
+                        isActive
+                          ? "bg-[hsl(var(--sidebar-active))] text-[hsl(var(--sidebar-active-foreground))]"
+                          : "text-ink-500 hover:bg-paper-200 hover:text-ink-700 dark:text-ink-300 dark:hover:bg-ink-700 dark:hover:text-paper-50",
+                        locked && "opacity-60"
+                      )
+                    }
                   >
-                    {item.label}
-                  </span>
-                  {item.kbd && hovered && (
-                    <kbd className="ml-auto shrink-0 inline-flex h-4 min-w-[1rem] items-center justify-center rounded px-1 text-[10px] font-mono bg-paper-200 text-ink-500 dark:bg-ink-700 dark:text-ink-300">
-                      {item.kbd}
-                    </kbd>
-                  )}
-                </NavLink>
-              ))}
+                    <item.icon
+                      className={cn("h-5 w-5 shrink-0", !hovered && "mx-auto")}
+                      strokeWidth={2}
+                    />
+                    <span
+                      className={cn(
+                        "whitespace-nowrap transition-opacity duration-200 flex-1",
+                        hovered ? "opacity-100" : "opacity-0 w-0 overflow-hidden"
+                      )}
+                    >
+                      {item.label}
+                    </span>
+                    {locked && hovered && (
+                      <Lock className="ml-auto h-3.5 w-3.5 shrink-0 text-sidebar-muted" strokeWidth={2} />
+                    )}
+                    {!locked && item.kbd && hovered && (
+                      <kbd className="ml-auto shrink-0 inline-flex h-4 min-w-[1rem] items-center justify-center rounded px-1 text-[10px] font-mono bg-paper-200 text-ink-500 dark:bg-ink-700 dark:text-ink-300">
+                        {item.kbd}
+                      </kbd>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
           ))}
         </nav>

@@ -11,12 +11,23 @@ export type PaymentConcept =
   | "other";
 
 export interface Payment {
+  cash_destination?: "cash_drawer" | "gym_fund";
   id: string;
+  /** Optimistic-lock version required by auditable administrative corrections. */
+  version: number;
   gym_id: string;
-  member_id: string;
+  member_id?: string | null;
   member_name?: string | null;
+  // Disponible en cobros de producto creados por una venta. Habilita la
+  // corrección auditable sin intentar inferir la venta desde el payment.
+  sale_id?: string | null;
+  // Productos de la venta ("Agua 1L ×2 · Proteína") para concept='product'
+  // y sus refunds. Título cuando no hay socio (venta walk-in).
+  sale_summary?: string | null;
   amount: number;
+  recognized_amount?: number;
   payment_method: PaymentMethod | null;
+  cash_drawer_id?: string | null;
   concept: PaymentConcept;
   reference: string;
   discount_amount?: number;
@@ -34,10 +45,65 @@ export interface Payment {
   receipt_sent_at?: string | null;
 }
 
+export interface PaymentCorrectionSnapshot {
+ cash_destination?: "cash_drawer" | "gym_fund";
+  version: number;
+  amount: number;
+  recognized_amount: number;
+  balance_pending: number;
+  payment_method: PaymentMethod;
+  cash_drawer_id?: string | null;
+  payment_date: string;
+  annulled: boolean;
+}
+
+export interface PaymentCorrectionInput {
+ cash_destination?: "cash_drawer" | "gym_fund";
+  expected_version: number;
+  reason: string;
+  amount?: number;
+  payment_method?: PaymentMethod;
+  cash_drawer_id?: string;
+  payment_date?: string;
+  /** Only valid for a root extraordinary-income payment. Cannot be mixed with field edits. */
+  annul?: boolean;
+  idempotency_key: string;
+}
+
+export interface PaymentCorrectionResponse {
+  correction_id: string;
+  payment_id: string;
+  payment_version: number;
+  before: PaymentCorrectionSnapshot;
+  after: PaymentCorrectionSnapshot;
+  /** Administrative corrections never rewrite the membership service period. */
+  service_effects_changed: false;
+  annulled: boolean;
+}
+
+export interface PaymentCorrectionHistoryItem {
+  id: string;
+  payment_id: string;
+  expected_payment_version: number;
+  reason: string;
+  before: PaymentCorrectionSnapshot;
+  after: PaymentCorrectionSnapshot;
+  created_by: string;
+  created_at: string;
+  annulled: boolean;
+}
+
+export interface PaymentCorrectionHistoryResponse {
+  items: PaymentCorrectionHistoryItem[];
+  total: number;
+}
+
 export interface RegisterMembershipPaymentInput {
+  idempotency_key: string;
   member_id: string;
   membership_type_id: string;
   payment_method: PaymentMethod;
+  cash_drawer_id?: string;
   // amount es lo que el FE muestra al operador como total a cobrar; el
   // backend lo deriva del MembershipType + flags. Lo enviamos sólo para
   // ergonomía (retrocompat con clientes que firmaban un "monto"). Vacío
@@ -93,10 +159,34 @@ export interface RegisterMembershipPaymentResponse {
 }
 
 export interface SettleBalanceInput {
+  idempotency_key: string;
   amount: number;
   payment_method: PaymentMethod;
+  cash_drawer_id?: string;
   payment_date?: string;
   notes?: string;
+}
+
+export interface RegisterOtherIncomeInput {
+  cash_destination?: "cash_drawer" | "gym_fund";
+  amount: number;
+  payment_method: PaymentMethod;
+  cash_drawer_id?: string;
+  payment_date: string;
+  description: string;
+  // Se conserva durante todos los reintentos del mismo intento de captura.
+  // El backend deriva el payment_id de esta llave para no duplicar ingresos
+  // cuando la respuesta se pierde o el sidecar reenvía la petición.
+  idempotency_key: string;
+}
+
+export function useRegisterOtherIncome() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: RegisterOtherIncomeInput) =>
+      api.post<{ payment_id: string; folio: string; amount: number }>("/api/v1/payments/other", input),
+    onSuccess: () => invalidateMember(qc, null),
+  });
 }
 
 // Espeja settleResp del backend (payment_controller.go).
@@ -106,18 +196,32 @@ export interface SettleBalanceResponse {
   new_balance_pending: number;
 }
 
-export type RefundMoneyReturn = "cash" | "transfer" | "none";
+export type RefundMoneyReturn = PaymentMethod;
 
 // RefundInput espeja refundReq del backend (payment_controller.go). El FE
-// usa una abstracción "money_returned" (cash/transfer/none) en la UI; el
-// modal lo mapea a `payment_method` antes de enviarlo. Para el caso
-// "none" (no se devuelve dinero, ej. cortesía) usa el método del pago
-// original — la auditoría queda con "refund de pago en X" aunque no
-// haya salido cash.
+// El método representa una devolución monetaria real. Cancelar un servicio o
+// corregir un registro sin devolver dinero es otra acción y nunca crea Refund.
 export interface RefundInput {
   reason: string;
   payment_method: PaymentMethod;
+  cash_drawer_id?: string;
+  amount: number;
+  payment_date: string;
   revert_membership?: boolean;
+  idempotency_key: string;
+}
+
+export interface RefundPreview {
+  selected_payment_id: string;
+  root_payment_id: string;
+  selected_refundable: number;
+  aggregate_collected: number;
+  aggregate_refunded: number;
+  aggregate_refundable: number;
+  balance_pending: number;
+  revert_membership_total: number;
+  membership_revert_allowed: boolean;
+  membership_revert_block_reason?: string;
 }
 
 export interface PaymentHistoryFilters {
@@ -173,6 +277,9 @@ function invalidateMember(qc: ReturnType<typeof useQueryClient>, memberID?: stri
   // sin esto el operador cobraba y el dashboard seguía mostrando lo viejo
   // hasta 60s de staleTime.
   qc.invalidateQueries({ queryKey: ["reports"] });
+  qc.invalidateQueries({ queryKey: ["dashboard"] });
+  qc.invalidateQueries({ queryKey: ["cash-close"] });
+  qc.invalidateQueries({ queryKey: ["analytics"] });
   if (memberID) qc.invalidateQueries({ queryKey: ["billing", "history", memberID] });
 }
 
@@ -207,6 +314,20 @@ export interface RefundResponse {
   folio: string;
   amount: number;
   reverted_membership: boolean;
+  balance_cancelled?: number;
+}
+
+export function useRefundPreview(
+  paymentID: string | null | undefined,
+  enabled = true,
+) {
+  return useQuery<RefundPreview>({
+    queryKey: ["billing", "refund-preview", paymentID ?? ""],
+    queryFn: () =>
+      api.get<RefundPreview>(`/api/v1/payments/${paymentID}/refund-preview`),
+    enabled: enabled && !!paymentID,
+    staleTime: 0,
+  });
 }
 
 export function useRefund(paymentID: string) {
@@ -215,6 +336,38 @@ export function useRefund(paymentID: string) {
     mutationFn: (input: RefundInput) =>
       api.post<RefundResponse>(`/api/v1/payments/${paymentID}/refund`, input),
     onSuccess: () => invalidateMember(qc, null),
+  });
+}
+
+/**
+ * Corrects capture facts for a root membership/other-income payment. Product
+ * sales and balance settlements intentionally use their own consequence-aware
+ * flows, so callers must not expose this mutation for those concepts.
+ */
+export function useCorrectPayment(paymentID: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PaymentCorrectionInput) =>
+      api.post<PaymentCorrectionResponse>(
+        `/api/v1/payments/${paymentID}/corrections`,
+        input,
+      ),
+    onSuccess: () => invalidateMember(qc, null),
+  });
+}
+
+export function usePaymentCorrectionHistory(
+  paymentID: string | null | undefined,
+  enabled = true,
+) {
+  return useQuery<PaymentCorrectionHistoryResponse>({
+    queryKey: ["billing", "payment-corrections", paymentID ?? ""],
+    queryFn: () =>
+      api.get<PaymentCorrectionHistoryResponse>(
+        `/api/v1/payments/${paymentID}/corrections`,
+      ),
+    enabled: enabled && !!paymentID,
+    staleTime: 0,
   });
 }
 

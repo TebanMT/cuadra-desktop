@@ -28,15 +28,6 @@ export function fmtIso(date: Date): string {
   return format(date, "yyyy-MM-dd");
 }
 
-// fmtDayGrain — para campos date-grain que el wire codifica como instante a
-// medianoche UTC ("2026-08-01T00:00:00Z", p.ej. fechas de retos): toma la
-// parte de fecha y la formatea como día calendario. Pasarla por la zona
-// local (fmtDate del instante) la pintaba un día antes en CDMX.
-export function fmtDayGrain(value: string | null | undefined): string {
-  if (!value) return "—";
-  return fmtDate(value.slice(0, 10));
-}
-
 export function todayIso(): string {
   return fmtIso(new Date());
 }
@@ -86,4 +77,10 @@ export function lastVisitLabel(
   if (ago <= 0) return strings.today;
   if (ago === 1) return strings.yesterday;
   return strings.daysAgo(ago);
+}
+
+export function fmtDateTime(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const date = typeof value === "string" ? parseDate(value) : value;
+  return date ? format(date, "d MMM yyyy, HH:mm", { locale: es }) : "—";
 }

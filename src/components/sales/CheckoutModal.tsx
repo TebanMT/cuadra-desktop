@@ -1,402 +1,143 @@
-import { useEffect, useMemo, useState } from "react";
-import {
-  AlertTriangle,
-  Banknote,
-  CreditCard,
-  Handshake,
-  Loader2,
-  Smartphone,
-  Wallet,
-} from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Banknote, CreditCard, Handshake, Loader2, Smartphone } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { fmtMoney, type PaymentMethod } from "@/hooks/useBilling";
+import { useSetupStatus } from "@/hooks/useSetupStatus";
 import type { MemberSearchResult } from "@/hooks/useSales";
 import { MemberAssociator } from "@/components/sales/MemberAssociator";
 import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { sales as t } from "@/strings/sales";
+import { CashDrawerField } from "@/components/cash/CashDrawerField";
+import { todayIso } from "@/lib/dates";
+import { moneyCents } from "./saleDraft";
 
-// El "momento de cobrar" de la venta rápida, separado del armado de la
-// cuenta (mismo patrón que PaymentModal en membresías). Aquí viven el
-// método de pago, la calculadora de cambio y el fiado — antes los tres
-// bloques colgaban permanentemente de la columna del carrito.
-//
-// Fiado es un MÉTODO más en la fila de botones, no un toggle al fondo:
-// es como el operador lo piensa ("¿cómo me pagas? — luego te lo pago").
-// El método del payment (cash/transfer/card) sigue siendo el de lo que
-// SÍ se cobra ahora — el mini-selector dentro del pane de fiado.
-
+export type CheckoutInput = { method: PaymentMethod; paid?: number; cash_drawer_id?: string; received?: number };
 type CheckoutMode = PaymentMethod | "fiado";
-
-const CASH_QUICK_AMOUNTS = [50, 100, 200, 500, 1000] as const;
-
-interface CheckoutModalProps {
-  open: boolean;
-  onOpenChange(open: boolean): void;
-  total: number;
-  itemCount: number;
-  member: MemberSearchResult | null;
-  onMemberChange(m: MemberSearchResult | null): void;
-  // Deuda total del socio asociado (0 si no hay socio o no debe). El chip
-  // ámbar del summary la exhibe; onSettle abre el modal de abono ENCIMA
-  // de este (Radix anida bien) — el momento de cobrar la deuda es cuando
-  // la persona está en el mostrador pagando otra cosa.
-  memberDebt: number;
-  onSettle(): void;
-  submitting: boolean;
-  // Lanza la venta. Debe THROW en error — el modal lo muestra sin
-  // cerrarse; en éxito el dueño (la página) cierra y limpia.
-  onConfirm(input: { method: PaymentMethod; paid?: number }): Promise<void>;
+const methods = [
+  { key: "cash", label: "Efectivo", icon: Banknote },
+  { key: "card", label: "Tarjeta", icon: CreditCard },
+  { key: "transfer", label: "Transferencia", icon: Smartphone },
+] as const;
+interface Props {
+  open: boolean; onOpenChange(open: boolean): void; total: number; itemCount: number;
+  member: MemberSearchResult | null; onMemberChange(m: MemberSearchResult | null): void;
+  memberDebt: number; debtStatus?: "loading" | "error" | "ready"; onRetryDebt?(): void;
+  onSettle(): void; submitting: boolean; blockedReason?: string;
+  onConfirm(input: CheckoutInput): Promise<void>;
 }
 
-export function CheckoutModal({
-  open,
-  onOpenChange,
-  total,
-  itemCount,
-  member,
-  onMemberChange,
-  memberDebt,
-  onSettle,
-  submitting,
-  onConfirm,
-}: CheckoutModalProps) {
-  const [mode, setMode] = useState<CheckoutMode>("cash");
-  const [givenCash, setGivenCash] = useState("");
+export function CheckoutModal({ open, onOpenChange, total, itemCount, member, onMemberChange,
+  memberDebt, debtStatus = "ready", onRetryDebt, onSettle, submitting, blockedReason, onConfirm }: Props) {
+  const setup = useSetupStatus();
+  const configured = methods.filter(m => setup.data?.payment_methods?.[m.key]);
+  // Older gyms can have completed setup with no saved methods. Preserve their
+  // existing checkout options; a loading/failed request is not an empty config.
+  const available = setup.data && configured.length === 0 ? methods : configured;
+  const firstMethod = available[0]?.key ?? "cash";
+  const [selectedMode, setMode] = useState<CheckoutMode | null>(null);
+  const mode: CheckoutMode = selectedMode === "fiado" ? "fiado"
+    : available.find(m => m.key === selectedMode)?.key ?? firstMethod;
+  const [given, setGiven] = useState("");
   const [paidValue, setPaidValue] = useState("");
-  const [fiadoMethod, setFiadoMethod] = useState<PaymentMethod>("cash");
+  const [selectedAbonoMethod, setAbonoMethod] = useState<PaymentMethod | null>(null);
+  const abonoMethod = available.find(m => m.key === selectedAbonoMethod)?.key ?? firstMethod;
+  const [drawer, setDrawer] = useState<string>();
   const [error, setError] = useState<string | null>(null);
-
+  const sending = useRef(false);
   useEffect(() => {
-    if (open) {
-      setMode("cash");
-      setGivenCash("");
-      setPaidValue("");
-      setFiadoMethod("cash");
-      setError(null);
-    }
+    if (open) { setMode(null); setGiven(""); setPaidValue(""); setAbonoMethod(null); setDrawer(undefined); setError(null); }
   }, [open]);
-
-  const isFiado = mode === "fiado";
-  const paidNow = useMemo(() => {
-    if (!isFiado) return total;
-    const v = parseFloat(paidValue);
-    return Number.isFinite(v) ? v : 0;
-  }, [isFiado, paidValue, total]);
-  const balanceLeft = isFiado ? Math.max(0, total - paidNow) : 0;
-
-  // Cambio: aplica cuando lo que entra en efectivo es el total (modo
-  // cash) o el "cobrado ahora" del fiado pagado en efectivo.
-  const cashToCover = isFiado ? paidNow : total;
-  const showChange = (mode === "cash" || (isFiado && fiadoMethod === "cash")) && cashToCover > 0;
-  const cashGiven = useMemo(() => {
-    const v = parseFloat(givenCash);
-    return Number.isFinite(v) ? v : 0;
-  }, [givenCash]);
-  const change = cashGiven - cashToCover;
-
-  const fiadoInvalid =
-    isFiado && (!member || paidNow <= 0 || paidNow > total);
-
+  const credit = mode === "fiado" && total > 0;
+  const paid = credit ? (paidValue.trim() === "" ? 0 : Number(paidValue)) : total;
+  const validPaid = Number.isFinite(paid) && paid >= 0 && moneyCents(paid) <= moneyCents(total);
+  const method = credit ? abonoMethod : mode === "fiado" ? firstMethod : mode;
+  const cash = method === "cash" && paid > 0;
+  const received = given.trim() === "" ? paid : Number(given);
+  const cashInvalid = cash && (!Number.isFinite(received) || moneyCents(received) < moneyCents(paid));
+  const methodUnavailable = paid > 0 && !available.some(m => m.key === method);
+  const disabled = total <= 0 || submitting || !validPaid || cashInvalid || (credit && !member) || methodUnavailable || !!blockedReason;
+  const balance = validPaid ? Math.max(0, moneyCents(total) - moneyCents(paid)) / 100 : total;
+  const label = total === 0 ? "Cobrar" : credit && paid === 0 ? "Guardar fiado"
+    : t.page.checkout.confirm(fmtMoney(paid));
   async function confirm() {
-    setError(null);
-    if (isFiado) {
-      if (!member) {
-        setError(t.page.credit.requiresMember);
-        return;
-      }
-      if (paidNow <= 0) {
-        setError(t.page.credit.paidMustBePositive);
-        return;
-      }
-      if (paidNow > total) {
-        setError(t.page.credit.paidExceedsTotal);
-        return;
-      }
-    }
+    if (disabled || sending.current) return;
+    sending.current = true; setError(null);
     try {
-      await onConfirm({
-        method: isFiado ? fiadoMethod : (mode as PaymentMethod),
-        // paid sólo viaja cuando de verdad queda saldo — pagar el total
-        // en modo fiado degrada a una venta normal.
-        ...(isFiado && paidNow < total ? { paid: paidNow } : {}),
-      });
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const data = err.details as Record<string, unknown> | null;
-        setError((data?.exception as string | undefined) || t.page.errors.generic);
-      } else {
-        setError(t.page.errors.generic);
-      }
-    }
+      await onConfirm({ method: paid === 0 ? "cash" : method,
+        ...(credit ? { paid: moneyCents(paid) / 100 } : {}),
+        ...(cash ? { received: moneyCents(received) / 100, ...(drawer ? { cash_drawer_id: drawer } : {}) } : {}) });
+    } catch (err) { setError(err instanceof ApiError ? err.message : t.page.errors.generic); }
+    finally { sending.current = false; }
   }
-
-  const modes: Array<{ key: CheckoutMode; label: string; icon: typeof Banknote }> = [
-    { key: "cash", label: t.page.cart.methods.cash, icon: Banknote },
-    { key: "card", label: t.page.cart.methods.card, icon: CreditCard },
-    { key: "transfer", label: t.page.cart.methods.transfer, icon: Smartphone },
-    { key: "fiado", label: t.page.checkout.fiado, icon: Handshake },
-  ];
-
-  return (
-    <Dialog open={open} onOpenChange={(o) => !submitting && onOpenChange(o)}>
-      {/* El cobro no se cierra por clicks afuera: (1) un misclick en el
-          momento del dinero tiraría método/monto ya capturados, y (2) el
-          Popover del asociador de socio (pane de fiado) vive en un portal
-          FUERA del DialogContent — sin esto, Radix trataba el pointerdown
-          sobre el resultado de búsqueda como "interacción externa" y
-          cerraba el modal antes de que el click asociara al socio. Se
-          cierra con la X o Esc. */}
-      <DialogContent
-        className="max-w-md"
-        onInteractOutside={(e) => e.preventDefault()}
-        onPointerDownOutside={(e) => e.preventDefault()}
-      >
-        <DialogHeader>
-          <DialogTitle>{t.page.checkout.title}</DialogTitle>
-          <div className="flex items-baseline justify-between pt-1">
-            <span className="text-sm text-muted-foreground">{t.page.checkout.totalLabel}</span>
-            <span className="text-3xl font-bold tabular-nums tracking-tight">
-              {fmtMoney(total)}
-            </span>
-          </div>
-          {/* La asociación de socio vive AQUÍ, en el momento del cobro —
-              antes era un botón permanente en el header de la página que
-              se usaba en 1 de cada 10 ventas. Asociar liga la venta al
-              historial del socio y habilita fiado; si además debe, el
-              chip ámbar lo exhibe con acción directa de abono. */}
-          <div className="flex items-center gap-2 flex-wrap pt-0.5">
-            <span className="text-xs text-muted-foreground">
-              {t.page.checkout.itemsSummary(itemCount)} ·
-            </span>
-            <MemberAssociator member={member} onChange={onMemberChange} />
-            {member && memberDebt > 0 && (
-              <button
-                type="button"
-                onClick={onSettle}
-                className="inline-flex items-center gap-1.5 rounded-full border border-warning/40 bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning hover:bg-warning/20 transition-colors"
-              >
-                <Wallet className="h-3.5 w-3.5" />
-                {t.page.debt.chip(fmtMoney(memberDebt))}
-              </button>
-            )}
-          </div>
-        </DialogHeader>
-
-        <div className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Métodos: botones grandes, ícono + etiqueta. Fiado al final. */}
-          <div className="grid grid-cols-2 gap-2">
-            {modes.map(({ key, label, icon: Icon }) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setMode(key)}
-                aria-pressed={mode === key}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-lg border-2 px-3.5 py-3 text-sm font-semibold transition-colors",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  mode === key
-                    ? "border-primary bg-primary/5 text-foreground"
-                    : "border-border bg-background hover:bg-muted text-foreground"
-                )}
-              >
-                <Icon
-                  className={cn("h-5 w-5 shrink-0", mode === key ? "text-primary" : "text-muted-foreground")}
-                />
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Pane por método */}
-          {mode === "cash" && (
-            <ChangeCalculator
-              label={t.page.checkout.cashQuestion}
-              cover={total}
-              given={givenCash}
-              onGiven={setGivenCash}
-              change={change}
-              showResult={givenCash !== ""}
-            />
-          )}
-
-          {(mode === "card" || mode === "transfer") && (
-            <div className="rounded-md border border-border bg-muted/40 p-3 text-sm text-muted-foreground">
-              {mode === "card" ? t.page.checkout.cardHint : t.page.checkout.transferHint}
-            </div>
-          )}
-
-          {isFiado && (
-            <div className="space-y-3 rounded-md border border-warning/40 bg-warning/5 p-3">
-              {!member ? (
-                <p className="text-sm text-muted-foreground">
-                  {t.page.checkout.fiadoNeedsMember}
-                </p>
-              ) : (
-                <>
-                  <div className="space-y-1.5">
-                    <Label
-                      htmlFor="co-paid"
-                      className="text-xs uppercase tracking-wide text-muted-foreground"
-                    >
-                      {t.page.checkout.fiadoQuestion}
-                    </Label>
-                    <Input
-                      id="co-paid"
-                      type="number"
-                      inputMode="decimal"
-                      min={0}
-                      max={total}
-                      step="0.01"
-                      value={paidValue}
-                      onChange={(e) => setPaidValue(e.target.value)}
-                      placeholder="0.00"
-                      autoFocus
-                      className="h-11 text-lg font-semibold tabular-nums"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs uppercase tracking-wide text-muted-foreground">
-                      {t.page.checkout.fiadoMethodQuestion}
-                    </Label>
-                    <div className="grid grid-cols-3 gap-1.5">
-                      {(["cash", "transfer", "card"] as PaymentMethod[]).map((m) => (
-                        <button
-                          key={m}
-                          type="button"
-                          onClick={() => setFiadoMethod(m)}
-                          aria-pressed={fiadoMethod === m}
-                          className={cn(
-                            "h-9 rounded-md border text-xs font-medium transition-colors",
-                            fiadoMethod === m
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-background hover:bg-muted border-border"
-                          )}
-                        >
-                          {t.page.cart.methods[m]}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  {isFiado && fiadoMethod === "cash" && paidNow > 0 && (
-                    <ChangeCalculator
-                      label={t.page.change.label}
-                      cover={paidNow}
-                      given={givenCash}
-                      onGiven={setGivenCash}
-                      change={change}
-                      showResult={givenCash !== ""}
-                      compact
-                    />
-                  )}
-                  <div className="flex items-center gap-2 text-sm font-semibold text-warning tabular-nums">
-                    <AlertTriangle className="h-4 w-4 shrink-0" />
-                    <span>{t.page.credit.balanceLabel(fmtMoney(balanceLeft))}</span>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={confirm}
-            disabled={submitting || fiadoInvalid}
-          >
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            {isFiado && balanceLeft > 0
-              ? t.page.checkout.confirmFiado(fmtMoney(paidNow), fmtMoney(balanceLeft))
-              : t.page.checkout.confirm(fmtMoney(total))}
-          </Button>
+  function selectMode(next: CheckoutMode) {
+    const target = next === "fiado" && mode === "fiado" ? firstMethod : next;
+    if (target === mode) return;
+    setMode(target); setGiven(""); setError(null);
+    if (target !== "fiado") setPaidValue("");
+  }
+  return <Dialog open={open} onOpenChange={value => !submitting && onOpenChange(value)}>
+    <DialogContent aria-describedby={undefined} className="max-w-md max-h-[calc(100dvh-2rem)] flex flex-col gap-0 overflow-hidden p-0"
+      onInteractOutside={e => e.preventDefault()} onPointerDownOutside={e => e.preventDefault()}>
+      <DialogHeader className="px-5 pt-5 pb-3 shrink-0">
+        <DialogTitle>{total === 0 ? "Registrar venta" : t.page.checkout.title}</DialogTitle>
+        <div className="flex items-baseline justify-between gap-3 pt-1">
+          <span className="text-sm text-muted-foreground">Total · {t.page.checkout.itemsSummary(itemCount)}</span>
+          <span className="text-3xl font-bold tabular-nums">{fmtMoney(total)}</span>
         </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// Calculadora de cambio compartida entre el pane de efectivo y el de
-// fiado-en-efectivo. Informativa: no bloquea el cobro (igual que antes).
-function ChangeCalculator({
-  label,
-  cover,
-  given,
-  onGiven,
-  change,
-  showResult,
-  compact = false,
-}: {
-  label: string;
-  cover: number;
-  given: string;
-  onGiven(v: string): void;
-  change: number;
-  showResult: boolean;
-  compact?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        "space-y-2 rounded-md border border-border bg-muted/40 p-3",
-        compact && "bg-background/60"
-      )}
-    >
-      <Label htmlFor="co-given" className="text-xs uppercase tracking-wide text-muted-foreground">
-        {label}
-      </Label>
-      <Input
-        id="co-given"
-        type="number"
-        inputMode="decimal"
-        min={0}
-        step="0.01"
-        value={given}
-        onChange={(e) => onGiven(e.target.value)}
-        placeholder={t.page.change.placeholder}
-        className={cn("text-base", compact ? "h-9" : "h-11 text-lg font-semibold tabular-nums")}
-      />
-      <div className="flex flex-wrap gap-1.5">
-        <button
-          type="button"
-          onClick={() => onGiven(String(cover))}
-          className="px-2 py-1 text-xs rounded border border-border bg-background hover:bg-muted transition-colors"
-        >
-          {t.page.change.exact}
-        </button>
-        {CASH_QUICK_AMOUNTS.filter((v) => v >= cover).map((v) => (
-          <button
-            key={v}
-            type="button"
-            onClick={() => onGiven(String(v))}
-            className="px-2 py-1 text-xs rounded border border-border bg-background hover:bg-muted transition-colors tabular-nums"
-          >
-            ${v}
-          </button>
-        ))}
-      </div>
-      {showResult && (
-        <div
-          className={cn(
-            "font-bold tabular-nums",
-            compact ? "text-sm" : "text-lg",
-            change >= 0 ? "text-success" : "text-destructive"
-          )}
-        >
-          {change >= 0
-            ? t.page.change.result(fmtMoney(change))
-            : t.page.change.shortfall(fmtMoney(-change))}
+      </DialogHeader>
+      <fieldset disabled={submitting} className="relative min-h-0 overflow-y-auto px-5 pb-4 space-y-4 disabled:opacity-70">
+        <div className="flex flex-wrap items-center gap-2">
+          <MemberAssociator member={member} onChange={onMemberChange} />
+          {member && debtStatus === "loading" && <span className="text-xs text-muted-foreground">Consultando saldo…</span>}
+          {member && debtStatus === "error" && <Button type="button" variant="link" size="sm" onClick={onRetryDebt}>Reintentar consulta de saldo</Button>}
+          {member && debtStatus === "ready" && memberDebt > 0 && <Button type="button" variant="ghost" size="sm" className="text-amber-700" onClick={onSettle}>{t.page.debt.chip(fmtMoney(memberDebt))}</Button>}
         </div>
-      )}
-    </div>
-  );
+        {total > 0 && <div className="grid grid-cols-2 gap-2" aria-label="Forma de pago">
+          {[...available, { key: "fiado" as const, label: "Fiado", icon: Handshake }].map(({ key, label: name, icon: Icon }) =>
+            <button key={key} type="button" onClick={() => selectMode(key)} aria-pressed={mode === key}
+              className={cn("flex items-center gap-2 rounded-lg border-2 px-3 py-2.5 text-sm font-medium focus-visible:ring-2 focus-visible:ring-ring", mode === key ? "border-primary bg-primary/5" : "border-border hover:bg-muted")}>
+              <Icon className="h-5 w-5 shrink-0" />{name}
+            </button>)}
+        </div>}
+        {total > 0 && !setup.data && <div className="text-sm text-muted-foreground" role="status">
+          {setup.isError ? <>No se pudieron cargar las formas de pago. <Button variant="link" size="sm" onClick={() => setup.refetch()}>Reintentar</Button></> : "Cargando formas de pago…"}
+        </div>}
+        {credit && <div className="space-y-3">
+          {!member && <p className="text-sm text-amber-700">Agrega un socio para guardar el fiado.</p>}
+          <div className="space-y-1.5"><Label htmlFor="co-paid">Abono inicial (opcional)</Label>
+            <Input id="co-paid" type="number" inputMode="decimal" min={0} max={total} step="0.01" value={paidValue}
+              onChange={e => setPaidValue(e.target.value)} placeholder="0.00" className="h-11 text-lg" aria-invalid={!validPaid} />
+            {!validPaid && <p role="alert" className="text-sm text-destructive">El abono debe estar entre cero y el total.</p>}
+          </div>
+          {paid > 0 && available.length > 1 && <div className="flex flex-wrap gap-2" aria-label="Forma de pago del abono">{available.map(m =>
+            <Button key={m.key} type="button" size="sm" variant={abonoMethod === m.key ? "default" : "outline"}
+              aria-pressed={abonoMethod === m.key} onClick={() => { setAbonoMethod(m.key); setGiven(""); }}>{m.label}</Button>)}</div>}
+          <p className="text-sm font-semibold tabular-nums">Queda a deber: {fmtMoney(balance)}</p>
+        </div>}
+        {cash && <div className="space-y-2">
+          <Label htmlFor="co-given">Efectivo recibido</Label>
+          <Input id="co-given" type="number" inputMode="decimal" min={0} step="0.01" value={given}
+            onChange={e => setGiven(e.target.value)} placeholder={paid.toFixed(2)} className="h-11 text-lg" aria-invalid={cashInvalid} />
+          <div className="flex flex-wrap gap-1.5">{[paid, ...[50, 100, 200, 500, 1000].filter(n => n > paid).slice(0, 3)].map((amount, i) =>
+            <Button type="button" key={i} variant="outline" size="sm" className="h-8" onClick={() => setGiven(amount.toFixed(2))}>{i === 0 ? "Exacto" : `$${amount}`}</Button>)}</div>
+          {given !== "" && Number.isFinite(received) && <p className={cn("font-semibold tabular-nums", cashInvalid ? "text-destructive" : "text-success")} role="status">
+            {cashInvalid ? `Falta: ${fmtMoney((moneyCents(paid) - moneyCents(received)) / 100)}` : `Cambio: ${fmtMoney((moneyCents(received) - moneyCents(paid)) / 100)}`}
+          </p>}
+          {cashInvalid && !credit && received >= 0 && <Button variant="link" size="sm" className="px-0" onClick={() => { setMode("fiado"); setPaidValue(String(received)); setGiven(""); }}>Dejar saldo pendiente</Button>}
+          <CashDrawerField value={drawer} onChange={setDrawer} date={todayIso()} id="sale-cash-drawer" hideHint />
+        </div>}
+        {paid > 0 && method !== "cash" && <p className="text-sm text-muted-foreground">{method === "card" ? t.page.checkout.cardHint : t.page.checkout.transferHint}</p>}
+        {total === 0 && <p className="text-sm text-muted-foreground">La promoción cubre todo el importe. Ajusta o quita la promoción antes de continuar.</p>}
+        {(error || blockedReason) && <Alert variant="destructive"><AlertDescription>{blockedReason || error}</AlertDescription></Alert>}
+      </fieldset>
+      <div className="relative z-10 border-t bg-background px-5 py-4 shrink-0"><Button size="lg" className="w-full" onClick={confirm} disabled={disabled}>
+        {submitting && <Loader2 className="h-4 w-4 animate-spin" />}{label}
+      </Button></div>
+    </DialogContent>
+  </Dialog>;
 }

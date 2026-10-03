@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -15,6 +15,8 @@ import {
 import { ApiError } from "@/lib/api";
 import { todayIso } from "@/lib/dates";
 import { billing as t } from "@/strings/billing";
+import { CashDrawerField } from "@/components/cash/CashDrawerField";
+import { keyForPayload } from "@/lib/idempotency";
 
 interface Props {
   paymentId: string;
@@ -34,13 +36,17 @@ export function SettleBalanceModal({
   const settle = useSettleBalance(paymentId);
   const [amount, setAmount] = useState<string>("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [cashDrawerId, setCashDrawerId] = useState<string>();
   const [error, setError] = useState<string | null>(null);
+  const settlementAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
 
   useEffect(() => {
     if (open) {
       setAmount(pendingBalance.toFixed(2));
       setMethod("cash");
+      setCashDrawerId(undefined);
       setError(null);
+      settlementAttempt.current = null;
     }
   }, [open, pendingBalance]);
 
@@ -57,10 +63,19 @@ export function SettleBalanceModal({
       return;
     }
     try {
-      const res = await settle.mutateAsync({
+      const settlementWithoutKey = {
         amount: v,
         payment_method: method,
+        ...(method === "cash" && cashDrawerId ? { cash_drawer_id: cashDrawerId } : {}),
         payment_date: todayIso(),
+      };
+      settlementAttempt.current = keyForPayload(
+        settlementAttempt.current,
+        settlementWithoutKey,
+      );
+      const res = await settle.mutateAsync({
+        ...settlementWithoutKey,
+        idempotency_key: settlementAttempt.current.key,
       });
       toast.success(t.settle.success(fmtMoney(res.new_balance_pending)));
       onOpenChange(false);
@@ -68,7 +83,6 @@ export function SettleBalanceModal({
       // Log completo a la consola — el BE manda `exception` pero a
       // veces vienen errores transitorios (network, sidecar dormido)
       // sin esa forma. Lo loggeamos completo para poder diagnosticar.
-      // eslint-disable-next-line no-console
       console.error("[settle-balance] failed", err);
       if (err instanceof ApiError) {
         const data = err.details as Record<string, unknown> | null;
@@ -131,6 +145,13 @@ export function SettleBalanceModal({
               </label>
             </RadioGroup>
           </div>
+          {method === "cash" && (
+            <CashDrawerField
+              value={cashDrawerId}
+              onChange={setCashDrawerId}
+              id="settlement-cash-drawer"
+            />
+          )}
           <div className="flex justify-end gap-2 pt-2">
             <Button
               type="button"

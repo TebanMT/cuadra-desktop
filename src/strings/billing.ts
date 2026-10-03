@@ -106,7 +106,7 @@ export const billing = {
     // Desglose del banner cuando la deuda viene de más de un origen.
     breakdownPart: (concept: string, amount: string) => {
       const label =
-        { membership: "de mensualidad", product: "de venta", other: "de otros" }[concept] ??
+        { membership: "de mensualidad", product: "de venta", other: "de otro ingreso" }[concept] ??
         `de ${concept}`;
       return `${amount} ${label}`;
     },
@@ -131,7 +131,7 @@ export const billing = {
       product: "Producto",
       balance_settlement: "Abono",
       refund: "Devolución",
-      other: "Otro",
+      other: "Otro ingreso",
     },
     empty: "Aún no hay pagos registrados.",
     pendingFlag: (amount: string) => `Saldo pendiente: ${amount}`,
@@ -141,7 +141,7 @@ export const billing = {
     error: "No pudimos cargar el historial.",
   },
   cobranza: {
-    title: "Cobros",
+    title: "Ingresos",
     subtitle: "Pagos del gym, día por día.",
     chargeMember: "Cobrar a un socio",
     pickMember: "Selecciona un socio",
@@ -192,24 +192,26 @@ export const billing = {
     rowMember: "(socio dado de baja)",
   },
   refund: {
-    title: (amount: string) => `¿Cancelar este pago de ${amount}?`,
+    title: (amount: string) => `¿Registrar devolución de ${amount}?`,
     reasonLabel: "Razón (obligatoria)",
-    reasonPlaceholder: "Ej. cobro doble, error de operador, cortesía…",
+    reasonPlaceholder: "Ej. cobro doble o error de operador…",
     revertLabel: "Revertir vigencia de membresía (regresará al estado anterior)",
     moneyLabel: "El dinero…",
     money: {
       cash: "Se devuelve en efectivo",
       transfer: "Se devuelve por transferencia",
-      none: "No se devuelve",
+      card: "Se devuelve a la tarjeta",
     },
+    productRequiresLines:
+      "Las ventas de productos se devuelven desde el detalle de la venta, eligiendo productos, cantidades y qué pasó con cada unidad.",
     disclaimer: "Esta acción queda registrada en el historial.",
-    submit: "Confirmar cancelación",
+    submit: "Registrar devolución",
     cancel: "Cancelar",
-    success: "Pago cancelado.",
-    ownerOnly: "Solo el dueño del gym puede cancelar pagos.",
+    success: "Devolución registrada.",
+    ownerOnly: "Solo el dueño del gym puede registrar devoluciones.",
     errors: {
       reasonRequired: "Escribe una razón.",
-      generic: "No pudimos cancelar el pago.",
+      generic: "No pudimos registrar la devolución.",
     },
   },
 };

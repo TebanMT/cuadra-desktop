@@ -121,7 +121,7 @@ export function useConfirmTransferOwnership() {
 
 // Knobs cosméticos del feedback de check-in (DA-031.5) que el dueño edita
 // en Ajustes → Perfil del gym: cuánto dura el veredicto en pantalla
-// ("Duración del feedback al check-in") y a qué volumen suena el tono
+// ("Duración del aviso de entrada") y a qué volumen suena el tono
 // ("Volumen del kiosko"). Los consumen TODAS las superficies de check-in
 // (kiosko, flotante, /checkin y el scanner global) — un solo knob, mismo
 // comportamiento en todas.

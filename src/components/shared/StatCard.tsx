@@ -162,7 +162,7 @@ interface StatListCardProps {
 
 /**
  * Variante de StatCard para mostrar DOS o más cifras relacionadas en un solo
- * card (ej. "Stock crítico" = bajos + agotados, "Ganancia" = del mes +
+ * card (ej. "Existencias bajas" = bajos + agotados, "Ganancia" = del mes +
  * potencial) — para no multiplicar cards de una sola cifra. Comparte el shell
  * y el sistema de tonos con StatCard.
  */

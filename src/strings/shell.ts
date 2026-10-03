@@ -1,22 +1,20 @@
 export const shell = {
   nav: {
     dashboard: "Inicio",
-    attention: "Atención",
     members: "Socios",
-    billing: "Cobros",
+    billing: "Ingresos",
     sales: "Venta rápida",
     products: "Productos",
     expenses: "Gastos",
     membershipTypes: "Membresías y promociones",
-    checkin: "Check-in",
-    challenges: "Retos",
+    checkin: "Entradas",
     reports: "Reportes",
+    cashClose: "Caja",
     settings: "Ajustes",
   },
   navGroups: {
     operation: "Operación",
     catalog: "Catálogo",
-    programs: "Programas",
     reports: "Reportes",
     settings: "Ajustes",
   },
@@ -35,23 +33,23 @@ export const shell = {
     syncing: "Sincronizando…",
     // Offline NO es error (offline-first): copy que tranquiliza, no que
     // alarma. El hint del diálogo explica que se sube solo al volver.
-    offline: "Sin conexión — todo se guarda aquí.",
+    offline: "Sin conexión",
     offlineHint:
-      "No hay conexión con la nube en este momento. Puedes seguir cobrando y registrando normal: todo queda guardado en esta computadora y se sube solo cuando regrese el internet.",
+      "Puedes seguir trabajando. Los cambios se guardan en esta computadora y se sincronizarán cuando vuelva la conexión.",
     offlineLong: "Llevas días sin sincronizar.",
     offlineLongHint:
-      "Esta computadora tiene más de una semana sin subir sus cambios. La operación local sigue funcionando, pero revisa el internet — el dashboard del celular no verá lo nuevo hasta sincronizar.",
+      "Hace más de una semana que no se sincroniza. Revisa la conexión; los cambios recientes aún no aparecen en la web.",
     stale: "Actualiza la app para seguir sincronizando.",
-    syncError: "Hay un problema al guardar cambios del servidor.",
+    syncError: "Hay cambios sin sincronizar.",
     syncErrorPushHint:
-      "Sí hay internet, pero la nube está rechazando uno o más cambios hechos en esta computadora. Nada se pierde — abajo está el detalle de cada uno. Si marca un nombre duplicado, renómbralo para destrabarlo; si no, comparte el error con soporte.",
+      "Algunos cambios no se pudieron enviar. Revisa los registros de abajo. Si el problema continúa, comparte el detalle con soporte.",
     syncErrorHint:
-      "Sí hay internet: el servidor respondió, pero un cambio no se pudo guardar en esta laptop. Suele arreglarse actualizando la app. Si sigue, comparte el 'Último error' con soporte.",
+      "No se pudieron recibir algunos cambios. Actualiza Tinta. Si el problema continúa, comparte el detalle con soporte.",
     authInvalid: "Vuelve a iniciar sesión para sincronizar.",
     authInvalidHint:
-      "La credencial de esta laptop expiró. Tus cambios siguen guardados; vuelve a iniciar sesión para reanudar el sync.",
+      "Inicia sesión de nuevo para sincronizar los cambios guardados en esta computadora.",
     detailsTitle: "Estado de sincronización",
-    lastSync: "Último sync exitoso",
+    lastSync: "Última sincronización",
     pending: "Cambios pendientes",
     quarantined: "Cambios que no se pudieron aplicar",
     stuckPush: "Cambios que no han podido subir",
@@ -61,7 +59,7 @@ export const shell = {
     triggerNow: "Sincronizar ahora",
     relogin: "Iniciar sesión",
     // Detalle de filas rechazadas por la nube (queue_stuck_items).
-    stuckItemsTitle: "Cambios rechazados por la nube",
+    stuckItemsTitle: "Cambios por revisar",
     openToRename: "Abrir para renombrar",
     stuckRetryCount: (n: number) => `${n} intentos`,
     // Nombres humanos por entity_type para la lista de rechazados. Los

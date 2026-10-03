@@ -66,7 +66,8 @@ export function MemberAssociator({
     );
   }
 
-  const results = search.data ?? [];
+  const currentResults = query.trim() === debounced.trim() && !search.isFetching && !search.isError;
+  const results = currentResults ? search.data ?? [] : [];
 
   return (
     // basis-full: dentro del summary (flex-wrap) el combobox expandido
@@ -115,11 +116,12 @@ export function MemberAssociator({
               <span>{t.page.associateSearching}</span>
             </div>
           )}
-          {!search.isFetching && results.length === 0 && (
+          {currentResults && results.length === 0 && (
             <p className="px-3 py-2.5 text-sm text-muted-foreground">
               {t.page.associateNoResults}
             </p>
           )}
+          {search.isError && <div className="p-3 text-sm" role="alert">No se pudo buscar. <Button type="button" variant="link" size="sm" onClick={() => search.refetch()}>Reintentar</Button></div>}
           {results.map((m, i) => (
             <button
               key={m.member_id}

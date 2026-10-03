@@ -3,6 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { SettleBalanceModal } from "../SettleBalanceModal";
+import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -73,5 +74,37 @@ describe("SettleBalanceModal", () => {
     await user.click(screen.getByRole("button", { name: /Abonar/ }));
 
     expect(await screen.findByText(/abono debe ser mayor a cero/i)).toBeInTheDocument();
+  });
+
+  it("conserva la llave del abono al reintentar tras una respuesta perdida", async () => {
+    const user = userEvent.setup();
+    const post = vi.mocked(api.post);
+    post
+      .mockRejectedValueOnce(new Error("respuesta perdida"))
+      .mockResolvedValueOnce({
+        settlement_id: "pay-2",
+        folio: "MEM-000088",
+        new_balance_pending: 0,
+      });
+    renderWithProviders(
+      <SettleBalanceModal
+        paymentId="pay-1"
+        memberName="Juan Pérez"
+        pendingBalance={200}
+        open
+        onOpenChange={() => {}}
+      />
+    );
+
+    const submit = screen.getByRole("button", { name: /Abonar/ });
+    await user.click(submit);
+    await screen.findByText(/No pudimos registrar el abono/i);
+    await user.click(submit);
+    await waitFor(() => expect(post).toHaveBeenCalledTimes(2));
+
+    const first = post.mock.calls[0][1] as { idempotency_key: string };
+    const second = post.mock.calls[1][1] as { idempotency_key: string };
+    expect(first.idempotency_key).toBeTruthy();
+    expect(second.idempotency_key).toBe(first.idempotency_key);
   });
 });

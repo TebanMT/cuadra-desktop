@@ -1,5 +1,7 @@
+import { ExpensesWorkspace } from "@/pages/expenses/ExpensesPage";
+import { PurchaseDeliveries } from "@/components/products/PurchaseDeliveries";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowDown,
   ArrowUp,
@@ -61,10 +63,12 @@ import {
   type SortDirection,
 } from "@/hooks/useProducts";
 import { useDebounce } from "@/hooks/useDebounce";
-import { useDashboard } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { useCan } from "@/lib/permissions";
 import { ApiError } from "@/lib/api";
 import { cn, formatMoney } from "@/lib/utils";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { ProductForm, type ProductFormSubmitPayload } from "@/components/products/ProductForm";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
 import { AdjustStockModal } from "@/components/products/AdjustStockModal";
@@ -76,6 +80,7 @@ const PAGE_SIZE = 50;
 
 function stockBadge(p: Product) {
   const level = stockLevel(p);
+  if (p.stock < 0) return <Badge variant="warning">Existencias por revisar</Badge>;
   if (level === "out") {
     return <Badge variant="destructive">{t.page.badges.out}</Badge>;
   }
@@ -141,9 +146,14 @@ export default function ProductsPage() {
   const [category, setCategory] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>("active");
   // Hidrata el filtro inicial desde el query param (?low_stock=1) — el KPI
-  // "Stock crítico" del reporte navega aquí con ese flag, y queremos que el
+  // "Existencias bajas" del reporte navega aquí con ese flag, y queremos que el
   // filtro arranque ya aplicado.
   const [searchParams, setSearchParams] = useSearchParams();
+  const purchasesView = searchParams.get("view") === "purchases";
+  const isOwner = useAuthStore(s => s.user?.role === "owner");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const openPurchase = (initialProduct?: Product) => navigate("/products/purchases/new", { state: { returnTo: location.pathname + location.search, initialProduct } });
   const [lowStockOnly, setLowStockOnly] = useState(
     () => searchParams.get("low_stock") === "1",
   );
@@ -179,13 +189,12 @@ export default function ProductsPage() {
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editParam, deepLink.data]);
-  // Ganancia realizada del mes — la calcula el backend de reportes
-  // (cross-context products × ventas) y la sirve el dashboard. La reusamos
-  // aquí para mostrarla junto a la potencial: la potencial baja al vender,
-  // la realizada sube. El endpoint está cacheado 60s, así que es barato.
-  const dashboard = useDashboard();
-  const realizedMonth = dashboard.data?.realized_profit_month.value ?? 0;
-  const realizedCoverage = dashboard.data?.realized_profit_coverage;
+  // El costo y los márgenes son sensibles y forman parte de Análisis Plus.
+  // Se requieren ambas condiciones: permiso de dueño y plan Plus. Standard
+  // conserva catálogo, stock, ventas, compras y captura de costos.
+  const plan = useAuthStore((state) => state.gym?.subscription_plan);
+  const showMargins =
+    useCan("view_product_margins") && canAccessPlusFeatures(plan);
 
   useEffect(() => {
     setPage(1);
@@ -272,23 +281,25 @@ export default function ProductsPage() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <PageHeader
         title={t.page.title}
-        subtitle="Catálogo y stock del gym"
+
         actions={
           <Button
             size="lg"
-            onClick={() => setCreateOpen(true)}
-            className="h-10 rounded-md font-semibold shadow-sm"
+            onClick={() => purchasesView ? openPurchase() : setCreateOpen(true)}
+            className={cn("h-10 rounded-md font-semibold shadow-sm", purchasesView && "bg-foreground text-background hover:bg-foreground/90")}
           >
-            <Plus className="h-4 w-4 mr-2" />
-            {t.page.new}
+            {purchasesView ? <PackagePlus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+            {purchasesView ? "Registrar compra" : t.page.new}
           </Button>
         }
       />
 
-      {/* Stats — calculadas en backend sobre el filtro completo, no la
-          página visible. 4 cards: dos de una cifra (Productos, Valor) y dos
-          combinadas (Stock crítico = bajos+agotados; Ganancia = del mes +
-          potencial) para no saturar con cards de una sola cifra. */}
+      <div className="flex gap-5 border-b" aria-label="Vistas de Productos">{[["catalog","Catálogo"],["purchases","Compras"]].map(([id,label])=><button key={id} type="button" onClick={()=>setSearchParams(current=>{const next=new URLSearchParams(current);next.set("view",id);return next;})} className={cn("h-11 border-b-2 px-1 text-sm",purchasesView===(id==="purchases")?"border-foreground font-semibold":"border-transparent text-muted-foreground")}>{label}</button>)}</div>
+      {purchasesView ? <div className="space-y-5"><PurchaseDeliveries />{isOwner&&<ExpensesWorkspace section="purchases" embedded />}</div> : <>
+
+
+      {/* Stats calculadas en backend sobre el filtro completo, no sólo la
+          página visible. */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           title="Productos"
@@ -297,7 +308,7 @@ export default function ProductsPage() {
           tone="neutral"
           hint={hasActiveFilters ? "en el filtro" : "en el catálogo"}
         />
-        {/* Stock crítico — junta "stock bajo" y "agotados" (la salud de
+        {/* Existencias bajas — junta "stock bajo" y "agotados" (la salud de
             inventario que le importa a recepción) en un solo card. */}
         <StatListCard
           title={t.page.stockHealth.title}
@@ -326,37 +337,34 @@ export default function ProductsPage() {
           tone="success"
           hint="precio venta × existencias"
         />
-        {/* Ganancia — del mes (realizada, sube al vender) + potencial sobre
-            el stock (baja al vender), sin un "total" que mezcle flujo con
-            inventario. El margen % va como chip en la potencial; el hint
-            muestra la cobertura honesta cuando faltan costos. */}
-        <StatListCard
-          title={t.page.margin.cardTitle}
-          icon={Coins}
-          tone="success"
-          rows={[
-            {
-              label: t.page.margin.monthRow,
-              value: money.fmt(realizedMonth),
-            },
-            {
-              label: t.page.margin.potentialRow,
-              value: money.fmt(totals.potential_profit),
-              chip:
-                !money.hidden && totals.margin_pct != null
-                  ? `${totals.margin_pct >= 0 ? "+" : ""}${totals.margin_pct.toFixed(0)}%`
-                  : undefined,
-            },
-          ]}
-          hint={
-            totals.products_with_cost < totals.products_total
-              ? t.page.margin.coverage(
-                  totals.products_with_cost,
-                  totals.products_total
-                )
-              : undefined
-          }
-        />
+        {/* Valor potencial del inventario actual. La ganancia realmente
+            obtenida por producto vive en Reportes > Análisis (Plus), donde
+            puede compararse sin mezclarla con el resumen operativo. */}
+        {showMargins && (
+          <StatListCard
+            title="Ganancia potencial"
+            icon={Coins}
+            tone="success"
+            rows={[
+              {
+                label: "En el stock actual",
+                value: money.fmt(totals.potential_profit),
+                chip:
+                  !money.hidden && totals.margin_pct != null
+                    ? `${totals.margin_pct >= 0 ? "+" : ""}${totals.margin_pct.toFixed(0)}%`
+                    : undefined,
+              },
+            ]}
+            hint={
+              totals.products_with_cost < totals.products_total
+                ? t.page.margin.coverage(
+                    totals.products_with_cost,
+                    totals.products_total
+                  )
+                : undefined
+            }
+          />
+        )}
       </div>
 
       {/* Filters */}
@@ -473,7 +481,7 @@ export default function ProductsPage() {
                 align="right"
               />
               <SortableHeader
-                label="Stock"
+                label="Existencias"
                 column="stock"
                 sortBy={sortBy}
                 sortDir={sortDir}
@@ -564,7 +572,7 @@ export default function ProductsPage() {
                           }
                         }}
                         className="font-semibold rounded px-1.5 py-0.5 -mx-1.5 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 transition-colors"
-                        aria-label={`Ajustar stock de ${p.name}`}
+                        aria-label={`Ajustar existencias de ${p.name}`}
                       >
                         {p.stock}
                       </button>
@@ -582,7 +590,7 @@ export default function ProductsPage() {
                       <Badge variant="outline">{t.page.badges.inactive}</Badge>
                     )}
                   </DataTableCell>
-                  {/* Acciones — solo "Ajustar stock" como botón explícito.
+                  {/* Acciones — solo "Ajustar existencias" como botón explícito.
                       Editar se accede via row-click / Enter / click en el
                       nombre (underline en hover). Quitamos el botón
                       Editar que vivía aquí en hover porque competía con
@@ -646,6 +654,7 @@ export default function ProductsPage() {
         </div>
       )}
 
+      </>}
       <CreateDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -653,6 +662,7 @@ export default function ProductsPage() {
       />
       <EditDialog
         product={editing}
+        showMargins={showMargins}
         knownCategories={knownCategories}
         onClose={() => setEditing(null)}
         onAskDeactivate={(p) => {
@@ -662,7 +672,7 @@ export default function ProductsPage() {
         onAskReactivate={() => setEditing(null)}
         onCaptureCost={(p) => {
           setEditing(null);
-          setAdjusting(p);
+          openPurchase(p);
         }}
       />
       <AdjustStockModal
@@ -750,6 +760,7 @@ function CreateDialog({
 
 function EditDialog({
   product,
+  showMargins,
   knownCategories,
   onClose,
   onAskDeactivate,
@@ -757,6 +768,7 @@ function EditDialog({
   onCaptureCost,
 }: {
   product: Product | null;
+  showMargins: boolean;
   knownCategories: string[];
   onClose(): void;
   onAskDeactivate(p: Product): void;
@@ -837,6 +849,7 @@ function EditDialog({
             />
             <ProductMarginLine
               product={product}
+              showMargins={showMargins}
               onCaptureCost={() => onCaptureCost(product)}
             />
             <div className="flex justify-between border-t pt-4 mt-2">
@@ -869,20 +882,23 @@ function EditDialog({
   );
 }
 
-// ProductMarginLine — "Costo prom · Precio · Margen (d%)" en la ficha.
+// ProductMarginLine — "Costo promedio · Precio · Margen (d%)" en la ficha.
 // Cuando el producto no tiene costo capturado muestra un enlace para
 // capturarlo al resurtir (abre AdjustStockModal vía onCaptureCost). Respeta
 // el ojo de visibilidad de dinero. El % se calcula client-side a partir del
 // costo y precio; el monto del margen sí se enmascara.
 function ProductMarginLine({
   product,
+  showMargins,
   onCaptureCost,
 }: {
   product: Product;
+  showMargins: boolean;
   onCaptureCost(): void;
 }) {
   const money = useMoneyVisibility();
   const cost = product.avg_unit_cost;
+  if (!showMargins) return null;
   const hasCost = typeof cost === "number";
   if (!hasCost) {
     return (

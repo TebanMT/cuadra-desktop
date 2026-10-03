@@ -1,3 +1,4 @@
+import { MemberLastEntry } from "@/components/members/MemberLastEntry";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -428,6 +429,8 @@ export default function MemberDetailPage() {
             <span className="text-xs underline shrink-0">{bt.detailFlag.pendingTitle}</span>
           </button>
         )}
+
+        <MemberLastEntry memberID={member.id} />
 
         {/* Tabs */}
         <Tabs defaultValue="payments">

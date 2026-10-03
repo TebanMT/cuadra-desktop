@@ -18,7 +18,7 @@ export const auth = {
       notSet: "Este usuario todavía no tiene PIN configurado.",
       tooManyAttempts: "Demasiados intentos. Toca otro operador o usa tu correo.",
       generic: "No pudimos validar el PIN. Vuelve a intentar.",
-      loadFailed: "No pudimos cargar los operadores. Revisa que la app esté corriendo.",
+      loadFailed: "No se pudieron cargar los operadores. Reinicia Tinta.",
     },
   },
   setupPin: {
@@ -27,7 +27,7 @@ export const auth = {
     skipCta: "Más tarde",
     submit: "Guardar PIN",
     confirmLabel: "Confirma tu PIN",
-    successToast: "PIN configurado. La próxima vez tócalo para entrar.",
+    successToast: "PIN guardado. Úsalo para entrar.",
     errors: {
       mismatch: "Los dos PINs no coinciden.",
       generic: "No pudimos guardar el PIN. Vuelve a intentar.",
@@ -66,7 +66,7 @@ export const auth = {
   },
   reset: {
     title: "Crea una contraseña nueva",
-    subtitle: "Mínimo 8 caracteres. Que sea fácil de recordar para ti.",
+    subtitle: "Usa al menos 8 caracteres.",
     newPasswordLabel: "Nueva contraseña",
     confirmPasswordLabel: "Repite la contraseña",
     submit: "Guardar contraseña",
@@ -79,14 +79,14 @@ export const auth = {
   },
   signup: {
     welcome: "Bienvenido a Tinta",
-    subtitle: "Vamos a poner tu gym a cuadrar en 5 minutos.",
+    subtitle: "Crea tu cuenta para registrar tu gimnasio.",
     fullName: "Tu nombre completo",
     email: "Tu correo electrónico",
     password: "Contraseña",
     confirmPassword: "Repite la contraseña",
     submit: "Crear mi cuenta",
     errors: {
-      emailFormat: "Ese correo no se ve bien. Revísalo.",
+      emailFormat: "Escribe un correo válido.",
       emailExists: "Este correo ya tiene una cuenta. ¿Quieres iniciar sesión?",
       passwordShort: "Tu contraseña debe tener al menos 8 caracteres.",
       passwordMismatch: "Las contraseñas no coinciden.",

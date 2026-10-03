@@ -19,14 +19,16 @@ export const dashboard = {
   fixProfileCta: "Editar perfil",
   subtitle: (gymName: string | null) =>
     gymName ? gymName : "Bienvenido a Tinta",
-  loading: "Cargando dashboard…",
-  error: "No pudimos cargar el dashboard.",
+  loading: "Cargando resumen…",
+  error: "No se pudo cargar el resumen.",
   kpis: {
     activeMembers: "Socios activos",
+    checkinsToday: "Entradas hoy",
+    checkinsTodayHint: "entradas registradas hoy",
     incomeMonth: "Ingresos del mes",
-    gananciaMes: "Utilidad de productos",
-    expensesMonth: "Egresos del mes",
-    expensesHint: "Mercancía + otros",
+    gananciaMes: "Ganancia de productos",
+    expensesMonth: "Salidas del mes",
+    expensesHint: "Gastos + compras + devoluciones",
     expiringWeek: "Vencen esta semana",
     recoverable: "Por recuperar",
     pendingDebt: "Por cobrar (fiado)",
@@ -40,23 +42,6 @@ export const dashboard = {
   income30d: {
     title: "Ingresos últimos 30 días",
     empty: "Sin ingresos en los últimos 30 días.",
-  },
-  attention: {
-    title: "Atención inmediata",
-    seeAll: "Ver todo",
-    expiringSoon: (n: number) =>
-      n === 1 ? "1 socio vence pronto" : `${n} socios vencen pronto`,
-    expiredRecoverable: (n: number) =>
-      n === 1 ? "1 vencido por recuperar" : `${n} vencidos por recuperar`,
-    inactiveInvoluntary: (n: number) =>
-      n === 1 ? "1 socio sin venir 21+ días" : `${n} socios sin venir 21+ días`,
-    lowStock: (n: number) =>
-      n === 1 ? "1 producto con stock bajo" : `${n} productos con stock bajo`,
-    pendingBalance: (n: number) =>
-      n === 1 ? "1 saldo pendiente" : `${n} saldos pendientes`,
-    birthdaysToday: (n: number) =>
-      n === 1 ? "1 cumpleañero hoy 🎂" : `${n} cumpleañeros hoy 🎂`,
-    none: "Todo en orden 🎉",
   },
   recentPayments: {
     title: "Últimos cobros",
@@ -77,7 +62,7 @@ export const dashboard = {
   quickActions: {
     sectionLabel: "Acciones rápidas",
     pay: "Cobrar",
-    checkin: "Check-in",
+    checkin: "Registrar entrada",
     sale: "Venta rápida",
     newMember: "Nuevo socio",
   },
@@ -87,9 +72,9 @@ export const dashboard = {
     masked: "$•••",
   },
   kioskCard: {
-    title: "¿Listo para abrir?",
+    title: "Entrada por kiosko",
     body:
-      "Pon el modo kiosko en la pantalla de entrada para que tus socios hagan check-in solos. Tú sigues cobrando en esta ventana.",
+      "Los socios registran su entrada en otra pantalla. Recepción puede seguir cobrando.",
     cta: "Abrir modo kiosko",
     shortcutHint: "También desde cualquier pantalla:",
     shortcut: "Ctrl + Alt + K",

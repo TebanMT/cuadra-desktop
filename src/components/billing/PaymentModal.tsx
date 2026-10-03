@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { validateDateFields } from "@/lib/date-input";
+import { DateInput } from "@/components/ui/date-input";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Loader2, Printer, MessageCircle, Tag, X } from "lucide-react";
 import { addDays, max as dateMax } from "date-fns";
 import { toast } from "sonner";
@@ -42,6 +44,8 @@ import { notifySendReceiptOutcome } from "@/lib/receiptToasts";
 import { api } from "@/lib/api";
 import { billing as t } from "@/strings/billing";
 import { members as mt } from "@/strings/members";
+import { CashDrawerField } from "@/components/cash/CashDrawerField";
+import { keyForPayload } from "@/lib/idempotency";
 
 interface Props {
   member: Pick<Member, "id" | "full_name" | "phone" | "enrollment_paid" | "last_maintenance_paid">;
@@ -148,6 +152,7 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
 
   const [typeId, setTypeId] = useState<string>(currentMembership?.membership_type_id || "");
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [cashDrawerId, setCashDrawerId] = useState<string>();
   const [paymentDate, setPaymentDate] = useState<string>(todayIso());
   const [notes, setNotes] = useState("");
   const [discountOpen, setDiscountOpen] = useState(false);
@@ -171,11 +176,13 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<RegisterMembershipPaymentResponse | null>(null);
   const [whatsappState, setWhatsappState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const paymentAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
 
   useEffect(() => {
     if (open) {
       setTypeId(currentMembership?.membership_type_id || "");
       setMethod("cash");
+      setCashDrawerId(undefined);
       setPaymentDate(todayIso());
       setNotes("");
       setDiscountOpen(false);
@@ -192,6 +199,7 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
       setError(null);
       setSuccess(null);
       setWhatsappState("idle");
+      paymentAttempt.current = null;
     }
   }, [open, currentMembership?.membership_type_id]);
 
@@ -358,10 +366,11 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
     setError(null);
     if (!selectedType) return;
 
-    const payload: RegisterMembershipPaymentInput = {
+    const paymentWithoutKey = {
       member_id: member.id,
       membership_type_id: selectedType.id,
       payment_method: method,
+      ...(method === "cash" && cashDrawerId ? { cash_drawer_id: cashDrawerId } : {}),
       amount: amountToCharge,
       payment_date: paymentDate,
       // Forzar la decisión del operador (override de la auto-decisión
@@ -385,6 +394,11 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
             },
           }
         : {}),
+    };
+    paymentAttempt.current = keyForPayload(paymentAttempt.current, paymentWithoutKey);
+    const payload: RegisterMembershipPaymentInput = {
+      ...paymentWithoutKey,
+      idempotency_key: paymentAttempt.current.key,
     };
 
     try {
@@ -483,7 +497,7 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <form onSubmitCapture={validateDateFields} onSubmit={handleSubmit} className="space-y-4" noValidate>
             {offline && (
               <Alert>
                 <AlertDescription>{t.payment.offline}</AlertDescription>
@@ -794,14 +808,23 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
               </RadioGroup>
             </div>
 
+            {method === "cash" && (
+              <CashDrawerField
+                value={cashDrawerId}
+                onChange={setCashDrawerId}
+                date={paymentDate}
+                id="membership-cash-drawer"
+              />
+            )}
+
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="pm-date">{t.payment.date}</Label>
-                <Input
+                <DateInput
                   id="pm-date"
-                  type="date"
+                  context="recent"
                   value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
+                  onValueChange={(e) => setPaymentDate(e)}
                 />
               </div>
               <div className="space-y-1">

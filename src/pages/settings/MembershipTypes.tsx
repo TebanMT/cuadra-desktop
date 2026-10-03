@@ -332,8 +332,7 @@ function MembershipsTab() {
 
         {(chargeEnrollment || chargeMaintenance) && (
           <p className="text-[11px] text-muted-foreground">
-            Estos montos se usan como default al crear planes nuevos. Cada plan
-            los puede ajustar al editarlo.
+            Montos iniciales para nuevas membresías. Puedes cambiarlos en cada una.
           </p>
         )}
       </div>

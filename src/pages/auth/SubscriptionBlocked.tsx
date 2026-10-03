@@ -85,7 +85,7 @@ export default function SubscriptionBlocked() {
 
         <p className="text-center text-xs text-muted-foreground pt-2">
           El pago se hace en tu navegador con Stripe o Mercado Pago. Cuando
-          termines, Tinta se desbloquea automáticamente al próximo sync.
+          termines, Tinta se desbloquea automáticamente cuando se sincronice.
         </p>
 
         {user && (

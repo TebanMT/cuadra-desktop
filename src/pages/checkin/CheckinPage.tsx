@@ -81,7 +81,7 @@ export default function CheckinPage() {
   }, []);
 
   // Duración del veredicto + volumen del tono — mismos knobs del kiosko
-  // ("Duración del feedback al check-in" / "Volumen del kiosko" en
+  // ("Duración del aviso de entrada" / "Volumen del kiosko" en
   // Ajustes → Perfil del gym). Antes esta página fijaba 5s en duro.
   const { ttlMs, volume } = useCheckinFeedbackSettings();
 

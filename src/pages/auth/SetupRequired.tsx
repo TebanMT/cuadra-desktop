@@ -40,9 +40,7 @@ export default function SetupRequired() {
           desde tu dashboard.
         </h1>
         <p className="text-muted-foreground mt-3 leading-relaxed">
-          La configuración inicial del gym (datos, planes, métodos de pago)
-          se hace desde la web. Toma 3 minutos. Después vuelves acá y la
-          recepción ya queda lista para operar.
+          Completa los datos del gimnasio, membresías y formas de pago en la web. Después, vuelve a abrir Tinta en recepción.
         </p>
       </div>
 

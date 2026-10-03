@@ -36,7 +36,7 @@ describe("MemberAssociator (inline)", () => {
     const onChange = vi.fn();
     renderWithProviders(<MemberAssociator member={null} onChange={onChange} />);
 
-    await user.click(screen.getByRole("button", { name: /Asociar a socio/i }));
+    await user.click(screen.getByRole("button", { name: /Agregar socio/i }));
     const input = screen.getByPlaceholderText(/Buscar por nombre o teléfono/i);
     await user.type(input, "Ro");
 
@@ -56,13 +56,13 @@ describe("MemberAssociator (inline)", () => {
     const onChange = vi.fn();
     renderWithProviders(<MemberAssociator member={null} onChange={onChange} />);
 
-    await user.click(screen.getByRole("button", { name: /Asociar a socio/i }));
+    await user.click(screen.getByRole("button", { name: /Agregar socio/i }));
     await user.type(screen.getByPlaceholderText(/Buscar por nombre o teléfono/i), "Ro");
     await user.keyboard("{Escape}");
 
     expect(onChange).not.toHaveBeenCalled();
     // Colapsado: el botón de asociar regresa.
-    expect(screen.getByRole("button", { name: /Asociar a socio/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Agregar socio/i })).toBeInTheDocument();
   });
 
   it("con socio asociado muestra la pastilla y Quitar la limpia", async () => {

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-export type MemberStatusFilter = "" | "active" | "expiring_soon" | "expired" | "inactive";
+export type MemberStatusFilter = "" | "active" | "expiring_soon" | "expired" | "inactive" | "unrenewed";
 export type MemberSort = "name" | "expiry" | "created_at";
 export type SortDir = "asc" | "desc";
 
@@ -206,9 +206,10 @@ function buildQuery(filters: ListMembersInput): Record<string, string | number |
   };
 }
 
-export function useMembersList(filters: ListMembersInput) {
+export function useMembersList(filters: ListMembersInput, enabled = true) {
   return useQuery<MemberListResponse>({
     queryKey: KEYS.list(filters),
+    enabled,
     queryFn: () => api.get<MemberListResponse>("/api/v1/members", { query: buildQuery(filters) }),
     placeholderData: keepPreviousData,
   });

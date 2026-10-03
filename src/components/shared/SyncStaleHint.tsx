@@ -35,8 +35,7 @@ export function SyncStaleHint({ noun }: { noun: string }) {
     <Alert variant="warning">
       <AlertTriangle className="h-4 w-4" />
       <AlertDescription>
-        {since} Si en otro equipo crearon {noun} con el mismo nombre, el choque se detectará
-        hasta sincronizar — usa un nombre distintivo o sincroniza primero.
+        {since} Sincroniza antes de crear {noun} para comprobar si ya existe.
       </AlertDescription>
     </Alert>
   );

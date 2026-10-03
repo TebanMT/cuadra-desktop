@@ -17,9 +17,9 @@ function status(state: SyncStatus["state"]): SyncStatus {
 }
 
 describe("levelOf", () => {
-  it("online y offline corto son 'ok' — el parpadeo de red no se reporta", () => {
+  it("una desconexión breve no se presenta como sincronizado", () => {
     expect(levelOf(status("online"))).toBe("ok");
-    expect(levelOf(status("offline_short"))).toBe("ok");
+    expect(levelOf(status("offline_short"))).toBe("offline");
   });
 
   it("offline medio/largo es 'offline' (calmado), no warning ni error", () => {

@@ -329,7 +329,7 @@ function TemplateEditModal({
                 </Alert>
               )}
               <div className="flex items-center justify-between">
-                <Label htmlFor="tpl-body">{t.templates.modal.bodyLabel}</Label>
+                <Label htmlFor="tpl-body">{canEditText ? t.templates.modal.bodyLabel : "Texto de referencia"}</Label>
                 <div className="flex items-center gap-2">
                   <Switch id="tpl-enabled" checked={enabled} onCheckedChange={setEnabled} />
                   <Label htmlFor="tpl-enabled" className="text-xs cursor-pointer">
@@ -356,11 +356,11 @@ function TemplateEditModal({
               )}
               <div className="rounded-md border bg-muted/30 px-3 py-2">
                 <p className="text-xs text-muted-foreground mb-1">
-                  {t.templates.modal.previewLabel}
+                  {canEditText ? t.templates.modal.previewLabel : "Ejemplo del mensaje"}
                 </p>
                 <p className="text-sm whitespace-pre-wrap">{previewBody()}</p>
                 <p className="text-[10px] text-muted-foreground mt-2">
-                  {t.templates.modal.previewHint}
+                  {canEditText ? t.templates.modal.previewHint : "El texto fijo de WhatsApp puede diferir de este ejemplo."}
                 </p>
               </div>
               <div className="flex justify-between pt-2">

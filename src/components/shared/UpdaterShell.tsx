@@ -88,9 +88,7 @@ export function UpdaterShell() {
           <AlertDialogHeader>
             <AlertDialogTitle>Tu versión de Tinta ya no es compatible</AlertDialogTitle>
             <AlertDialogDescription>
-              La nube actualizó la forma en que Tinta sincroniza datos. Hace
-              falta que actualices el programa para seguir trabajando. La
-              actualización tarda un par de minutos.
+              Actualiza Tinta para seguir sincronizando y trabajando.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

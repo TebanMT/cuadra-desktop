@@ -1,7 +1,7 @@
 export const reports = {
   page: {
     title: "Reportes",
-    subtitle: "Analiza tu gym por períodos y exporta lo que necesites.",
+    subtitle: "Ingresos, gastos y caja por período.",
     periodLabel: "Período",
     customFromLabel: "Desde",
     customToLabel: "Hasta",
@@ -17,37 +17,45 @@ export const reports = {
   },
   periods: {
     today: "Hoy",
-    week: "Esta semana",
+    week: "Últimos 7 días",
     month: "Este mes",
     last_month: "Mes pasado",
     "3_months": "Últimos 3 meses",
-    year: "Este año",
+    year: "Últimos 12 meses",
     custom: "Personalizado",
   },
   kpis: {
-    net: "Utilidad del período",
-    netHint: "Ingresos − mercancía − gastos − devoluciones",
+    operatingResult: "Resultado del período",
+    operatingResultHint: "Ingresos − salidas registradas",
+    cashFlow: "Movimiento neto de caja",
+    cashFlowHint: "Sólo movimientos físicos de la caja de recepción",
+    cashCounted: "Último conteo de efectivo",
+    cashDifference: "Diferencia de caja",
     income: "Ingresos",
+    membershipIncome: "Cobros de membresías",
+    productSales: "Cobros de productos",
+    otherIncome: "Otros ingresos",
     newMembers: "Socios nuevos",
-    checkins: "Check-ins",
+    checkins: "Asistencias",
     refunds: "Devoluciones",
-    inventoryCost: "Egresos por mercancía",
-    expensesGeneral: "Otros gastos",
-    criticalStock: "Stock crítico",
+    inventoryPurchases: "Compras pagadas para reventa",
+    cogs: "Costo de productos vendidos",
+    expensesGeneral: "Gastos de operación",
+    criticalStock: "Existencias bajas",
     criticalStockHint: (out: number, low: number) =>
       out > 0
-        ? `${out} sin stock · ${low} bajo mínimo`
+        ? `${out} sin existencias · ${low} bajo mínimo`
         : low > 0
         ? `${low} bajo mínimo`
         : "Todo en orden",
   },
   charts: {
     incomeByDay: "Ingresos por día",
-    incomeVsExpensesByDay: "Ingresos vs egresos por día",
-    incomeVsExpensesHint: "Línea azul: ingresos · línea roja: egresos",
-    checkinsByDay: "Check-ins por día",
+    incomeVsExpensesByDay: "Ingresos vs salidas registradas por día",
+    incomeVsExpensesHint: "Línea azul: ingresos · línea roja: salidas registradas",
+    checkinsByDay: "Asistencias por día",
     legendIncome: "Ingresos",
-    legendExpenses: "Egresos",
+    legendExpenses: "Salidas registradas",
   },
   byMethod: {
     title: "Por método de pago",
@@ -57,7 +65,7 @@ export const reports = {
   },
   byCategory: {
     title: "Gastos por categoría",
-    description: "Desglose de los egresos generales del período.",
+    description: "Desglose de los gastos de operación del período.",
     empty: "Sin gastos clasificados en este período.",
   },
   topMembers: {
@@ -72,12 +80,12 @@ export const reports = {
   },
   topProducts: {
     title: "Productos más vendidos",
-    description: "Ranking por revenue del período.",
+    description: "Ranking por ventas cobradas del período.",
     empty: "Sin ventas de productos en este período.",
     columns: {
       product: "Producto",
       quantity: "Unidades",
-      revenue: "Revenue",
+      revenue: "Ventas cobradas",
     },
     quantityValue: (n: number) =>
       n === 1 ? "1 unidad" : `${n.toLocaleString("es-MX")} unidades`,
@@ -94,11 +102,11 @@ export const reports = {
     },
   },
   inventoryCosts: {
-    title: "Compras de inventario",
-    description: "Mercancía que entró con costo capturado en el período.",
+    title: "Compras de productos",
+    description: "Dinero usado para surtir productos en el período.",
     empty: "Sin compras registradas en este período.",
-    hint: "Captura el costo al cargar mercancía para que aparezca aquí.",
-    totalLabel: "Total egresado:",
+    hint: "Captura el costo al surtir productos para que aparezca aquí.",
+    totalLabel: "Total:",
     columns: {
       date: "Fecha",
       product: "Producto",
@@ -110,10 +118,10 @@ export const reports = {
   },
   expensesSection: {
     title: "Gastos del período",
-    description: "Renta, servicios, sueldos y otros egresos generales.",
+    description: "Renta, servicios, sueldos y otros gastos de operación.",
     empty: "Sin gastos registrados en este período.",
     hint: "Ve a Gastos para capturar uno.",
-    totalLabel: "Total egresado:",
+    totalLabel: "Total:",
     columns: {
       date: "Fecha",
       category: "Categoría",
@@ -125,10 +133,14 @@ export const reports = {
   expenseCategories: {
     renta: "Renta",
     servicios: "Servicios",
+    nomina: "Nómina",
     mantenimiento: "Mantenimiento",
-    sueldos: "Sueldos",
-    marketing: "Marketing",
-    mercaderia_externa: "Mercadería externa",
+    marketing: "Publicidad y promoción",
+    insumos_no_inventariables: "Materiales de uso interno",
+    impuestos_y_permisos: "Impuestos y permisos",
+    // Aliases de lectura para instalaciones todavía sin migrar.
+    sueldos: "Nómina",
+    mercaderia_externa: "Materiales de uso interno",
     otros: "Otros",
   } as Record<string, string>,
   expenseMethods: {
@@ -139,8 +151,8 @@ export const reports = {
   drillDown: {
     incomeTitle: (day: string) => `Cobros del ${day}`,
     incomeEmpty: "Sin cobros ese día.",
-    checkinsTitle: (day: string) => `Check-ins del ${day}`,
-    checkinsEmpty: "Sin check-ins ese día.",
+    checkinsTitle: (day: string) => `Asistencias del ${day}`,
+    checkinsEmpty: "Sin asistencias ese día.",
     close: "Cerrar",
     loading: "Cargando…",
   },

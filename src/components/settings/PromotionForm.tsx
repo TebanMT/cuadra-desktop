@@ -1,3 +1,5 @@
+import { validateDateFields } from "@/lib/date-input";
+import { DateInput } from "@/components/ui/date-input";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -110,7 +112,7 @@ export function PromotionForm({
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form onSubmitCapture={validateDateFields} onSubmit={submit} className="space-y-4">
       {serverError && (
         <Alert variant="destructive">
           <AlertDescription>{serverError}</AlertDescription>
@@ -275,20 +277,19 @@ export function PromotionForm({
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-2">
             <Label htmlFor="promo-from">{t.form.validFrom}</Label>
-            <Input
+            <DateInput
               id="promo-from"
-              type="date"
               value={validFrom ?? ""}
-              onChange={(e) => setValidFrom(e.target.value)}
+              onValueChange={(e) => setValidFrom(e)}
             />
           </div>
           <div className="space-y-2">
             <Label htmlFor="promo-until">{t.form.validUntil}</Label>
-            <Input
+            <DateInput
               id="promo-until"
-              type="date"
+              min={validFrom || undefined}
               value={validUntil ?? ""}
-              onChange={(e) => setValidUntil(e.target.value)}
+              onValueChange={(e) => setValidUntil(e)}
             />
           </div>
         </div>

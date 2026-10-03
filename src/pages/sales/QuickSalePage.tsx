@@ -1,949 +1,252 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import {
-  Loader2,
-  Minus,
-  PackagePlus,
-  Plus,
-  Search,
-  Tag,
-  Trash2,
-  X,
-} from "lucide-react";
+import { Link } from "react-router-dom";
+import { CheckCircle2, Loader2, Minus, Plus, Search, Tag, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import {
-  stockLevel,
-  useActiveProducts,
-  type Product,
-  type StockLevel,
-} from "@/hooks/useProducts";
+import { stockLevel, useActiveProducts, type Product } from "@/hooks/useProducts";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
-import {
-  useRegisterSale,
-  type MemberSearchResult,
-  type RegisterSaleInput,
-} from "@/hooks/useSales";
-import { fmtMoney, usePaymentHistory, type PaymentMethod } from "@/hooks/useBilling";
+import { useRegisterSale } from "@/hooks/useSales";
+import { fmtMoney, usePaymentHistory, type Payment } from "@/hooks/useBilling";
 import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
-import { CheckoutModal } from "@/components/sales/CheckoutModal";
-import { levelOf, useSyncStatus } from "@/hooks/useSyncStatus";
-import { api, ApiError } from "@/lib/api";
+import { ReceiptViewer } from "@/components/billing/ReceiptViewer";
+import { CheckoutModal, type CheckoutInput } from "@/components/sales/CheckoutModal";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
+import { ApiError } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { fmtDate } from "@/lib/dates";
 import { sales as t } from "@/strings/sales";
-import type { Promotion } from "@/hooks/usePromotions";
-import { formatPromotionValue } from "@/strings/promotions";
 import { PromotionPickerModal } from "@/components/billing/PromotionPickerModal";
-import { Badge } from "@/components/ui/badge";
+import { SaleCorrectionModal } from "@/components/sales/SaleCorrectionModal";
+import { createIdempotencyKey } from "@/lib/idempotency";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { changedSaleProducts, emptySaleDraft, moneyCents, saleTotals, useSaleDraft, type CartLine, type SaleAttempt } from "@/components/sales/saleDraft";
 
-interface CartLine {
-  product: Product;
-  qty: number;
-}
-
-// normalize — quita acentos y baja a lowercase. Sin esto "mineral" no
-// pegaba con "Agua mineral" y "ciel" no pegaba con "Ciél". Usamos
-// NFD + strip de combining marks (Unicode plane Diacritic) que cubre
-// todas las vocales acentuadas en español.
-function normalize(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-}
-
-function badgeForStock(level: StockLevel, stock: number) {
-  if (level === "out")
-    return { text: t.page.badges.out, className: "bg-destructive text-destructive-foreground" };
-  if (level === "low")
-    return { text: t.page.badges.low(stock), className: "bg-warning text-warning-foreground" };
-  return { text: t.page.badges.stock(stock), className: "bg-muted text-muted-foreground" };
-}
+interface LastSale { saleId: string; paymentId: string; folio: string; total: number; paid: number; balance: number; change?: number }
+const normalize = (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 
 export default function QuickSalePage() {
-  const queryClient = useQueryClient();
+  const gym = useAuthStore(s => s.gym?.gym_id);
+  const user = useAuthStore(s => s.user?.user_id);
+  if (!gym || !user) return null;
+  const key = `tinta.sale.v1:${gym}:${user}`;
+  return <SaleWorkspace key={key} draftKey={key} />;
+}
+function SaleWorkspace({ draftKey }: { draftKey: string }) {
   const products = useActiveProducts();
   const sync = useSyncStatus();
   const register = useRegisterSale();
-
-  const [cart, setCart] = useState<Record<string, number>>({});
-  const [member, setMember] = useState<MemberSearchResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [qtyModal, setQtyModal] = useState<Product | null>(null);
-  const [qtyValue, setQtyValue] = useState("1");
+  const saved = useSaleDraft(draftKey);
+  const { draft } = saved;
+  const { lines, member, promo } = draft;
   const [search, setSearch] = useState("");
-  // El cobro (método, cambio, fiado) vive en CheckoutModal — la columna
-  // del carrito sólo arma la cuenta.
+  const [category, setCategory] = useState<string | null>(null);
+  const [showOutOfStock, setShowOutOfStock] = useState(true);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
-  // Por default escondemos los productos con stock=0 — el operador
-  // tiene foco en lo que SÍ se puede vender ahora. El toggle expone los
-  // agotados (caso típico: el operador sabe que sí tiene físico pero el
-  // sistema no lo refleja). Al tocar uno agotado se abre el modal de
-  // restock rápido que registra el inventario y agrega al carrito en un
-  // solo gesto — protege contra olvidos del día a día.
-  const [showOutOfStock, setShowOutOfStock] = useState(false);
-  const [restockModal, setRestockModal] = useState<Product | null>(null);
-  // Promo opcional. En ventas sólo aplican percent / fixed_amount; el BE
-  // tira no-op para los demás kinds. El target del picker es "sale".
-  const [promo, setPromo] = useState<Promotion | null>(null);
-  const [promoPickerOpen, setPromoPickerOpen] = useState(false);
-  // Deuda del socio asociado: el momento natural de cobrar un fiado es
-  // cuando esa persona vuelve al mostrador. El chip ámbar junto a su
-  // nombre abre el modal de abono sin salir de la venta.
-  const [settleOpen, setSettleOpen] = useState(false);
-  const memberHistory = usePaymentHistory(member?.member_id ?? null, {});
-  const memberDebt = member ? (memberHistory.data?.total_pending ?? 0) : 0;
-  const oldestMemberDebt = useMemo(() => {
-    if (!member) return undefined;
-    return [...(memberHistory.data?.items ?? [])]
-      .filter((p) => p.balance_pending > 0)
-      .sort((a, b) => a.payment_date.localeCompare(b.payment_date))[0];
-  }, [member, memberHistory.data]);
-  const searchRef = useRef<HTMLInputElement | null>(null);
-
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [lastSale, setLastSale] = useState<LastSale | null>(null);
+  const [correctionOpen, setCorrectionOpen] = useState(false);
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [promoOpen, setPromoOpen] = useState(false);
+  const [debtOpen, setDebtOpen] = useState(false);
+  const [settlement, setSettlement] = useState<Payment | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const sending = useRef(false);
+  const memberHistory = usePaymentHistory(member?.member_id, {});
   const items = useMemo(() => products.data ?? [], [products.data]);
-  const offline = levelOf(sync.data) !== "ok";
+  const categories = useMemo(() => [...new Set(items.map(p => p.category || t.page.uncategorized))].sort((a, b) => a.localeCompare(b, "es")), [items]);
+  const filtered = useMemo(() => items.filter(p => p.active && (showOutOfStock || p.stock > 0)
+    && (!category || (p.category || t.page.uncategorized) === category)
+    && (!normalize(search) || normalize(p.name).includes(normalize(search))))
+    .sort((a, b) => a.name.localeCompare(b.name, "es")), [items, showOutOfStock, category, search]);
+  const changed = products.data ? changedSaleProducts(lines, items) : [];
+  const totals = saleTotals(lines, promo);
+  const blocked = register.isPending || !!draft.attempt || saved.blocked;
+  const needsReview = changed.length > 0;
+  const debts = [...(memberHistory.data?.items ?? [])].filter(p => p.balance_pending > 0)
+    .sort((a, b) => a.payment_date.localeCompare(b.payment_date));
+  useEffect(() => { searchRef.current?.focus(); }, []);
 
-  const cartLines: CartLine[] = useMemo(() => {
-    return Object.entries(cart)
-      .map(([id, qty]) => {
-        const product = items.find((p) => p.id === id);
-        if (!product) return null;
-        return { product, qty };
-      })
-      .filter((x): x is CartLine => x !== null && x.qty > 0);
-  }, [cart, items]);
-
-  const subtotal = useMemo(
-    () => cartLines.reduce((sum, l) => sum + l.product.price * l.qty, 0),
-    [cartLines]
-  );
-
-  // Promo preview client-side (espeja Calculate del BE). Para ventas sólo
-  // percent y fixed_amount dan descuento; los demás kinds → 0.
-  const promoDiscount = useMemo(() => {
-    if (!promo || subtotal <= 0) return 0;
-    switch (promo.kind) {
-      case "percent":
-        if (promo.value == null) return 0;
-        return Math.min(subtotal, subtotal * (promo.value / 100));
-      case "fixed_amount":
-        if (promo.value == null) return 0;
-        return Math.min(subtotal, promo.value);
-      default:
-        return 0;
-    }
-  }, [promo, subtotal]);
-
-  const total = useMemo(
-    () => Math.max(0, subtotal - promoDiscount),
-    [subtotal, promoDiscount]
-  );
-
-  // Filtra los productos por (a) la búsqueda visible — substring +
-  // accent-tolerant (normalize ambos lados) — y (b) la regla
-  // "esconder agotados por default". El toggle showOutOfStock los
-  // reintroduce cuando el operador necesita registrar mercancía no
-  // capturada.
-  const filtered = useMemo(() => {
-    const q = normalize(search);
-    return items.filter((p) => {
-      if (!showOutOfStock && p.stock <= 0) return false;
-      if (q && !normalize(p.name).includes(q)) return false;
-      return true;
+  function add(product: Product) {
+    if (blocked) return;
+    saved.update(d => {
+      const existing = d.lines.find(l => l.product.id === product.id);
+      return { ...d, lines: existing ? d.lines.map(l => l === existing ? { ...l, qty: l.qty + 1 } : l) : [...d.lines, { product, qty: 1 }] };
     });
-  }, [items, search, showOutOfStock]);
-
-  // El primer match vendible cuando hay búsqueda activa: es el que Enter
-  // agrega al carrito, así que se resalta en el grid para que el atajo
-  // sea predecible (ves lo que va a entrar antes de soltar el Enter).
-  const firstMatchId = useMemo(() => {
-    if (!search) return null;
-    return filtered.find((p) => p.active && p.stock > 0)?.id ?? null;
-  }, [search, filtered]);
-
-  // outOfStockCount — count de agotados que el toggle expondría. Si es
-  // 0 escondemos el toggle entero (no aporta señal). Conteo se hace
-  // sobre `items` (no filtered) para que respete sólo el dataset, no la
-  // búsqueda.
-  const outOfStockCount = useMemo(
-    () => items.filter((p) => p.stock <= 0).length,
-    [items]
-  );
-
-  const grouped = useMemo(() => {
-    const map = new Map<string, Product[]>();
-    for (const p of filtered) {
-      // El backend omite `category` cuando es null (omitempty), así que
-      // puede llegar undefined aunque el tipo diga string. Agrupamos esos
-      // bajo "Sin categoría" — sin el fallback, la key undefined rompía el
-      // .sort (undefined.localeCompare) y dejaba un encabezado vacío.
-      const category = p.category || t.page.uncategorized;
-      const arr = map.get(category) ?? [];
-      arr.push(p);
-      map.set(category, arr);
+    setLastSale(null); setError(null);
+  }
+  function quantity(id: string, qty: number) {
+    if (blocked || !Number.isSafeInteger(qty) || qty < 0) return;
+    saved.update(d => ({ ...d, lines: qty === 0 ? d.lines.filter(l => l.product.id !== id) : d.lines.map(l => l.product.id === id ? { ...l, qty } : l) }));
+  }
+  function clear() {
+    const previous = draft;
+    if (!blocked && saved.update(() => emptySaleDraft())) {
+      setError(null);
+      toast("Venta vaciada", { action: { label: "Deshacer", onClick: () => saved.update(d => d.lines.length || d.attempt ? d : previous) } });
     }
-    return Array.from(map.entries())
-      .sort(([a], [b]) => a.localeCompare(b, "es"))
-      .map(([category, list]) => ({
-        category,
-        list: list.slice().sort((a, b) => a.name.localeCompare(b.name, "es")),
-      }));
-  }, [filtered]);
-
-  function addToCart(product: Product, qty = 1) {
-    if (product.stock <= 0) return;
-    setCart((c) => {
-      const current = c[product.id] ?? 0;
-      const next = Math.min(product.stock, current + qty);
-      if (next === current) {
-        toast.error(t.page.errors.stockInsufficient(product.name, product.stock));
-        return c;
-      }
-      return { ...c, [product.id]: next };
-    });
-    setError(null);
   }
-
-  function setLineQty(productId: string, qty: number) {
-    setCart((c) => {
-      if (qty <= 0) {
-        const { [productId]: _drop, ...rest } = c;
-        return rest;
-      }
-      const product = items.find((p) => p.id === productId);
-      const capped = product ? Math.min(product.stock, qty) : qty;
-      return { ...c, [productId]: capped };
-    });
+  function checkout() {
+    if (blocked || !lines.length) return;
+    if (totals.total <= 0) { setPromoOpen(true); return; }
+    if (!products.data) { setError("Carga los productos antes de cobrar."); return; }
+    if (needsReview) { setReviewOpen(true); return; }
+    setError(null); setCheckoutOpen(true);
   }
-
-  function removeLine(productId: string) {
-    setCart((c) => {
-      const { [productId]: _drop, ...rest } = c;
-      return rest;
-    });
+  async function send(attempt: SaleAttempt) {
+    if (sending.current) return;
+    sending.current = true;
+    try {
+      const res = await register.mutateAsync(attempt.request);
+      const change = attempt.received === undefined ? undefined : Math.max(0, moneyCents(attempt.received) - moneyCents(res.paid)) / 100;
+      setLastSale({ saleId: res.sale_id, paymentId: res.payment_id, folio: res.folio, total: res.total, paid: res.paid, balance: res.balance_pending, change });
+      saved.update(() => emptySaleDraft());
+      setCheckoutOpen(false); setError(null); setSearch("");
+      const message = res.balance_pending > 0 && res.paid === 0 ? `Fiado guardado: ${fmtMoney(res.balance_pending)} pendientes.` : res.balance_pending > 0 ? `${fmtMoney(res.paid)} cobrados · ${fmtMoney(res.balance_pending)} pendientes.`
+        : res.total === 0 ? "Venta registrada sin cobro." : t.page.success.online(fmtMoney(res.paid));
+      toast.success(message, { description: res.pending_offline_sync || sync.data?.state.startsWith("offline_") ? "Guardada en este equipo. Pendiente de sincronizar." : undefined });
+      searchRef.current?.focus();
+    } catch (err) {
+      // A definitive rejection did not create a sale. A lost response retains
+      // the exact request/key, including after reload, until confirmed.
+      const rejected = err instanceof ApiError && err.status >= 400 && err.status < 500 && ![408, 429].includes(err.status);
+      if (rejected) { saved.update(d => ({ ...d, attempt: null })); void products.refetch(); }
+      else { setCheckoutOpen(false); }
+      setError(err instanceof ApiError ? err.message : "No se pudo confirmar la venta. Reintenta la confirmación.");
+      throw err;
+    } finally { sending.current = false; }
   }
-
-  function clearCart() {
-    setCart({});
-    setMember(null);
-    setError(null);
-    setPromo(null);
-  }
-
-  // Teclado mínimo — sólo lo que acompaña el flujo natural de tecleo:
-  //   Enter (en la búsqueda) → agrega el primer match con stock.
-  //   Esc                    → limpia la BÚSQUEDA, nada más.
-  //
-  // Los atajos E/T/C de método de pago se eliminaron: cambiar el método
-  // es un clic por venta (no ahorran nada) y con el foco fuera del input
-  // teclear un nombre de producto cambiaba el método en silencio. Esc
-  // tampoco vacía ya el carrito: un Esc accidental tiraba una cuenta de
-  // N productos sin confirmación ni undo — vaciar tiene su botón.
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      const target = e.target as HTMLElement | null;
-
-      if (e.key === "Escape") {
-        if (search) {
-          e.preventDefault();
-          setSearch("");
-        }
-        return;
-      }
-
-      if (e.key === "Enter" && target === searchRef.current) {
-        const first = filtered.find((p) => p.active && p.stock > 0);
-        if (first) {
-          e.preventDefault();
-          addToCart(first, 1);
-        }
-      }
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [filtered, search]);
-
-  // Autofocus en el search al cargar la página — habilita escribir
-  // inmediatamente sin tocar el mouse.
-  useEffect(() => {
-    searchRef.current?.focus();
-  }, []);
-
-  function openQtyModal(p: Product) {
-    if (p.stock <= 0) return;
-    setQtyValue(String(cart[p.id] ?? 1));
-    setQtyModal(p);
-  }
-
-  function confirmQty() {
-    if (!qtyModal) return;
-    const q = parseInt(qtyValue, 10);
-    if (!Number.isFinite(q) || q <= 0) return;
-    if (q > qtyModal.stock) {
-      setError(t.page.errors.stockInsufficient(qtyModal.name, qtyModal.stock));
-      return;
-    }
-    setCart((c) => ({ ...c, [qtyModal.id]: q }));
-    setQtyModal(null);
-  }
-
-  // Paso 1 → paso 2: valida lo que es del CARRITO (vacío, stock) antes
-  // de abrir el modal de cobro. Lo que es del cobro (fiado, método) se
-  // valida adentro del modal.
-  function openCheckout() {
-    setError(null);
-    if (cartLines.length === 0) {
-      setError(t.page.errors.cartEmpty);
-      return;
-    }
-    for (const line of cartLines) {
-      if (line.qty > line.product.stock) {
-        setError(t.page.errors.stockInsufficient(line.product.name, line.product.stock));
-        return;
-      }
-    }
-    setCheckoutOpen(true);
-  }
-
-  // Confirmación del modal. THROW en error (el modal lo pinta sin
-  // cerrarse); en éxito cierra, limpia y regresa el foco a la búsqueda
-  // para el siguiente cliente.
-  async function handleCheckoutConfirm(input: { method: PaymentMethod; paid?: number }) {
-    const payload: RegisterSaleInput = {
-      line_items: cartLines.map((l) => ({ product_id: l.product.id, quantity: l.qty })),
+  async function confirm(input: CheckoutInput) {
+    if (needsReview || saved.blocked || sending.current) return;
+    const attempt: SaleAttempt = { received: input.received, request: {
+      idempotency_key: createIdempotencyKey(), expected_total: totals.total,
+      line_items: lines.map(l => ({ product_id: l.product.id, quantity: l.qty })),
       payment_method: input.method,
+      ...(input.cash_drawer_id ? { cash_drawer_id: input.cash_drawer_id } : {}),
       ...(member ? { member_id: member.member_id } : {}),
       ...(input.paid !== undefined ? { paid: input.paid } : {}),
       ...(promo ? { promotion: { promotion_id: promo.id } } : {}),
-    };
-
-    const res = await register.mutateAsync(payload);
-    if (res.pending_offline_sync || offline) {
-      toast.success(t.page.success.offline);
-    } else if (res.balance_pending > 0) {
-      toast.success(
-        `${fmtMoney(res.paid)} cobrados · queda ${fmtMoney(res.balance_pending)} a deber.`
-      );
-    } else {
-      toast.success(t.page.success.online(fmtMoney(res.total)));
-    }
-    setCheckoutOpen(false);
-    clearCart();
-    searchRef.current?.focus();
+    } };
+    if (!saved.update(d => ({ ...d, attempt }))) throw new Error("draft storage unavailable");
+    await send(attempt);
   }
-
-  return (
-    <div className="flex flex-col h-full">
-      <header className="flex items-center justify-between border-b border-foreground/10 px-6 py-5 bg-background">
-        <h1
-          className="text-3xl font-semibold text-foreground"
-          style={{ letterSpacing: "-0.025em" }}
-        >
-          {t.page.title}
-        </h1>
-      </header>
-
-      {member && oldestMemberDebt && (
-        <SettleBalanceModal
-          paymentId={oldestMemberDebt.id}
-          memberName={member.full_name}
-          pendingBalance={oldestMemberDebt.balance_pending}
-          open={settleOpen}
-          onOpenChange={setSettleOpen}
-        />
-      )}
-
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_360px] overflow-hidden">
-        <div className="flex flex-col overflow-hidden">
-          {/* Strip de búsqueda FIJO (fuera del scroller) — el sticky con
-              márgenes negativos dejaba una rendija de 24px por donde el
-              título de la categoría se asomaba cortado al hacer scroll.
-              Autofocus al cargar; Enter agrega el primer match (el que
-              se resalta en el grid). */}
-          <div className="border-b border-border bg-background px-6 py-3">
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="relative flex-1 min-w-[240px] max-w-lg">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                <Input
-                  ref={searchRef}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={t.page.searchPlaceholder}
-                  className="pl-9 pr-9 h-11 text-base"
-                  aria-label={t.page.searchPlaceholder}
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearch("");
-                      searchRef.current?.focus();
-                    }}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-                    aria-label="Limpiar búsqueda"
-                    title="Limpiar búsqueda"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-              {/* Toggle "Ver agotados". Sólo aparece si hay al menos un
-                  producto en 0 — sin nada que esconder no aporta. */}
-              {outOfStockCount > 0 && (
-                <label className="flex items-center gap-2 cursor-pointer h-11 px-3 rounded-md border border-input hover:bg-muted">
-                  <Switch
-                    checked={showOutOfStock}
-                    onCheckedChange={setShowOutOfStock}
-                  />
-                  <span className="text-sm whitespace-nowrap">
-                    {t.page.showOutOfStock}
-                    <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">
-                      ({outOfStockCount})
-                    </span>
-                  </span>
-                </label>
-              )}
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-6 space-y-8">
-          {products.isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : items.length === 0 ? (
-            <div className="text-center py-20 text-muted-foreground">
-              <p>{t.page.empty}</p>
-              <p className="text-sm mt-1">{t.page.emptyHint}</p>
-            </div>
-          ) : grouped.length === 0 ? (
-            <div className="text-center py-20 text-muted-foreground">
-              <p>{t.page.noSearchResults}</p>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {grouped.map(({ category, list }) => (
-                <section key={category}>
-                  <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground mb-3">
-                    {category}
-                  </h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                    {list.map((p) => (
-                      <ProductCard
-                        key={p.id}
-                        product={p}
-                        cartQty={cart[p.id] ?? 0}
-                        highlight={p.id === firstMatchId}
-                        onAdd={() => addToCart(p, 1)}
-                        onCustomQty={() => openQtyModal(p)}
-                        onRestock={() => setRestockModal(p)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          )}
-          </div>
-        </div>
-
-        <aside className="border-l border-border bg-muted/40 flex flex-col overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <h2 className="font-semibold text-foreground">{t.page.cart.title}</h2>
-            {cartLines.length > 0 && (
-              <Button variant="ghost" size="sm" onClick={clearCart}>
-                <Trash2 className="h-4 w-4" />
-                {t.page.cart.clear}
-              </Button>
-            )}
-          </div>
-
-          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-            {cartLines.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-6 text-center">{t.page.cart.empty}</p>
-            ) : (
-              cartLines.map((line) => (
-                <CartRow
-                  key={line.product.id}
-                  line={line}
-                  onInc={() => addToCart(line.product, 1)}
-                  onDec={() => setLineQty(line.product.id, line.qty - 1)}
-                  onRemove={() => removeLine(line.product.id)}
-                />
-              ))
-            )}
-          </div>
-
-          <div className="border-t border-border bg-background px-4 py-4 space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="space-y-1">
-              {promoDiscount > 0 && (
-                <div className="flex items-baseline justify-between text-xs text-muted-foreground">
-                  <span>Subtotal</span>
-                  <span className="tabular-nums">{fmtMoney(subtotal)}</span>
-                </div>
-              )}
-              {promoDiscount > 0 && (
-                <div className="flex items-baseline justify-between text-xs text-success">
-                  <span>− Promoción ({promo?.name})</span>
-                  <span className="tabular-nums">−{fmtMoney(promoDiscount)}</span>
-                </div>
-              )}
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm font-medium">{t.page.cart.total}</span>
-                <span className="text-2xl font-semibold tabular-nums">{fmtMoney(total)}</span>
-              </div>
-            </div>
-
-            {/* Promoción — opcional. Botón "Aplicar promoción" abre el
-                picker compartido con el flujo de membresía. La promo
-                sólo se aplica al subtotal de productos. */}
-            <div className="rounded-md border border-dashed bg-card p-2.5">
-              {!promo ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="w-full h-9"
-                  onClick={() => setPromoPickerOpen(true)}
-                  disabled={cartLines.length === 0}
-                >
-                  <Tag className="h-4 w-4 mr-2" />
-                  Aplicar promoción
-                </Button>
-              ) : (
-                <div className="flex items-center justify-between gap-2">
-                  <div className="min-w-0 flex items-center gap-2 flex-wrap">
-                    <Tag className="h-4 w-4 text-primary shrink-0" />
-                    <span className="text-sm font-medium truncate">{promo.name}</span>
-                    <Badge variant="secondary" className="text-[10px]">
-                      {formatPromotionValue(promo.kind, promo.value, promo.companion_count)}
-                    </Badge>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setPromo(null)}
-                    aria-label="Quitar promoción"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <PromotionPickerModal
-              open={promoPickerOpen}
-              onOpenChange={setPromoPickerOpen}
-              target="sale"
-              onApply={(p) => setPromo(p)}
-            />
-
-            {/* Un solo botón: abre el modal de cobro (método, cambio y
-                fiado viven allá). La columna sólo arma la cuenta. */}
-            <Button
-              size="lg"
-              className="w-full h-12 text-base"
-              onClick={openCheckout}
-              disabled={cartLines.length === 0}
-            >
-              {t.page.cart.submit(fmtMoney(total))}
-            </Button>
-          </div>
-        </aside>
+  return <div className="flex h-full min-h-0 flex-col">
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
+      <h1 className="text-2xl font-semibold tracking-tight">{t.page.title}</h1>
+      <Button variant="outline" size="sm" asChild><Link to="/billing?concept=product">Ventas del día</Link></Button>
+    </header>
+    {lastSale && <div role="status" className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-success/10 px-5 py-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"><span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Venta {lastSale.folio} · {fmtMoney(lastSale.total)}</span>
+        {lastSale.balance > 0 && <span>Pendiente: {fmtMoney(lastSale.balance)}</span>}
+        {lastSale.change !== undefined && <strong className="text-lg">Cambio: {fmtMoney(lastSale.change)}</strong>}
       </div>
-
-      <Dialog open={!!qtyModal} onOpenChange={(o) => !o && setQtyModal(null)}>
-        <DialogContent className="max-w-xs">
-          <DialogHeader>
-            <DialogTitle>{qtyModal ? t.page.quantityModal.title(qtyModal.name) : ""}</DialogTitle>
-          </DialogHeader>
-          {qtyModal && (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                {t.page.quantityModal.stockLabel(qtyModal.stock)}
-              </p>
-              <div className="space-y-1">
-                <Label htmlFor="qs-qty">{t.page.quantityModal.label}</Label>
-                <Input
-                  id="qs-qty"
-                  type="number"
-                  inputMode="numeric"
-                  min={1}
-                  max={qtyModal.stock}
-                  value={qtyValue}
-                  onChange={(e) => setQtyValue(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      confirmQty();
-                    }
-                  }}
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <Button variant="outline" onClick={() => setQtyModal(null)}>
-                  {t.page.quantityModal.cancel}
-                </Button>
-                <Button onClick={confirmQty}>{t.page.quantityModal.submit}</Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <CheckoutModal
-        open={checkoutOpen}
-        onOpenChange={setCheckoutOpen}
-        total={total}
-        itemCount={cartLines.reduce((n, l) => n + l.qty, 0)}
-        member={member}
-        onMemberChange={setMember}
-        memberDebt={memberDebt}
-        onSettle={() => setSettleOpen(true)}
-        submitting={register.isPending}
-        onConfirm={handleCheckoutConfirm}
-      />
-
-      <QuickRestockModal
-        product={restockModal}
-        onClose={() => setRestockModal(null)}
-        onDone={(productId, newStock) => {
-          // Parche optimista al cache de useActiveProducts. Si no lo
-          // hacemos, addToCart leería el item con stock=0 del closure
-          // viejo y el +1 se descartaría. setQueryData dispara un
-          // re-render de QuickSalePage con el item refrescado.
-          queryClient.setQueryData<Product[]>(["products", "active"], (old) =>
-            (old ?? []).map((p) => (p.id === productId ? { ...p, stock: newStock } : p))
-          );
-          // Y aún así no podemos depender del closure para addToCart —
-          // metemos directo al carrito con qty=1. La fila lee el item
-          // del array refrescado, así que el precio se mostrará bien.
-          setCart((c) => ({ ...c, [productId]: 1 }));
-          setRestockModal(null);
-          searchRef.current?.focus();
-        }}
-      />
+      <div className="flex items-center gap-1"><Button variant="ghost" size="sm" onClick={() => setReceiptOpen(true)}>Ver comprobante</Button>
+        <Button variant="ghost" size="sm" onClick={() => setCorrectionOpen(true)}>Corregir</Button>
+        <Button variant="ghost" size="icon" aria-label="Ocultar última venta" onClick={() => setLastSale(null)}><X className="h-4 w-4" /></Button></div>
+    </div>}
+    <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_360px] md:overflow-hidden">
+      <section className="flex min-h-0 flex-col">
+        <div className="shrink-0 space-y-3 border-b px-5 py-3">
+          <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+            <Input ref={searchRef} aria-label="Buscar producto" placeholder="Buscar producto…" value={search} onChange={e => setSearch(e.target.value)} className="h-11 pl-9 pr-10"
+              onKeyDown={e => {
+                if (e.key === "Escape") { e.preventDefault(); setSearch(""); }
+                if (e.key === "Enter" && normalize(search) && filtered[0]) { e.preventDefault(); add(filtered[0]); }
+              }} />
+            {search && <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1 h-9 w-9" aria-label="Limpiar búsqueda" onClick={() => { setSearch(""); searchRef.current?.focus(); }}><X className="h-4 w-4" /></Button>}
+          </div>
+          {categories.length > 1 && <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Categorías">
+            {[null, ...categories].map(c => <Button key={c ?? "all"} variant={category === c ? "secondary" : "ghost"} size="sm" className="shrink-0" aria-pressed={category === c} onClick={() => setCategory(c)}>{c ?? "Todos"}</Button>)}
+          </div>}
+          {items.some(p => p.stock <= 0) && <label className="flex w-fit cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <input type="checkbox" className="h-4 w-4 accent-primary" checked={showOutOfStock} onChange={e => setShowOutOfStock(e.target.checked)} />{t.page.showOutOfStock}
+          </label>}
+        </div>
+        <div className="min-h-40 flex-1 overflow-y-auto p-5">
+          {products.isError && <Alert variant="destructive" className="mb-3"><AlertDescription>No se pudieron cargar los productos. <Button variant="link" size="sm" onClick={() => products.refetch()}>Reintentar</Button></AlertDescription></Alert>}
+          {products.isLoading ? <div className="flex justify-center py-12"><Loader2 aria-label="Cargando productos" className="h-6 w-6 animate-spin" /></div>
+            : !items.length && !products.isError ? <div className="py-12 text-center text-sm text-muted-foreground"><p>{t.page.empty}</p><Button variant="link" asChild><Link to="/products">Agregar productos</Link></Button></div>
+            : items.length > 0 && !filtered.length ? <p className="py-12 text-center text-sm text-muted-foreground">{t.page.noSearchResults}</p>
+            : <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,170px),1fr))] gap-2.5">{filtered.map(p => <ProductCard key={p.id} product={p}
+              qty={lines.find(l => l.product.id === p.id)?.qty ?? 0} highlighted={!!normalize(search) && filtered[0]?.id === p.id} disabled={blocked} onAdd={() => add(p)} />)}</div>}
+        </div>
+      </section>
+      <aside className="flex min-h-72 flex-col border-t bg-muted/30 md:min-h-0 md:border-l md:border-t-0">
+        <div className="flex shrink-0 items-center justify-between border-b px-4 py-3"><h2 className="font-semibold">Venta actual</h2>
+          {!!lines.length && <Button variant="ghost" size="sm" onClick={clear} disabled={blocked}><Trash2 className="h-4 w-4" />Vaciar</Button>}</div>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
+          {saved.error && <Alert variant="destructive"><AlertDescription>{saved.error}<Button variant="link" onClick={saved.reload}>Recargar venta</Button></AlertDescription></Alert>}
+          {draft.attempt && <Alert><AlertDescription>Esta venta está por confirmar.
+            <Button className="mt-2 w-full" disabled={register.isPending || saved.blocked} onClick={() => { void send(draft.attempt!).catch(() => {}); }}>{register.isPending ? "Confirmando…" : "Reintentar confirmación"}</Button>
+          </AlertDescription></Alert>}
+          {needsReview && !draft.attempt && <Alert><AlertDescription>Cambiaron productos de esta venta. <Button variant="link" className="px-0" onClick={() => setReviewOpen(true)}>Revisar cambios</Button></AlertDescription></Alert>}
+          {!lines.length ? <p className="py-8 text-center text-sm text-muted-foreground">Agrega un producto para empezar.</p> : lines.map(line => <CartRow key={line.product.id} line={line}
+            stock={items.find(p => p.id === line.product.id)?.stock ?? line.product.stock} disabled={blocked} onQuantity={q => quantity(line.product.id, q)} />)}
+        </div>
+        <div className="shrink-0 space-y-3 border-t bg-background p-4">
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+          {!!lines.length && <div className="flex items-center justify-between gap-2">
+            <Button variant="ghost" size="sm" className="h-auto min-h-9 max-w-full justify-start whitespace-normal px-0 text-sm" disabled={blocked} onClick={() => setPromoOpen(true)}><Tag className="h-4 w-4 shrink-0" />{promo?.name ?? "Aplicar promoción"}</Button>
+            {promo && <Button variant="ghost" size="icon" aria-label="Quitar promoción" disabled={blocked} onClick={() => saved.update(d => ({ ...d, promo: null }))}><X className="h-4 w-4" /></Button>}
+          </div>}
+          {totals.total === 0 && lines.length > 0 && <p role="alert" className="text-sm text-amber-700">La promoción cubre todo el importe. Ajusta o quita la promoción.</p>}
+          {totals.discount > 0 && <div className="space-y-1 text-xs text-muted-foreground"><div className="flex justify-between"><span>Subtotal</span><span>{fmtMoney(totals.subtotal)}</span></div><div className="flex justify-between"><span>Promoción</span><span>−{fmtMoney(totals.discount)}</span></div></div>}
+          <div className="flex items-baseline justify-between"><span>Total</span><strong className="text-2xl tabular-nums">{fmtMoney(totals.total)}</strong></div>
+          <Button size="lg" className="h-12 w-full text-base" disabled={!lines.length || blocked} onClick={checkout}>{totals.total === 0 && lines.length ? "Cambiar promoción" : `Cobrar ${fmtMoney(totals.total)}`}</Button>
+        </div>
+      </aside>
     </div>
-  );
+    <PromotionPickerModal open={promoOpen} onOpenChange={setPromoOpen} target="sale" onApply={p => { if (!blocked) saved.update(d => ({ ...d, promo: p })); }} />
+    <CheckoutModal open={checkoutOpen} onOpenChange={setCheckoutOpen} total={totals.total} itemCount={lines.reduce((n, l) => n + l.qty, 0)}
+      member={member} onMemberChange={m => saved.update(d => ({ ...d, member: m }))} memberDebt={memberHistory.data?.total_pending ?? 0}
+      debtStatus={memberHistory.isError ? "error" : memberHistory.isPending ? "loading" : "ready"} onRetryDebt={() => { void memberHistory.refetch(); }}
+      onSettle={() => setDebtOpen(true)} submitting={register.isPending} blockedReason={needsReview ? "Los productos cambiaron. Vuelve a la venta y revisa los cambios." : saved.error ?? undefined} onConfirm={confirm} />
+    <Dialog open={reviewOpen} onOpenChange={setReviewOpen}><DialogContent aria-describedby={undefined} className="max-w-md max-h-[85dvh] overflow-y-auto"><DialogHeader><DialogTitle>Revisar cambios</DialogTitle></DialogHeader>
+      {changed.map(l => { const current = items.find(p => p.id === l.product.id && p.active); return <div key={l.product.id} className="border-b py-2 text-sm"><p className="font-medium">{l.product.name}</p>
+        <p className="text-muted-foreground">{current ? `${fmtMoney(l.product.price)} → ${fmtMoney(current.price)}${current.name !== l.product.name ? ` · ${current.name}` : ""}` : "Ya no está disponible. Se quitará de la venta."}</p></div>; })}
+      <Button onClick={() => { saved.update(d => ({ ...d, lines: d.lines.flatMap(l => { const p = items.find(p => p.id === l.product.id && p.active); return p ? [{ ...l, product: p }] : []; }) })); setReviewOpen(false); }}>Actualizar venta</Button>
+    </DialogContent></Dialog>
+    <Dialog open={debtOpen} onOpenChange={setDebtOpen}><DialogContent aria-describedby={undefined} className="max-w-md max-h-[85dvh] overflow-y-auto"><DialogHeader><DialogTitle>Saldos de {member?.full_name}</DialogTitle></DialogHeader>
+      <p className="font-semibold">Total pendiente: {fmtMoney(memberHistory.data?.total_pending ?? 0)}</p>
+      {debts.map(p => <div key={p.id} className="flex items-center justify-between gap-3 border-b py-2 text-sm"><div><p>{p.reference || (p.concept === "product" ? "Compra de productos" : "Membresía")}</p><p className="text-muted-foreground">{fmtDate(p.payment_date)}</p></div><Button variant="outline" onClick={() => { setDebtOpen(false); setSettlement(p); }}>Abonar a {fmtMoney(p.balance_pending)}</Button></div>)}
+    </DialogContent></Dialog>
+    {member && settlement && <SettleBalanceModal paymentId={settlement.id} memberName={member.full_name} pendingBalance={settlement.balance_pending} open onOpenChange={open => !open && setSettlement(null)} />}
+    <ReceiptViewer paymentId={lastSale?.paymentId ?? null} folio={lastSale?.folio} open={receiptOpen} onOpenChange={setReceiptOpen} />
+    <SaleCorrectionModal saleId={lastSale?.saleId ?? null} open={correctionOpen} onOpenChange={setCorrectionOpen} onCorrected={() => { setLastSale(null); }} />
+  </div>;
 }
-
-interface ProductCardProps {
-  product: Product;
-  cartQty: number;
-  // highlight: es el primer match de la búsqueda — lo que Enter agrega.
-  highlight?: boolean;
-  onAdd(): void;
-  onCustomQty(): void;
-  onRestock(): void;
-}
-
-function ProductCard({ product, cartQty, highlight, onAdd, onCustomQty, onRestock }: ProductCardProps) {
+function ProductCard({ product, qty, highlighted, disabled, onAdd }: { product: Product; qty: number; highlighted: boolean; disabled: boolean; onAdd(): void }) {
   const level = stockLevel(product);
-  const out = level === "out";
-  const badge = badgeForStock(level, product.stock);
-  // Long-press para abrir el modal de cantidad. El right-click sigue
-  // funcionando en desktop pero no es descubrible en touch. 500ms es
-  // el umbral típico (Material/iOS). Si la posición cambia mucho
-  // (scroll/drag) cancelamos para no disparar accidentalmente.
-  const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const longPressFired = useRef(false);
-
-  function startLongPress() {
-    if (out) return;
-    longPressFired.current = false;
-    longPressTimer.current = setTimeout(() => {
-      longPressFired.current = true;
-      onCustomQty();
-    }, 500);
-  }
-  function cancelLongPress() {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-  }
-
-  function handleClick() {
-    if (out) {
-      // Out-of-stock ya no bloquea: el tap abre el modal de restock
-      // rápido. Caso típico: te llegó mercancía y no la registraste,
-      // ahora un socio te la pide. Un solo gesto registra el inventario
-      // y mete 1 al carrito.
-      onRestock();
-      return;
-    }
-    if (longPressFired.current) {
-      // El long-press ya abrió el modal — evitamos sumar 1 además.
-      longPressFired.current = false;
-      return;
-    }
-    onAdd();
-  }
-
-  function handleContextMenu(e: React.MouseEvent) {
-    e.preventDefault();
-    if (out) return;
-    onCustomQty();
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      onContextMenu={handleContextMenu}
-      onPointerDown={startLongPress}
-      onPointerUp={cancelLongPress}
-      onPointerLeave={cancelLongPress}
-      onPointerCancel={cancelLongPress}
-      title={out ? t.page.outOfStockTap : t.page.tooltips.rightClick}
-      className={cn(
-        "relative flex flex-col items-stretch text-left rounded-lg border-2 bg-background overflow-hidden transition-all",
-        "focus:outline-none focus:ring-2 focus:ring-ring",
-        out
-          // Out-of-stock: dashed border + muted bg para diferenciar
-          // visualmente del estado "vendible", sin esconderlo (toggle
-          // del padre ya hace eso). Hover ofrece el affordance de
-          // restock — borde primary tenue.
-          ? "border-dashed border-muted-foreground/40 bg-muted/30 hover:border-primary/60 hover:bg-primary/5"
-          : cartQty > 0
-          ? "border-primary shadow-sm bg-primary/5"
-          : highlight
-          ? "border-primary/70 ring-2 ring-primary/25 shadow-sm"
-          : "border-border hover:border-primary/60 hover:shadow-sm active:scale-[0.98]"
-      )}
-    >
-      <div className="relative aspect-[4/3] bg-muted flex items-center justify-center overflow-hidden">
-        <span className="text-2xl font-semibold text-muted-foreground">
-          {product.name.slice(0, 2).toUpperCase()}
-        </span>
-        <ProductPhoto
-          productId={product.id}
-          imageUrl={product.image_url}
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-      </div>
-      <div className="px-3 py-2 space-y-1">
-        <div className="font-medium text-sm leading-tight line-clamp-2 min-h-[2.5rem]">
-          {product.name}
-        </div>
-        <div className="flex items-baseline justify-between">
-          <span className="text-base font-semibold tabular-nums">{fmtMoney(product.price)}</span>
-          <span
-            className={cn(
-              "rounded px-1.5 py-0.5 text-xs font-medium tabular-nums",
-              badge.className
-            )}
-          >
-            {badge.text}
-          </span>
-        </div>
-      </div>
-      {cartQty > 0 && (
-        <span className="absolute top-2 right-2 inline-flex items-center justify-center h-7 min-w-[1.75rem] rounded-full bg-primary text-primary-foreground text-xs font-semibold px-2 shadow">
-          ×{cartQty}
-        </span>
-      )}
-      {out && (
-        // Hint visible: el card está accesible y el tap registra
-        // mercancía. Lo ponemos sobre la foto en lugar de bajo el
-        // nombre para no romper el alineamiento del grid.
-        <span className="absolute top-2 left-2 inline-flex items-center gap-1 rounded-md bg-background/95 border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-          <PackagePlus className="h-3 w-3" />
-          {t.page.outOfStockTap}
-        </span>
-      )}
-    </button>
-  );
-}
-
-interface CartRowProps {
-  line: CartLine;
-  onInc(): void;
-  onDec(): void;
-  onRemove(): void;
-}
-
-function CartRow({ line, onInc, onDec, onRemove }: CartRowProps) {
-  return (
-    <div className="rounded-md bg-background border px-3 py-2 flex items-center gap-2">
-      <div className="flex-1 min-w-0">
-        <div className="font-medium text-sm truncate">{line.product.name}</div>
-        <div className="text-xs text-muted-foreground tabular-nums">
-          {fmtMoney(line.product.price)} c/u
-        </div>
-      </div>
-      <div className="flex items-center gap-1">
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onDec}>
-          <Minus className="h-3.5 w-3.5" />
-        </Button>
-        <span className="w-7 text-center text-sm font-semibold tabular-nums">{line.qty}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={onInc}
-          disabled={line.qty >= line.product.stock}
-        >
-          <Plus className="h-3.5 w-3.5" />
-        </Button>
-      </div>
-      <div className="w-20 text-right tabular-nums font-semibold">
-        {fmtMoney(line.product.price * line.qty)}
-      </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="h-7 w-7 text-muted-foreground"
-        onClick={onRemove}
-        aria-label={t.page.cart.remove}
-      >
-        <X className="h-3.5 w-3.5" />
-      </Button>
+  return <button type="button" disabled={disabled} onClick={onAdd} aria-label={`Agregar ${product.name}`} className={cn("relative flex min-h-28 flex-col justify-between gap-3 rounded-lg border bg-background p-3 text-left transition-colors hover:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60",
+    qty > 0 || highlighted ? "border-primary bg-primary/5" : "border-border")}>
+    <div className="flex items-start gap-2">
+      {product.image_url && <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-muted"><ProductPhoto productId={product.id} imageUrl={product.image_url} className="h-full w-full object-cover" /></div>}
+      <span className="min-w-0 flex-1 text-sm font-medium leading-snug">{product.name}</span>
+      {qty > 0 && <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">×{qty}</span>}
     </div>
-  );
+    <div className="flex flex-col gap-1"><strong className="tabular-nums">{fmtMoney(product.price)}</strong><span className={cn("text-xs tabular-nums", level === "ok" ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}>Existencias: {product.stock}</span></div>
+  </button>;
 }
-
-// adjustStockResp — shape devuelta por POST /products/:id/adjust-stock
-// según payment_controller.go. La definimos aquí porque el hook
-// existente useAdjustStock devuelve `Product` (incorrecto — pre-existing
-// FE/BE mismatch). Para no expandir el blast radius, este modal hace
-// el POST directo con `api.post` y el tipo correcto.
-interface AdjustStockResp {
-  new_stock: number;
-  delta: number;
-  movement_id: string;
-}
-
-function QuickRestockModal({
-  product,
-  onClose,
-  onDone,
-}: {
-  product: Product | null;
-  onClose(): void;
-  onDone(productId: string, newStock: number): void;
-}) {
-  const [qty, setQty] = useState("1");
-  const [cost, setCost] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (product) {
-      setQty("1");
-      setCost("");
-      setError(null);
-      setSubmitting(false);
-    }
-  }, [product]);
-
-  if (!product) return null;
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    const q = parseInt(qty, 10);
-    if (!Number.isFinite(q) || q <= 0) {
-      setError(t.page.restock.errors.qtyInvalid);
-      return;
-    }
-    const costNum = cost ? parseFloat(cost) : undefined;
-    // reason fija porque la triggereó la venta. Sin razón, el reporte
-    // de "Compras de inventario" mostraría "—" y el dueño no sabría
-    // por qué se registró el restock. La etiqueta lo deja claro.
-    const payload: Record<string, unknown> = {
-      movement_type: "restock",
-      quantity: q,
-      reason: t.page.restock.reasonDefault,
-    };
-    if (costNum !== undefined && Number.isFinite(costNum) && costNum > 0) {
-      payload.cost = costNum;
-    }
-    setSubmitting(true);
-    try {
-      const res = await api.post<AdjustStockResp>(
-        `/api/v1/products/${product!.id}/adjust-stock`,
-        payload
-      );
-      toast.success(t.page.restock.success(q, product!.name));
-      onDone(product!.id, res.new_stock);
-    } catch (err) {
-      if (err instanceof ApiError) {
-        const data = err.details as Record<string, unknown> | null;
-        setError((data?.exception as string | undefined) || t.page.restock.errors.generic);
-      } else {
-        setError(t.page.restock.errors.generic);
-      }
-      setSubmitting(false);
-    }
+function CartRow({ line, stock, disabled, onQuantity }: { line: CartLine; stock: number; disabled: boolean; onQuantity(n: number): void }) {
+  const [value, setValue] = useState(String(line.qty));
+  const [invalid, setInvalid] = useState(false);
+  useEffect(() => { setValue(String(line.qty)); setInvalid(false); }, [line.qty]);
+  function commit() {
+    const qty = Number(value);
+    if (!value.trim() || !Number.isSafeInteger(qty) || qty < 1) { setInvalid(true); setValue(String(line.qty)); return; }
+    setInvalid(false); onQuantity(qty);
   }
-
-  return (
-    <Dialog open={!!product} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-w-sm">
-        <DialogHeader>
-          <DialogTitle>{t.page.restock.title(product.name)}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-4" noValidate>
-          <p className="text-sm text-muted-foreground">{t.page.restock.description}</p>
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="restock-qty">{t.page.restock.qtyLabel}</Label>
-            <Input
-              id="restock-qty"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              step={1}
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="restock-cost">{t.page.restock.costLabel}</Label>
-            <Input
-              id="restock-cost"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              placeholder="0.00"
-              value={cost}
-              onChange={(e) => setCost(e.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">{t.page.restock.costHint}</p>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={onClose} disabled={submitting}>
-              {t.page.restock.cancel}
-            </Button>
-            <Button type="submit" disabled={submitting}>
-              {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-              {t.page.restock.submit}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+  return <div className="space-y-2 rounded-md border bg-background p-3">
+    <div className="flex items-start justify-between gap-2"><span className="text-sm font-medium">{line.product.name}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={disabled} aria-label={`Quitar ${line.product.name}`} onClick={() => onQuantity(0)}><X className="h-4 w-4" /></Button></div>
+    <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-1">
+      <Button variant="outline" size="icon" className="h-9 w-8" disabled={disabled} aria-label={`Restar una unidad de ${line.product.name}`} onClick={() => onQuantity(line.qty - 1)}><Minus className="h-4 w-4" /></Button>
+      <Input aria-label={`Cantidad de ${line.product.name}`} inputMode="numeric" value={value} onChange={e => { setValue(e.target.value); setInvalid(false); }} onBlur={commit} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }} disabled={disabled} aria-invalid={invalid} className="h-9 w-14 px-1 text-center tabular-nums" />
+      <Button variant="outline" size="icon" className="h-9 w-8" disabled={disabled} aria-label={`Sumar una unidad de ${line.product.name}`} onClick={() => onQuantity(line.qty + 1)}><Plus className="h-4 w-4" /></Button>
+    </div><strong className="text-sm tabular-nums">{fmtMoney(moneyCents(line.product.price) * line.qty / 100)}</strong></div>
+    {invalid && <p role="alert" className="text-xs text-destructive">Escribe una cantidad entera mayor a cero.</p>}
+    <div className="flex flex-wrap justify-between gap-1 text-xs text-muted-foreground"><span>{fmtMoney(line.product.price)} c/u</span>{line.qty > stock && <span className="text-amber-700 dark:text-amber-400">Existencias por revisar</span>}</div>
+  </div>;
 }

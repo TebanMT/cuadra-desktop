@@ -5,7 +5,7 @@ export const settings = {
     sections: {
       gymProfile: {
         title: "Datos del gym",
-        body: "Nombre, ciudad, datos fiscales y branding.",
+        body: "Nombre, ciudad, datos fiscales, logo y colores.",
       },
       subscription: {
         title: "Suscripción",
@@ -69,12 +69,12 @@ export const settings = {
     fiscalLocked:
       "Captura RFC, razón social y régimen fiscal para emitir comprobantes formales con datos de tu gym. Próximamente en Plus.",
     hardwareLocked:
-      "Conecta torniquete o cerradura por webhook al check-in. Próximamente en Plus.",
+      "Abre un torniquete o cerradura al registrar una entrada.",
     // Copy genérico para PlusFeatureLock — cada página le pasa un title +
     // body adaptado a su feature.
     lockedTitle: "Próximamente en Plus",
     lockedBody:
-      "Esta función llega con el plan Plus en los próximos meses. Mientras tanto Standard cubre tu operación diaria. Te avisamos cuando Plus esté listo.",
+      "Esta función aún no está disponible.",
   },
   // Página parent que agrupa WhatsApp + Plantillas + Envío al socio en tabs.
   // El subtitle Standard refleja lo que el dueño realmente puede tocar hoy
@@ -103,7 +103,7 @@ export const settings = {
     sections: {
       general: "Datos generales",
       tax: "Datos fiscales (opcional)",
-      branding: "Branding",
+      branding: "Logo y colores",
       operations: "Configuración operativa",
       danger: "Zona delicada",
     },
@@ -122,7 +122,7 @@ export const settings = {
       openTime: "Hora de apertura",
       closeTime: "Hora de cierre",
       kioskVolume: "Volumen del kiosko",
-      kioskFeedbackTtl: "Duración del feedback al check-in",
+      kioskFeedbackTtl: "Duración del aviso de entrada",
     },
     placeholders: {
       whatsapp: "+52 55 1234 5678",
@@ -174,13 +174,13 @@ export const settings = {
       inactive: "Inactivo",
       pendingPassword: "Pendiente cambiar contraseña",
       pin: "PIN",
-      legacyPending: "Pendiente migrar",
+      legacyPending: "Sin PIN",
     },
     actions: {
       activate: "Activar",
       deactivate: "Desactivar",
       rotatePin: "Regenerar PIN",
-      resetPasswordLegacy: "Resetear contraseña (legacy)",
+      resetPasswordLegacy: "Restablecer contraseña",
       edit: "Editar",
     },
     softWarning: "Estás cerca del límite de 10 operadores.",
@@ -195,7 +195,7 @@ export const settings = {
       pinLabel: "PIN de acceso",
       pinHint:
         "Tu operador lo usa para iniciar sesión en el sistema del gym. No se vuelve a mostrar.",
-      whatsappSent: (phone: string) => `Enviado por WhatsApp a ${phone}.`,
+      whatsappSent: (phone: string) => `Se enviará por WhatsApp a ${phone}.`,
       whatsappSkipped:
         "WhatsApp no está conectado — compártele el PIN tú mismo o conecta WhatsApp para automatizarlo.",
       submit: "Crear operador",
@@ -210,7 +210,7 @@ export const settings = {
       submitting: "Guardando…",
       success: "Operador actualizado.",
       legacyMigrate:
-        "Este operador no tiene PIN. Captura su teléfono y regenera su PIN para migrarlo al nuevo flujo.",
+        "Agrega su teléfono y genera un PIN para que pueda entrar.",
     },
     fields: {
       fullName: "Nombre completo",
@@ -253,7 +253,7 @@ export const settings = {
     resetPwd: {
       title: (name: string) => `Resetear contraseña de ${name}`,
       body:
-        "Generaremos una nueva contraseña temporal. Sólo aplica a operadores con correo (flujo legacy).",
+        "Se creará una contraseña temporal para entrar con su correo.",
       confirm: "Generar nueva",
       success: "Contraseña reseteada.",
     },
@@ -378,8 +378,8 @@ export const settings = {
         description: "Se envía al socio al registrar una venta rápida.",
       },
       owner_alert_low_stock: {
-        title: "Alerta al dueño: stock bajo",
-        description: "Aviso al dueño cuando un producto cae al stock mínimo.",
+        title: "Alerta al dueño: existencias bajas",
+        description: "Aviso al dueño cuando quedan pocas existencias.",
       },
       owner_alert_expired_batch: {
         title: "Alerta al dueño: vencidos sin contactar",
@@ -391,15 +391,15 @@ export const settings = {
       },
       broadcast_freeform: {
         title: "Mensaje masivo (envío al socio)",
-        description: "Plantilla wrapper para los envíos manuales a grupos de socios.",
+        description: "Saludo y cierre de los mensajes a grupos de socios.",
       },
-      operator_temp_password: {
-        title: "Contraseña temporal de operador",
-        description: "Se envía al operador cuando el dueño le crea o resetea la contraseña.",
+      operator_welcome_pin: {
+        title: "PIN del operador",
+        description: "Se envía al crear al operador o cambiar su PIN.",
       },
-      member_welcome_pin: {
-        title: "Bienvenida al socio con PIN de kiosko",
-        description: "Se envía al socio al inscribirse o al regenerar su PIN de check-in.",
+      member_welcome_number: {
+        title: "Bienvenida con número de socio",
+        description: "Se envía al inscribir al socio o cambiar su número de acceso.",
       },
       whatsapp_connect_otp: {
         title: "Código de conexión de WhatsApp",
@@ -410,13 +410,13 @@ export const settings = {
       title: (name: string) => name,
       bodyLabel: "Mensaje",
       plusOnlyBody:
-        "Se envía la plantilla aprobada por WhatsApp, así que el texto no se puede cambiar. Para personalizarlo necesitas conectar tu propio número de WhatsApp (Plus).",
+        "WhatsApp usa un texto fijo aprobado. Para personalizar mensajes, conecta tu número con Plus.",
       previewLabel: "Vista previa",
       previewHint: "Las variables se reemplazan con datos de ejemplo.",
       variablesLabel: "Variables disponibles",
-      reset: "Restaurar texto por defecto",
+      reset: "Restaurar texto original",
       resetConfirm: {
-        title: "¿Restaurar texto por defecto?",
+        title: "¿Restaurar texto original?",
         body: "Perderás los cambios que hayas hecho a esta plantilla.",
         confirm: "Restaurar",
       },
@@ -424,7 +424,7 @@ export const settings = {
       submit: "Guardar cambios",
       submitting: "Guardando…",
       success: "Plantilla actualizada.",
-      successReset: "Plantilla restaurada al texto por defecto.",
+      successReset: "Plantilla restaurada.",
       error: "No pudimos guardar.",
       tooLong: "Mensaje muy largo. Máximo 1000 caracteres.",
       empty: "El mensaje no puede estar vacío.",
@@ -446,16 +446,16 @@ export const settings = {
       enabledLabel: "Recibir esta alerta",
       bodyLabel: "Mensaje que recibes",
       plusOnlyBody:
-        "Se envía la plantilla aprobada por WhatsApp, así que el texto no se puede cambiar. Para personalizarlo necesitas conectar tu propio número de WhatsApp (Plus).",
+        "WhatsApp usa un texto fijo aprobado. Para personalizar mensajes, conecta tu número con Plus.",
       previewLabel: "Vista previa",
       previewHint: "Las variables se reemplazan con datos de ejemplo.",
       variablesLabel: "Variables disponibles",
       save: "Guardar texto",
       saving: "Guardando…",
       success: "Texto actualizado.",
-      reset: "Restaurar texto por defecto",
+      reset: "Restaurar texto original",
       resetConfirm: {
-        title: "¿Restaurar texto por defecto?",
+        title: "¿Restaurar texto original?",
         body: "Perderás los cambios que hayas hecho a este mensaje.",
         confirm: "Restaurar",
       },
@@ -465,9 +465,9 @@ export const settings = {
     },
     keys: {
       low_stock: {
-        title: "Stock bajo",
+        title: "Existencias bajas",
         description:
-          "Te avisamos cuando un producto cae al stock mínimo configurado.",
+          "Te avisamos cuando un producto llega al mínimo de existencias.",
       },
       expired_no_contact: {
         title: "Vencidos sin contactar",

@@ -1,3 +1,5 @@
+import { validateDateFields } from "@/lib/date-input";
+import { DateInput } from "@/components/ui/date-input";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Image as ImageIcon, X as XIcon, Upload, Camera, ChevronRight, UserPlus, Tag } from "lucide-react";
@@ -444,7 +446,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmitCapture={validateDateFields} onSubmit={handleSubmit} className="space-y-6">
       {(error || serverError) && (
         <Alert variant="destructive">
           <AlertDescription>{error || serverError}</AlertDescription>
@@ -461,9 +463,6 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
               objetivo. Esta línea explica la jerarquía sin meter una
               leyenda formal de "* = obligatorio" que se sentiría a
               burocracia. */}
-          <p className="text-xs text-muted-foreground">
-            {t.form.sections.basicsHint}
-          </p>
         </div>
 
         <div className="space-y-2" ref={nameSectionRef}>
@@ -571,11 +570,11 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                 setShowBirthdate(false);
               }}
             />
-            <Input
+            <DateInput
               id="m-birthdate"
-              type="date"
+              context="birthdate"
               value={values.birthdate}
-              onChange={(e) => update("birthdate", e.target.value)}
+              onValueChange={(e) => update("birthdate", e)}
             />
           </div>
         )}
@@ -716,11 +715,10 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
 
           <div className="space-y-2">
             <Label htmlFor="m-start">{t.form.fields.startDate}</Label>
-            <Input
+            <DateInput
               id="m-start"
-              type="date"
               value={values.start_date}
-              onChange={(e) => update("start_date", e.target.value)}
+              onValueChange={(e) => update("start_date", e)}
             />
             {expiryStr && (
               <p className="text-sm text-muted-foreground">{t.form.expiryPreview(expiryStr)}</p>
@@ -1076,7 +1074,6 @@ function MemberMatches({ query, onDismiss }: { query: string; onDismiss(): void 
           <p className="text-sm font-medium text-foreground">
             {t.form.matches.header(items.length)}
           </p>
-          <p className="text-xs text-muted-foreground">{t.form.matches.hint}</p>
         </div>
         {/* Dismiss: si el operador confirma que es alguien nuevo a pesar
             del match (caso "ya revisé, es otro"), cierra la caja para

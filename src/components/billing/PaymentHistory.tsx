@@ -1,8 +1,8 @@
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { useMemo, useState } from "react";
 import { Loader2, Banknote, CreditCard, ArrowLeftRight, MoreHorizontal } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -40,6 +40,9 @@ import { billing as t } from "@/strings/billing";
 import { ReceiptViewer } from "./ReceiptViewer";
 import { SettleBalanceModal } from "./SettleBalanceModal";
 import { RefundModal } from "./RefundModal";
+import { ProductRefundModal } from "@/components/sales/ProductRefundModal";
+import { SaleCorrectionModal } from "@/components/sales/SaleCorrectionModal";
+import { PaymentCorrectionModal } from "./PaymentCorrectionModal";
 
 interface Props {
   memberId: string;
@@ -52,7 +55,7 @@ const CONCEPT_OPTIONS: Array<{ value: PaymentConcept | "all"; label: string }> =
   { value: "product", label: "Productos" },
   { value: "balance_settlement", label: "Abonos" },
   { value: "refund", label: "Devoluciones" },
-  { value: "other", label: "Otros" },
+  { value: "other", label: "Otros ingresos" },
 ];
 
 function MethodIcon({ method }: { method: PaymentMethod | null }) {
@@ -94,12 +97,15 @@ export function PaymentHistory({ memberId, memberName }: Props) {
   const [receiptFolio, setReceiptFolio] = useState<string | undefined>(undefined);
   const [settleTarget, setSettleTarget] = useState<Payment | null>(null);
   const [refundTarget, setRefundTarget] = useState<Payment | null>(null);
+  const [correctionTarget, setCorrectionTarget] = useState<Payment | null>(null);
+  const [productRefundSaleId, setProductRefundSaleId] = useState<string | null>(null);
+  const [productCorrectionSaleId, setProductCorrectionSaleId] = useState<string | null>(null);
 
   const items = history.data?.items ?? [];
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
         <div className="space-y-1">
           <Label htmlFor="ph-concept" className="text-xs">
             {t.history.filters.conceptLabel}
@@ -120,30 +126,7 @@ export function PaymentHistory({ memberId, memberName }: Props) {
             </SelectContent>
           </Select>
         </div>
-        <div className="space-y-1">
-          <Label htmlFor="ph-from" className="text-xs">
-            {t.history.filters.from}
-          </Label>
-          <Input
-            id="ph-from"
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="h-9"
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor="ph-to" className="text-xs">
-            {t.history.filters.to}
-          </Label>
-          <Input
-            id="ph-to"
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="h-9"
-          />
-        </div>
+        <div className="sm:col-span-2 self-end"><DateRangePicker from={from} to={to} label="Filtrar por fecha" clearable onChange={(start, end) => { setFrom(start); setTo(end); }} /></div>
       </div>
 
       {history.isLoading ? (
@@ -173,6 +156,9 @@ export function PaymentHistory({ memberId, memberName }: Props) {
             <TableBody>
               {items.map((p) => {
                 const isNeg = p.amount < 0;
+                const recognitionDiffers =
+                  p.recognized_amount != null &&
+                  Math.abs(p.amount - p.recognized_amount) >= 0.005;
                 return (
                   <TableRow
                     key={p.id}
@@ -209,10 +195,15 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                         isNeg && "text-destructive"
                       )}
                     >
-                      {money.fmt(p.amount)}
+                      <span className="block">{money.fmt(p.amount)}</span>
+                      {recognitionDiffers && (
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          {money.fmt(p.recognized_amount!)} cuenta como ingreso
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell>
-                      <MethodCell method={p.payment_method} />
+                      {p.concept === "product" && p.amount === 0 ? <span>{p.balance_pending > 0 ? "Fiado" : "Sin cobro"}</span> : <MethodCell method={p.payment_method} />}
                     </TableCell>
                     <TableCell className="text-xs text-muted-foreground max-w-[12rem] truncate">
                       {p.notes || "—"}
@@ -245,9 +236,30 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                               {t.history.pendingSettle}
                             </DropdownMenuItem>
                           )}
-                          {isOwner && p.concept !== "refund" && p.amount > 0 && (
+                          {isOwner &&
+                            (p.concept === "membership" || p.concept === "other") &&
+                            p.amount > 0 && (
+                              <DropdownMenuItem onSelect={() => setCorrectionTarget(p)}>
+                                Corregir captura
+                              </DropdownMenuItem>
+                            )}
+                          {isOwner && p.concept === "product" && p.sale_id && (
+                            <DropdownMenuItem onSelect={() => setProductCorrectionSaleId(p.sale_id!)}>
+                              Corregir venta
+                            </DropdownMenuItem>
+                          )}
+                          {isOwner &&
+                            p.concept !== "refund" &&
+                            (p.amount > 0 || p.concept === "product") &&
+                            (p.concept !== "product" || !!p.sale_id) && (
                             <DropdownMenuItem
-                              onSelect={() => setRefundTarget(p)}
+                              onSelect={() => {
+                                if (p.concept === "product" && p.sale_id) {
+                                  setProductRefundSaleId(p.sale_id);
+                                  return;
+                                }
+                                setRefundTarget(p);
+                              }}
                               className="text-destructive"
                             >
                               {t.history.rowRefund}
@@ -293,6 +305,24 @@ export function PaymentHistory({ memberId, memberName }: Props) {
           onOpenChange={(o) => !o && setRefundTarget(null)}
         />
       )}
+
+      <PaymentCorrectionModal
+        payment={correctionTarget}
+        open={correctionTarget !== null}
+        onOpenChange={(next) => !next && setCorrectionTarget(null)}
+      />
+
+      <ProductRefundModal
+        saleId={productRefundSaleId}
+        open={productRefundSaleId !== null}
+        onOpenChange={(next) => !next && setProductRefundSaleId(null)}
+      />
+
+      <SaleCorrectionModal
+        saleId={productCorrectionSaleId}
+        open={productCorrectionSaleId !== null}
+        onOpenChange={(next) => !next && setProductCorrectionSaleId(null)}
+      />
     </div>
   );
 }

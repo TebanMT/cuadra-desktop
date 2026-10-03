@@ -68,10 +68,11 @@ describe("StuckItemsList", () => {
 
     // Fila duplicada: nombre humano del tipo + label del registro + motivo.
     expect(screen.getByText("Plan: Mensual")).toBeInTheDocument();
-    expect(screen.getByText('Ya existe un plan llamado "Mensual" en la nube.')).toBeInTheDocument();
+    expect(screen.getByText("Ya existe un registro con estos datos.")).toBeInTheDocument();
 
-    // Fila no accionable: visible con su motivo, sin botón propio.
-    expect(screen.getByText("rejected_internal_error: fk members")).toBeInTheDocument();
+    // El diagnóstico sigue disponible en un detalle cerrado por defecto.
+    expect(screen.getByText('membership_types: Ya existe un plan llamado "Mensual" en la nube.').closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByText(/rejected_internal_error: fk members/)).toBeInTheDocument();
 
     // Un solo CTA (el del duplicado renombrable) y navega a la edición.
     const buttons = screen.getAllByRole("button", { name: /abrir para renombrar/i });

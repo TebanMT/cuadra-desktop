@@ -251,8 +251,8 @@ export function GlobalSearch() {
                 const flatIdx = memberMatches.length + idx;
                 const subtitle =
                   h.stock <= 0
-                    ? `${fmtMoney(h.price)} · sin stock`
-                    : `${fmtMoney(h.price)} · ${h.stock} en stock`;
+                    ? `${fmtMoney(h.price)} · sin existencias`
+                    : `${fmtMoney(h.price)} · ${h.stock} disponibles`;
                 return (
                   <ResultRow
                     key={h.id}

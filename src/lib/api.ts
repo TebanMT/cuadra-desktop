@@ -1,3 +1,4 @@
+import { apiErrorMessage } from "./apiErrorMessage";
 import {
   getLocalAuthToken,
   getSidecarUrl,
@@ -10,13 +11,15 @@ const ACCESS_TOKEN_KEY = "user_access_token";
 const REFRESH_TOKEN_KEY = "user_refresh_token";
 
 export class ApiError extends Error {
+  public readonly diagnosticMessage: string;
   constructor(
     public status: number,
     public code: string,
     message: string,
     public details?: unknown
   ) {
-    super(message);
+    super(apiErrorMessage(status, code, message));
+    this.diagnosticMessage = message;
     this.name = "ApiError";
   }
 }
@@ -73,6 +76,37 @@ interface RequestOptions extends Omit<RequestInit, "body" | "headers"> {
 }
 
 const DEFAULT_RETRIES = 2;
+
+/**
+ * Reintentar una lectura es seguro. Una escritura sólo se reintenta de forma
+ * automática cuando el servidor puede deduplicarla con una llave estable del
+ * mismo intento. Sin esta regla, una respuesta perdida podía duplicar cobros,
+ * ventas, gastos y movimientos de caja aunque el primer commit sí hubiera
+ * terminado correctamente.
+ */
+export function defaultRetriesForRequest(
+  method: string,
+  body?: unknown,
+  headers?: Record<string, string>,
+): number {
+  const normalizedMethod = method.toUpperCase();
+  if (["GET", "HEAD", "OPTIONS"].includes(normalizedMethod)) {
+    return DEFAULT_RETRIES;
+  }
+
+  const headerKey = Object.entries(headers ?? {}).find(
+    ([name]) => name.toLowerCase() === "idempotency-key",
+  )?.[1];
+  const bodyKey =
+    body !== null && typeof body === "object" && !Array.isArray(body)
+      ? (body as Record<string, unknown>).idempotency_key
+      : undefined;
+
+  return (typeof headerKey === "string" && headerKey.trim() !== "") ||
+    (typeof bodyKey === "string" && bodyKey.trim() !== "")
+    ? DEFAULT_RETRIES
+    : 0;
+}
 
 // onAuthExpired is kept as a hook for code that wants to react to a session
 // loss (e.g. closing modals), but it is *no longer fired* by token refresh
@@ -202,7 +236,8 @@ async function rawRequest<T>(
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   };
 
-  const retry = opts.retry ?? DEFAULT_RETRIES;
+  const retry =
+    opts.retry ?? defaultRetriesForRequest(method, opts.body, opts.headers);
   let attempt = 0;
   let lastErr: unknown;
 

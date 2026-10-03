@@ -21,15 +21,15 @@ export const promotionKindLabels: Record<PromotionKind, string> = {
 
 export const promotionKindHints: Record<PromotionKind, string> = {
   percent:
-    "Descuento porcentual sobre el subtotal del cobro. Ejemplo: 25% en mensualidad → si la mensualidad cuesta $400, paga $300.",
+    "Ejemplo: 25% de descuento en una membresía de $400; el socio paga $300.",
   fixed_amount:
-    "Descuento de monto fijo. Ejemplo: $100 menos en cualquier cobro. Si el subtotal es menor, se ajusta al subtotal.",
+    "Resta un monto al cobro, sin superar su total.",
   free_enrollment:
-    "Quita la cuota de inscripción del cobro. Solo aplica cuando el cobro está cobrando inscripción.",
+    "Elimina la cuota de inscripción, cuando el cobro la incluye.",
   extra_days:
-    "Agrega N días al vencimiento de la membresía. Ejemplo: +15 días al renovar.",
+    "Agrega días a la vigencia de la membresía.",
   companion_memberships:
-    "El socio principal paga su membresía y se regalan M membresías $0 a otros socios. Tú eliges a quién en el cobro.",
+    "Al pagar una membresía, elige qué socios reciben las membresías de regalo.",
 };
 
 export const appliesToLabels: Record<PromotionAppliesTo, string> = {
@@ -45,7 +45,7 @@ export const promotions = {
       "Crea descuentos, cupones, 2x1 y días de regalo. Aplícalas al cobrar.",
     addNew: "Nueva promoción",
     showInactive: "Mostrar inactivas",
-    empty: "Aún no tienes promociones. Crea la primera.",
+    empty: "Aún no hay promociones.",
   },
   status: {
     active: "Vigente",
@@ -80,7 +80,7 @@ export const promotions = {
     code: "Código de cupón (opcional)",
     codePlaceholder: "VERANO2026",
     codeHint:
-      "Si pones código, el operador puede teclearlo al cobrar. Se compara sin distinguir mayúsculas.",
+      "El código se usa al cobrar. No distingue mayúsculas.",
     validFrom: "Válida desde (opcional)",
     validUntil: "Válida hasta (opcional)",
     maxUsesTotal: "Tope total de usos (opcional)",
@@ -101,7 +101,7 @@ export const promotions = {
   deactivateConfirm: {
     title: (name: string) => `¿Desactivar "${name}"?`,
     body:
-      "No podrás aplicarla a nuevos cobros, pero los cobros viejos siguen igual. La puedes reactivar cuando quieras.",
+      "Dejará de estar disponible al cobrar. Los cobros anteriores no cambian.",
     confirm: "Desactivar",
   },
   picker: {
@@ -124,8 +124,8 @@ export const promotions = {
     title: "¿A quién le regalas?",
     subtitle: (n: number) =>
       n === 1
-        ? "Elige al socio que recibe la membresía $0."
-        : `Elige a ${n} socios que reciben membresía $0.`,
+        ? "Elige quién recibe la membresía de regalo."
+        : `Elige a ${n} socios para las membresías de regalo.`,
     searchPlaceholder: "Busca por nombre o teléfono…",
     confirm: "Confirmar",
     cancel: "Cancelar",

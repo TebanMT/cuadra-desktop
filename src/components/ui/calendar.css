@@ -1,0 +1,28 @@
+.tinta-calendar {
+  --rdp-accent-color: hsl(var(--primary));
+  --rdp-accent-background-color: hsl(var(--accent));
+  --rdp-day_button-width: 44px;
+  --rdp-day_button-height: 44px;
+  --rdp-day_button-border-radius: 6px;
+  --rdp-nav_button-width: 44px;
+  --rdp-nav_button-height: 44px;
+  --rdp-range_middle-color: hsl(var(--accent-foreground));
+  --rdp-range_start-color: hsl(var(--primary-foreground));
+  --rdp-range_end-color: hsl(var(--primary-foreground));
+  margin-inline: auto;
+  width: 308px;
+  font-size: 14px;
+}
+.tinta-calendar .rdp-months { width: 308px; max-width: none; }
+.tinta-calendar .rdp-month_grid { width: 308px; }
+.tinta-calendar .rdp-day { padding: 0; }
+.tinta-calendar .rdp-month_caption { padding: 0; }
+.tinta-calendar .rdp-dropdowns { gap: 4px; }
+.tinta-calendar .rdp-dropdown_root { height: 44px; display: flex; align-items: center; }
+.tinta-calendar .rdp-caption_label { font-size: 14px; font-weight: 600; gap: 4px; padding-inline: 4px; }
+.tinta-calendar .rdp-chevron { width: 16px; height: 16px; }
+.tinta-calendar .rdp-selected .rdp-day_button { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+.tinta-calendar .rdp-range_middle .rdp-day_button { background: hsl(var(--accent)); color: hsl(var(--accent-foreground)); border-color: transparent; }
+.tinta-calendar .rdp-today:not(.rdp-selected) .rdp-day_button { box-shadow: inset 0 0 0 1px hsl(var(--primary)); font-weight: 700; }
+.tinta-calendar button:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
+.tinta-calendar button:hover:not(:disabled) { box-shadow: inset 0 0 0 2px hsl(var(--ring)); }

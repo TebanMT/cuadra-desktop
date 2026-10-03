@@ -60,5 +60,5 @@ export const AUDIT_ENTITY_TYPES: { code: string; label: string }[] = [
   { code: "product", label: "Productos" },
   { code: "user", label: "Operadores" },
   { code: "gym", label: "Gym" },
-  { code: "checkin", label: "Check-ins" },
+  { code: "checkin", label: "Asistencias" },
 ];

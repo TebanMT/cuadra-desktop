@@ -7,7 +7,7 @@ import { isDev } from "@/lib/runtime";
 export function DevModeBanner() {
   if (!isDev) return null;
   return (
-    <div className="bg-amber-500/10 text-amber-900 py-1.5 px-4 text-xs font-medium border-b border-amber-500/30 text-center">
+    <div className="border-b border-warning/40 bg-warning-soft px-4 py-1.5 text-center text-xs font-medium text-warning-foreground">
       MODO DEV — gates Plus deshabilitados, todo es visible.
     </div>
   );

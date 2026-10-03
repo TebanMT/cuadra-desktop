@@ -1,7 +1,7 @@
 export const sales = {
   page: {
     title: "Venta rápida",
-    associate: "Asociar a socio",
+    associate: "Agregar socio",
     associated: (name: string) => `Socio: ${name}`,
     removeAssociation: "Quitar",
     associateSearchPlaceholder: "Buscar por nombre o teléfono…",
@@ -13,7 +13,7 @@ export const sales = {
     uncategorized: "Sin categoría",
     cart: {
       title: "Carrito",
-      clear: "Limpiar",
+      clear: "Vaciar",
       empty: "Empieza haciendo clic en un producto.",
       total: "Total",
       methods: {
@@ -33,7 +33,7 @@ export const sales = {
       placeholder: "0",
     },
     debt: {
-      chip: (amount: string) => `Debe ${amount} · Cobrar deuda`,
+      chip: (amount: string) => `Debe ${amount} · Ver saldos`,
     },
     checkout: {
       title: "Cobrar",
@@ -41,20 +41,20 @@ export const sales = {
       itemsSummary: (n: number) => (n === 1 ? "1 producto" : `${n} productos`),
       fiado: "Fiado",
       fiadoNeedsMember: "Asocia al socio (arriba) para poder fiar.",
-      fiadoQuestion: "¿Cuánto te deja ahora?",
-      fiadoMethodQuestion: "¿Cómo te paga lo de ahora?",
-      cashQuestion: "¿Con cuánto te pagan?",
+      fiadoQuestion: "Abono inicial (opcional)",
+      fiadoMethodQuestion: "Forma de pago del abono",
+      cashQuestion: "Efectivo recibido",
       cardHint: "Cobra en la terminal y confirma aquí.",
       transferHint: "Verifica que llegó la transferencia y confirma aquí.",
-      confirm: (amount: string) => `Confirmar — cobrar ${amount}`,
+      confirm: (amount: string) => `Cobrar ${amount}`,
       confirmFiado: (paid: string, debt: string) =>
-        `Confirmar — cobrar ${paid} · quedan ${debt}`,
+        `Cobrar ${paid} y guardar saldo de ${debt}`,
     },
     credit: {
       requiresMember: "Asocia un socio para poder fiar.",
       balanceLabel: (amount: string) => `Queda a deber: ${amount}`,
       paidExceedsTotal: "El monto cobrado no puede ser mayor al total.",
-      paidMustBePositive: "Debes cobrar al menos algo ahora.",
+      paidMustBePositive: "El abono debe estar entre cero y el total.",
     },
     badges: {
       out: "0✕",
@@ -62,35 +62,17 @@ export const sales = {
       stock: (n: number) => String(n),
     },
     tooltips: {
-      out: "Sin stock",
-      low: "Stock bajo",
+      out: "Sin existencias",
+      low: "Existencias bajas",
       rightClick: "Click derecho o mantén presionado para cantidad personalizada",
     },
     searchPlaceholder: "Buscar producto…",
     noSearchResults: "Sin productos que coincidan.",
-    showOutOfStock: "Ver agotados",
-    restock: {
-      title: (name: string) => `Registrar mercancía — ${name}`,
-      description:
-        "El sistema dice que no quedan. Si te llegaron unidades sin registrar, anótalas aquí y se agregan al carrito.",
-      qtyLabel: "¿Cuántas te llegaron?",
-      costLabel: "Costo unitario (opcional)",
-      costHint: "Cuánto pagaste por cada una. Queda en el historial de egresos.",
-      reasonDefault: "Recibido en venta",
-      submit: "Registrar y agregar",
-      cancel: "Cancelar",
-      success: (qty: number, name: string) =>
-        qty === 1 ? `${name} agregado al stock y al carrito.` : `${qty} ${name} agregados al stock y al carrito.`,
-      errors: {
-        qtyInvalid: "La cantidad debe ser mayor a cero.",
-        generic: "No pudimos registrar la mercancía.",
-      },
-    },
-    outOfStockTap: "Sin stock — toca para registrar",
+    showOutOfStock: "Incluir sin existencias",
     quantityModal: {
       title: (name: string) => `Cantidad — ${name}`,
       label: "¿Cuántos vas a vender?",
-      stockLabel: (n: number) => `Stock disponible: ${n}`,
+      stockLabel: (n: number) => `Existencias registradas: ${n}`,
       tooMuch: (avail: number) => `Solo hay ${avail} disponibles.`,
       submit: "Agregar",
       cancel: "Cancelar",
@@ -98,6 +80,150 @@ export const sales = {
     success: {
       online: (amount: string) => `${amount} cobrados.`,
       offline: "Guardado. Se sincronizará cuando vuelva la conexión.",
+    },
+    correction: {
+      openLast: "Corregir última venta",
+      openPayment: "Corregir venta",
+      lastSale: (folio: string, amount: string) => `Última venta ${folio} · ${amount}`,
+      dismissLast: "Ocultar última venta",
+      title: (folio?: string) => (folio ? `Corregir venta ${folio}` : "Corregir venta"),
+      description:
+        "Corrige los productos o cantidades de esta venta.",
+      loading: "Cargando la venta…",
+      loadError: "No encontramos la venta o esta versión de Tinta todavía no permite corregirla.",
+      retry: "Volver a intentar",
+      product: "Producto",
+      captured: "Capturado",
+      corrected: "Correcto",
+      stockEffect: "Cambio en existencias",
+      restores: (n: number) => `Restaura ${n} ${n === 1 ? "unidad" : "unidades"}`,
+      deducts: (n: number) => `Descuenta ${n} ${n === 1 ? "unidad" : "unidades"}`,
+      unchanged: "Sin cambio",
+      removeLine: (name: string) => `Quitar ${name} de la venta`,
+      decreaseLine: (name: string) => `Restar una unidad de ${name}`,
+      increaseLine: (name: string) => `Sumar una unidad de ${name}`,
+      registeredTotal: "Venta registrada",
+      correctedTotal: "Venta corregida",
+      difference: "Diferencia estimada",
+      discountHint: "Se conserva el porcentaje de descuento original.",
+      inventoryPreview: (restored: number, deducted: number) => {
+        if (restored > 0 && deducted > 0) {
+          return `Se restauran ${restored} y se descuentan ${deducted} unidades.`;
+        }
+        if (restored > 0) return `Se restauran ${restored} unidades al inventario.`;
+        if (deducted > 0) return `Se descuentan ${deducted} unidades adicionales.`;
+        return "El inventario no cambia.";
+      },
+      moneyQuestion: "¿Qué pasó realmente con el dinero?",
+      recordOnly: "Sólo estaba mal capturado",
+      recordOnlyHint: (amount: string) =>
+        `El cobro real fue ${amount}. Corrige el registro sin crear una devolución.`,
+      refundNow: "Sí cobré de más; devolver ahora",
+      refundNowHint: (amount: string) => `Registra ahora la devolución de ${amount}.`,
+      refundPending: "Sí cobré de más; devolver después",
+      refundPendingHint: (amount: string) =>
+        `Deja ${amount} pendiente por devolver, sin mover dinero ahora.`,
+      operatorLimit:
+        "Puedes corregir ventas recientes cuando el dinero cobrado ya era correcto.",
+      operatorNeedsOwner:
+        "Pide al dueño la devolución si cobraste de más o ya se hizo el corte o retiro.",
+      refundMethod: "¿Cómo se devuelve?",
+      refundMethods: {
+        cash: "Efectivo",
+        transfer: "Transferencia",
+        card: "Tarjeta",
+      },
+      reason: "Motivo de la corrección",
+      reasonPlaceholder: "Ej. Se capturaron 40 unidades y eran 4",
+      cancel: "Cancelar",
+      submit: "Guardar corrección",
+      submitting: "Guardando…",
+      success: "Venta corregida.",
+      successRefund: (amount: string) => `Venta corregida y ${amount} registrados como devolución.`,
+      successPending: (amount: string) => `Venta corregida. Quedan ${amount} por devolver.`,
+      errors: {
+        unchanged: "Cambia al menos una cantidad antes de guardar.",
+        reason: "Explica brevemente por qué se corrige la venta.",
+        refundMethod: "Elige cómo se devolverá la diferencia.",
+        versionConflict:
+          "La venta cambió en otra pantalla. Recárgala antes de volver a guardar.",
+        generic: "No pudimos guardar la corrección.",
+      },
+    },
+    refund: {
+      title: (folio?: string) =>
+        folio ? `Devolver productos de ${folio}` : "Devolver productos",
+      description:
+        "Selecciona los productos que se devuelven.",
+      loading: "Cargando la venta…",
+      loadError: "No pudimos cargar el detalle de esta venta.",
+      retry: "Volver a intentar",
+      ownerOnly: "Solo el dueño del gym puede registrar devoluciones de productos.",
+      availableMoney: "Disponible para devolver en dinero",
+      product: "Producto",
+      available: "Disponibles",
+      quantity: "Cantidad",
+      disposition: "¿Qué pasó con el producto?",
+      alreadyRefunded: "Ya no hay unidades por devolver",
+      dispositions: {
+        returned_to_stock: "Regresó en buen estado",
+        damaged: "Regresó dañado",
+        not_returned: "No regresó",
+      },
+      dispositionHints: {
+        returned_to_stock: "Vuelve al inventario",
+        damaged: "No vuelve al inventario",
+        not_returned: "No mueve el inventario",
+      },
+      previewTitle: "Antes de confirmar",
+      previewUnits: "Unidades elegidas",
+      previewMoney: "Dinero a devolver",
+      previewDebt: "Saldo pendiente que se cancela",
+      previewStock: "Vuelven al inventario",
+      previewNoStock: "No vuelven al inventario",
+      debtSplit: (value: string, debt: string, money: string) =>
+        `De ${value}, se cancelan ${debt} de deuda y se devuelven ${money}.`,
+      estimateHint:
+        "El importe incluye el descuento de la venta.",
+      method: "¿Cómo se devuelve el dinero?",
+      methods: {
+        cash: "Efectivo",
+        transfer: "Transferencia",
+        card: "Tarjeta",
+      },
+      date: "Fecha de la devolución",
+      reason: "Motivo",
+      reasonPlaceholder: "Ej. El cliente regresó dos bebidas cerradas",
+      cancel: "Cancelar",
+      submit: "Registrar devolución",
+      submitting: "Registrando…",
+      success: (amount: string) => `Devolución de ${amount} registrada.`,
+      successWithDebt: (amount: string, debt: string) =>
+        `Se devolvieron ${amount} y se cancelaron ${debt} del saldo pendiente.`,
+      successDebtOnly: (debt: string) =>
+        `Se cancelaron ${debt} del saldo pendiente. No salió dinero.`,
+      errors: {
+        noLines: "Elige al menos un producto y una cantidad.",
+        reason: "Explica brevemente por qué se hace la devolución.",
+        exceedsAvailable: (amount: string) =>
+          `La selección supera los ${amount} que todavía se pueden devolver de este cobro.`,
+        generic: "No pudimos registrar la devolución.",
+      },
+    },
+    pendingRefund: {
+      title: "Dinero pendiente por devolver",
+      total: (amount: string) => `${amount} todavía no han salido del gym.`,
+      reason: "Motivo",
+      created: "Registrado",
+      settle: "Entregar ahora",
+      method: "¿Cómo sale el dinero?",
+      date: "Fecha de entrega",
+      confirm: "Confirmar entrega",
+      confirming: "Registrando…",
+      cancel: "No entregar ahora",
+      ownerHint: "Solo el dueño puede confirmar que este dinero ya se entregó.",
+      success: (amount: string) => `${amount} registrados como dinero devuelto.`,
+      error: "No pudimos registrar la entrega de esta devolución.",
     },
     errors: {
       cartEmpty: "Agrega al menos un producto al carrito.",

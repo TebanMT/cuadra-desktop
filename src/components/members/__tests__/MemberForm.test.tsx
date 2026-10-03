@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "@/test/utils";
 import { MemberForm } from "../MemberForm";
 
@@ -42,17 +43,23 @@ vi.mock("@/lib/api", async () => {
 describe("MemberForm", () => {
   beforeEach(() => vi.clearAllMocks());
 
+  function renderCreateForm(onSubmit: ReturnType<typeof vi.fn>) {
+    return renderWithProviders(
+      <MemoryRouter>
+        <MemberForm
+          mode="create"
+          submitting={false}
+          onSubmit={onSubmit}
+          onCancel={() => {}}
+        />
+      </MemoryRouter>,
+    );
+  }
+
   it("flags missing name on submit", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    renderWithProviders(
-      <MemberForm
-        mode="create"
-        submitting={false}
-        onSubmit={onSubmit}
-        onCancel={() => {}}
-      />
-    );
+    renderCreateForm(onSubmit);
 
     await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
 
@@ -63,14 +70,7 @@ describe("MemberForm", () => {
   it("flags invalid phone (less than 10 digits)", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    renderWithProviders(
-      <MemberForm
-        mode="create"
-        submitting={false}
-        onSubmit={onSubmit}
-        onCancel={() => {}}
-      />
-    );
+    renderCreateForm(onSubmit);
 
     await user.type(screen.getByLabelText(/nombre completo/i), "Juan Pérez");
     // /^teléfono/ y no /teléfono/: el label del check "Sin teléfono"
@@ -78,27 +78,20 @@ describe("MemberForm", () => {
     await user.type(screen.getByLabelText(/^teléfono/i), "12345");
     await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
 
-    expect(await screen.findByText(/necesito 10 dígitos/i)).toBeInTheDocument();
+    expect(await screen.findByText(/teléfono de 10 dígitos/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it("permite alta sin teléfono SOLO con el check explícito", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    renderWithProviders(
-      <MemberForm
-        mode="create"
-        submitting={false}
-        onSubmit={onSubmit}
-        onCancel={() => {}}
-      />
-    );
+    renderCreateForm(onSubmit);
 
     await user.type(screen.getByLabelText(/nombre completo/i), "Juan Pérez");
 
     // Sin el check, teléfono vacío rebota.
     await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
-    expect(await screen.findByText(/necesito 10 dígitos/i)).toBeInTheDocument();
+    expect(await screen.findByText(/teléfono de 10 dígitos/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
 
     // Con el check: el input se deshabilita y el submit sale con
@@ -117,14 +110,7 @@ describe("MemberForm", () => {
   it("el check limpia un número ya tecleado", async () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn();
-    renderWithProviders(
-      <MemberForm
-        mode="create"
-        submitting={false}
-        onSubmit={onSubmit}
-        onCancel={() => {}}
-      />
-    );
+    renderCreateForm(onSubmit);
 
     await user.type(screen.getByLabelText(/nombre completo/i), "Juan Pérez");
     await user.type(screen.getByLabelText(/^teléfono/i), "4421234567");

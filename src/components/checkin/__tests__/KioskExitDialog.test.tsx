@@ -97,7 +97,7 @@ describe("KioskExitDialog — error differentiation", () => {
     await user.type(screen.getByLabelText(/Contraseña/i), "any");
     await user.click(screen.getByRole("button", { name: /^Salir$/ }));
 
-    expect(await screen.findByText(/No logro contactar al sistema/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No se pudo conectar/i)).toBeInTheDocument();
   });
 
   it("ApiError genérico (500 server) → mensaje genérico, no 'contraseña incorrecta'", async () => {
@@ -111,7 +111,7 @@ describe("KioskExitDialog — error differentiation", () => {
     await user.type(screen.getByLabelText(/Contraseña/i), "any");
     await user.click(screen.getByRole("button", { name: /^Salir$/ }));
 
-    expect(await screen.findByText(/No pude validar la contraseña/i)).toBeInTheDocument();
+    expect(await screen.findByText(/No se pudo validar la contraseña/i)).toBeInTheDocument();
     expect(screen.queryByText(/Contraseña incorrecta/)).not.toBeInTheDocument();
   });
 });

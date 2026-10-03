@@ -26,25 +26,128 @@ export interface KpiTrend {
   delta_pct: number | null;
 }
 
+export interface FinancialIntegrity {
+  status: "complete" | "incomplete";
+  warnings?: string[];
+  issues?: string[];
+  missing_purchase_amount_count?: number;
+  unclassified_income_count?: number;
+  unclassified_cash_out_count?: number;
+  invalid_cash_in_classification_count?: number;
+  legacy_cash_source_unverified_count?: number;
+  legacy_purchase_count?: number;
+  legacy_refund_count?: number;
+  legacy_review_count?: number;
+  legacy_unlinked_purchases?: number;
+  unclassified_cash_out?: number;
+  unknown_refund_disposition?: number;
+  product_cost_coverage_pct?: number | null;
+  calculated_at?: string;
+  data_watermark?: string;
+}
+
+export interface CashRangeReconciliation {
+  complete?: boolean;
+  status?: "complete" | "incomplete" | "stale";
+  // Contrato canónico de sesiones. Todos los importes son flujos salvo
+  // latest_counted, que es el ÚLTIMO saldo físico y nunca se suma.
+  cash_activity?: number;
+  withdrawn?: number;
+  period_activity?: number;
+  period_withdrawn?: number;
+  latest_session_id?: string | null;
+  latest_expected?: number | null;
+  latest_counted?: number | null;
+  latest_difference?: number | null;
+  latest_counted_at?: string | null;
+  /** Effective status of the latest physical session. */
+  latest_status?: "open" | "closed_unverified" | "reconciled" | "stale" | "withdrawn" | null;
+  latest_needs_recount?: boolean;
+  difference?: number | null;
+  active_days?: number;
+  missing_active_days?: number;
+  uncovered_activity_days?: number;
+  historical_activity_days?: number;
+  historical_sessions?: number;
+  requires_attention?: boolean;
+  open_sessions?: number;
+  closed_unverified_sessions?: number;
+  reconciled_sessions?: number;
+  stale_sessions?: number;
+  withdrawn_sessions?: number;
+  unknown_opening_sessions?: number;
+  adjusted_after_withdrawal_sessions?: number;
+  legacy_cash_source_unverified_count?: number;
+  active_sessions?: number;
+  total_sessions?: number;
+  // Shape legado. Se conserva únicamente para detectar capacidades de un
+  // sidecar anterior; la UI no interpreta la suma de counted como saldo.
+  counted?: number;
+  counted_closes?: number;
+  total_closes?: number;
+}
+
+export interface ProductProfitabilityRow {
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  revenue: number;
+  cogs: number;
+  gross_profit: number;
+  margin_pct: number | null;
+  cost_complete: boolean;
+}
+
+export interface ProductProfitability {
+  status: "complete" | "incomplete";
+  items_with_cost: number;
+  items_total: number;
+  rows: ProductProfitabilityRow[];
+}
+
 export interface DashboardData {
+  local_date?: string;
+  timezone?: string;
+  previous_from?: string;
+  previous_to?: string;
   active_members: KpiTrend;
-  income_month: KpiTrend;
-  // Ganancia realizada de productos del mes (Standard): revenue − COGS de
-  // ventas no reembolsadas. realized_profit_coverage es la cobertura
+  // ── KPIs de dinero del MES — owner-only ──────────────────────────────
+  // El BE los OMITE para operadores (wire role-aware, plan Reports-improve
+  // transversal §2): ausente = "no es tuyo", no cero. Por eso son
+  // opcionales; el FE además los oculta con can("view_money_kpis").
+  income_month?: KpiTrend;
+  // Alias de compatibilidad para clientes Plus antiguos. Las superficies
+  // Standard no lo solicitan ni renderizan; la rentabilidad canónica vive en
+  // product_profitability dentro de Análisis.
+  // realized_profit_coverage es la cobertura
   // honesta ("X de Y líneas con costo").
-  realized_profit_month: KpiTrend;
-  realized_profit_coverage: { items_with_cost: number; items_total: number };
+  realized_profit_month?: KpiTrend;
+  realized_profit_coverage?: { items_with_cost: number; items_total: number };
   // Margen de la utilidad del mes: utilidad / ingreso por productos × 100.
   // null cuando no hubo ventas de productos en el rango.
-  realized_profit_margin_pct: number | null;
-  // Egresos del mes: AGREGADO de mercancía (stock_movements restock con
-  // costo) + gastos generales (BC expenses). El hint del StatCard
-  // aclara "Mercancía + otros". El desglose por fuente vive (por ahora)
-  // solo en backend.
-  expenses_month: KpiTrend;
+  realized_profit_margin_pct?: number | null;
+  // Salidas del mes: gastos pagados + compras pagadas para reventa +
+  // devoluciones económicas, con la misma definición que Reportes.
+  expenses_month?: KpiTrend;
+  period_result_month?: KpiTrend;
+  membership_income_month?: KpiTrend;
+  product_income_month?: KpiTrend;
+  other_income_month?: KpiTrend;
+  unclassified_income_month?: KpiTrend;
+  operating_expenses_month?: KpiTrend;
+  inventory_purchases_month?: KpiTrend;
+  refunds_month?: KpiTrend;
+  generated_at?: string;
+  data_watermark?: string;
+  sync_pending?: boolean;
+  integrity?: FinancialIntegrity;
+  income_30d?: { date: string; total: number }[];
+  // ── Operacional (ambos roles) ────────────────────────────────────────
+  // Check-ins de HOY (día local del gym) — pieza del home operacional.
+  // Opcional por compat con sidecars viejos que aún no lo mandan.
+  checkins_today?: number;
   expiring_week: KpiTrend;
   recoverable: KpiTrend;
-  income_30d: { date: string; total: number }[];
   attention_summary: {
     expiring_soon: number;
     expired_recoverable: number;
@@ -56,6 +159,8 @@ export interface DashboardData {
   recent_payments: {
     id: string;
     member_name: string;
+    // Productos de la venta ("Agua 1L ×2") — título para ventas walk-in.
+    sale_summary?: string;
     amount: number;
     payment_method: PaymentMethod | null;
     payment_date: string;
@@ -130,9 +235,38 @@ export interface AttentionData {
 }
 
 export interface ReportsRangeData {
+  previous_from?: string;
+  previous_to?: string;
   period: ReportPeriod;
   from: string;
   to: string;
+  calculated_at?: string;
+  data_watermark?: string;
+  sync_pending?: boolean;
+  detail_metadata?: {
+    inventory_costs: { returned: number; limit?: number; truncated: boolean };
+    expenses: { returned: number; limit?: number; truncated: boolean };
+  };
+  // Conciliación de los cortes cerrados del período. `difference` sólo
+  // existe cuando todos los cortes tienen conteo de efectivo.
+  cash_reconciliation?: CashRangeReconciliation;
+  integrity?: FinancialIntegrity;
+  // Contrato agrupado v2. Facilita validar las dos ecuaciones sin depender
+  // de aliases y convive una versión con los totals planos.
+  income?: {
+    total: KpiTrend;
+    memberships: KpiTrend;
+    products: KpiTrend;
+    other: KpiTrend;
+    unclassified: KpiTrend;
+  };
+  outflows?: {
+    total: KpiTrend;
+    operating_expenses: KpiTrend;
+    inventory_purchases: KpiTrend;
+    refunds: KpiTrend;
+  };
+  period_result?: KpiTrend;
   // Cada total surface como KPI {value, delta, delta_pct} para que los
   // StatCards puedan renderear deltas vs ventana previa. La ventana
   // previa se calcula server-side: para month/last_month usa el mes
@@ -140,19 +274,46 @@ export interface ReportsRangeData {
   // largo terminando un día antes de `from`.
   totals: {
     income: KpiTrend;
+    // Contrato canónico ADR-011. Son opcionales durante una versión para
+    // aceptar cloud/sidecars anteriores sin fabricar ceros.
+    membership_income?: KpiTrend;
+    product_income?: KpiTrend;
+    unclassified_income?: KpiTrend;
+    operating_expenses?: KpiTrend;
+    inventory_purchases?: KpiTrend;
+    outflows?: KpiTrend;
+    period_result?: KpiTrend;
+    other_income: KpiTrend;
     new_members: KpiTrend;
     checkins: KpiTrend;
     refunds: KpiTrend;
     inventory_cost: KpiTrend;
     expenses_general: KpiTrend;
-    // Net = income − inventory_cost − expenses_general. Calculado
-    // server-side sobre ambas ventanas para que el delta tenga sentido.
+    // Aliases legados; las superficies nuevas no los usan.
     net: KpiTrend;
+    cogs: KpiTrend;
+    // Alias legado de net_result.
+    operating_result: KpiTrend;
+    // Alias legado de cash_from_closes.
+    cash_flow: KpiTrend;
+    // income − inventory_cost − expenses_general − refunds.
+    net_result: KpiTrend;
+    // Efectivo operativo calculado en los cortes cerrados del rango.
+    cash_from_closes: KpiTrend;
+    cogs_coverage: { items_with_cost: number; items_total: number };
+    coverage_warnings: string[];
   };
+  product_sales: {
+    amount: KpiTrend;
+    units: number;
+  };
+  product_profitability?: ProductProfitability;
   income_by_day: { date: string; total: number }[];
   expenses_by_day: { date: string; total: number }[];
   checkins_by_day: { date: string; count: number }[];
   income_by_method: Record<PaymentMethod, number>;
+  income_by_membership_type: Record<string, number>;
+  members_by_membership_type: Record<string, number>;
   // Gastos generales agrupados por categoría del enum (renta,
   // servicios, sueldos, …). No incluye compras de mercancía.
   expenses_by_category: Record<string, number>;
@@ -165,7 +326,7 @@ export interface ReportsRangeData {
   top_products: TopProductRow[];
   inventory_costs: InventoryCostMovement[];
   expenses: ExpenseRow[];
-  // Snapshot del catálogo: cuántos productos están sin stock vs por
+  // Snapshot del catálogo: cuántos productos están sin existencias vs por
   // debajo del mínimo. No varía con el período.
   critical_stock: {
     out_count: number;
@@ -174,6 +335,7 @@ export interface ReportsRangeData {
   recent_payments: {
     id: string;
     member_name: string;
+    sale_summary?: string;
     amount: number;
     concept: string;
     payment_method: PaymentMethod | null;
@@ -207,6 +369,7 @@ export interface ExpenseRow {
   category: string;
   description?: string | null;
   payment_method: string;
+  paid_from?: "cash_drawer" | "gym_fund" | "external";
 }
 
 // Las keys incluyen el día LOCAL: un período nombrado ("month", "today")
@@ -224,6 +387,7 @@ export function useDashboard() {
     queryKey: KEYS.dashboard(),
     queryFn: () => api.get<DashboardData>("/api/v1/dashboard"),
     staleTime: 60_000,
+    refetchInterval: 60_000,
   });
 }
 
@@ -235,8 +399,8 @@ export function useAttentionRequired() {
   });
 }
 
-export function useReportsRange(period: ReportPeriod, from?: string, to?: string) {
-  const enabled = period !== "custom" || (!!from && !!to);
+export function useReportsRange(period: ReportPeriod, from?: string, to?: string, allowed = true) {
+  const enabled = allowed && (period !== "custom" || (!!from && !!to));
   return useQuery<ReportsRangeData>({
     queryKey: KEYS.range(period, from, to),
     queryFn: () => {
@@ -262,4 +426,3 @@ export async function fetchExport(
     period: params.period,
   });
 }
-

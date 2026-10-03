@@ -3,6 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { PaymentModal } from "../PaymentModal";
+import { api } from "@/lib/api";
 
 vi.mock("@/lib/api", async () => {
   const actual = await vi.importActual<typeof import("@/lib/api")>("@/lib/api");
@@ -152,5 +153,44 @@ describe("PaymentModal", () => {
 
     expect(await screen.findByRole("button", { name: /imprimir comprobante/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /enviar por whatsapp/i })).toBeInTheDocument();
+  });
+
+  it("reutiliza la llave del mismo cobro si la respuesta se pierde", async () => {
+    const user = userEvent.setup();
+    const post = vi.mocked(api.post);
+    post
+      .mockRejectedValueOnce(new Error("respuesta perdida"))
+      .mockResolvedValueOnce({
+        payment_id: "pay-1",
+        folio: "MEM-000087",
+        subtotal: 500,
+        discount: 0,
+        total: 500,
+        paid: 500,
+        balance_pending: 0,
+        new_membership_id: "ms-2",
+        new_expiry: "2026-05-25",
+        enrollment_charged: false,
+        maintenance_charged: false,
+      });
+
+    renderWithProviders(
+      <PaymentModal
+        member={member}
+        currentMembership={currentMembership}
+        open
+        onOpenChange={() => {}}
+      />
+    );
+    const submit = await screen.findByRole("button", { name: /Cobrar \$500\.00/ });
+    await user.click(submit);
+    await screen.findByText(/No pudimos cobrar/i);
+    await user.click(submit);
+
+    await screen.findByRole("button", { name: /imprimir comprobante/i });
+    const first = post.mock.calls[0][1] as { idempotency_key: string };
+    const second = post.mock.calls[1][1] as { idempotency_key: string };
+    expect(first.idempotency_key).toBeTruthy();
+    expect(second.idempotency_key).toBe(first.idempotency_key);
   });
 });

@@ -1,5 +1,7 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
+import { OtherIncomeDialog } from "@/components/billing/OtherIncomeDialog";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -10,13 +12,14 @@ import {
   CircleDollarSign,
   CreditCard,
   Loader2,
+  Pencil,
   Plus,
   Receipt,
+  Undo2,
   Wallet,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -61,6 +64,15 @@ import { useMember } from "@/hooks/useMembers";
 import { parseDate, todayIso } from "@/lib/dates";
 import { billing as t } from "@/strings/billing";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { useRegisterOtherIncome } from "@/hooks/useBilling";
+import { SaleCorrectionModal } from "@/components/sales/SaleCorrectionModal";
+import { ProductRefundModal } from "@/components/sales/ProductRefundModal";
+import { CashDrawerField } from "@/components/cash/CashDrawerField";
+import { RefundModal } from "@/components/billing/RefundModal";
+import { PaymentCorrectionModal } from "@/components/billing/PaymentCorrectionModal";
+import { keyForPayload } from "@/lib/idempotency";
 
 type Period = "today" | "week" | "month" | "custom";
 
@@ -89,7 +101,7 @@ const CONCEPT_OPTIONS: Array<{ value: PaymentConcept | "all"; label: string }> =
   { value: "product", label: "Productos" },
   { value: "balance_settlement", label: "Abonos" },
   { value: "refund", label: "Devoluciones" },
-  { value: "other", label: "Otros" },
+  { value: "other", label: "Otros ingresos" },
 ];
 
 function MethodBadge({ method }: { method: PaymentMethod | null }) {
@@ -151,18 +163,28 @@ function rowAccent(p: Payment): string | null {
 export default function CobrosPage() {
   const navigate = useNavigate();
   const money = useMoneyVisibility();
-  const [period, setPeriod] = useState<Period>("today");
-  const [customFrom, setCustomFrom] = useState<string>(todayIso());
-  const [customTo, setCustomTo] = useState<string>(todayIso());
-  const [concept, setConcept] = useState<PaymentConcept | "all">("all");
-  const [page, setPage] = useState(1);
+  const [params, setParams] = useSearchParams();
+  const period: Period = params.get("from") && params.get("to") ? "custom" : ["week", "month", "custom"].includes(params.get("period") ?? "") ? params.get("period") as Period : "today";
+  const customFrom = params.get("from") ?? todayIso();
+  const customTo = params.get("to") ?? todayIso();
+  const concept = (Object.keys(t.history.concepts).includes(params.get("concept") ?? "") ? params.get("concept") : "all") as PaymentConcept | "all";
+  const page = Math.max(1, Number(params.get("page")) || 1);
+  const setPage = (next: number | ((previous: number) => number)) => setParams(previous => { const p = new URLSearchParams(previous); p.set("page", String(typeof next === "function" ? next(page) : next)); return p; }, { replace: true });
+  const setConcept = (value: PaymentConcept | "all") => setParams(previous => { const p = new URLSearchParams(previous); p.set("concept", value); p.delete("page"); return p; });
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickedMemberId, setPickedMemberId] = useState<string | null>(null);
   const [paymentOpen, setPaymentOpen] = useState(false);
+  const [otherIncomeOpen, setOtherIncomeOpen] = useState(false);
+  const isOwner = useAuthStore((s) => s.user?.role === "owner");
+  const currentUserId = useAuthStore((s) => s.user?.user_id);
 
   const [receiptId, setReceiptId] = useState<string | null>(null);
   const [receiptFolio, setReceiptFolio] = useState<string | undefined>(undefined);
+  const [saleCorrectionTarget, setSaleCorrectionTarget] = useState<Payment | null>(null);
+  const [paymentCorrectionTarget, setPaymentCorrectionTarget] = useState<Payment | null>(null);
+  const [refundSaleId, setRefundSaleId] = useState<string | null>(null);
+  const [refundPayment, setRefundPayment] = useState<Payment | null>(null);
 
   const range = useMemo(
     () => rangeFor(period, customFrom, customTo),
@@ -208,8 +230,10 @@ export default function CobrosPage() {
   }
 
   function setPeriodAndReset(p: Period) {
-    setPeriod(p);
-    setPage(1);
+    setParams(previous => { const next = new URLSearchParams(previous); next.set("period", p); next.delete("page");
+      if (p !== "custom") { next.delete("from"); next.delete("to"); }
+      return next;
+    });
   }
 
   return (
@@ -218,6 +242,11 @@ export default function CobrosPage() {
         title={t.cobranza.title}
         subtitle={t.cobranza.subtitle}
         actions={
+          <div className="flex flex-wrap gap-2">
+          {isOwner && <Button size="lg" onClick={() => setOtherIncomeOpen(true)} className="h-10 font-semibold shadow-sm">
+            <CircleDollarSign className="h-4 w-4 mr-2" />
+            Otro ingreso
+          </Button>}
           <Button
             size="lg"
             onClick={() => setPickerOpen(true)}
@@ -226,6 +255,7 @@ export default function CobrosPage() {
             <Plus className="h-4 w-4 mr-2" />
             {t.cobranza.chargeMember}
           </Button>
+          </div>
         }
       />
 
@@ -266,7 +296,7 @@ export default function CobrosPage() {
       </div>
 
       {/* Period filters */}
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 [&_button]:min-h-11">
         <FilterPill
           label={t.cobranza.period.today}
           active={period === "today"}
@@ -287,40 +317,7 @@ export default function CobrosPage() {
           active={period === "custom"}
           onClick={() => setPeriodAndReset("custom")}
         />
-        {period === "custom" && (
-          <div className="flex items-end gap-2 ml-2">
-            <div className="space-y-1">
-              <Label htmlFor="cb-from" className="text-xs text-muted-foreground">
-                {t.cobranza.filters.from}
-              </Label>
-              <Input
-                id="cb-from"
-                type="date"
-                value={customFrom}
-                onChange={(e) => {
-                  setCustomFrom(e.target.value);
-                  setPage(1);
-                }}
-                className="h-9 w-[160px]"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="cb-to" className="text-xs text-muted-foreground">
-                {t.cobranza.filters.to}
-              </Label>
-              <Input
-                id="cb-to"
-                type="date"
-                value={customTo}
-                onChange={(e) => {
-                  setCustomTo(e.target.value);
-                  setPage(1);
-                }}
-                className="h-9 w-[160px]"
-              />
-            </div>
-          </div>
-        )}
+        {period === "custom" && <DateRangePicker from={customFrom} to={customTo} onChange={(start, end) => { setParams(previous => { const p = new URLSearchParams(previous); p.set("from", start); p.set("to", end); p.set("period", "custom"); p.delete("page"); return p; }); }} />}
         <div className="ml-auto flex items-center gap-2">
           <Label className="text-xs text-muted-foreground">
             {t.cobranza.filters.conceptLabel}
@@ -329,7 +326,6 @@ export default function CobrosPage() {
             value={concept}
             onValueChange={(v) => {
               setConcept(v as PaymentConcept | "all");
-              setPage(1);
             }}
           >
             <SelectTrigger className="h-9 w-[180px]">
@@ -379,11 +375,14 @@ export default function CobrosPage() {
               <DataTableTh className="text-right">{t.cobranza.columns.amount}</DataTableTh>
               <DataTableTh>{t.cobranza.columns.method}</DataTableTh>
               <DataTableTh>{t.cobranza.columns.operator}</DataTableTh>
-              <DataTableTh className="w-24 text-right pr-5" />
+              <DataTableTh className="w-40 text-right pr-5" />
             </DataTableHead>
             <DataTableBody>
               {items.map((p) => {
                 const accent = rowAccent(p);
+                const recognitionDiffers =
+                  p.recognized_amount != null &&
+                  Math.abs(p.amount - p.recognized_amount) >= 0.005;
                 return (
                   <DataTableRow
                     key={p.id}
@@ -411,11 +410,18 @@ export default function CobrosPage() {
                           {p.member_name || t.cobranza.rowMember}
                         </button>
                       ) : (
-                        <span className="text-sm text-muted-foreground">—</span>
+                        <span className="text-sm text-muted-foreground truncate">
+                          {p.sale_summary || (p.concept === "other" ? p.notes : null) || "—"}
+                        </span>
                       )}
                     </DataTableCell>
                     <DataTableCell className="text-sm">
                       <span>{conceptLabel(p.concept)}</span>
+                      {p.member_id && p.sale_summary && (
+                        <span className="ml-1.5 text-xs text-muted-foreground">
+                          • {p.sale_summary}
+                        </span>
+                      )}
                       {p.balance_pending > 0 && (
                         <span className="ml-1.5 text-xs text-warning">
                           • {t.cobranza.pendingTag(money.fmt(p.balance_pending))}
@@ -433,27 +439,98 @@ export default function CobrosPage() {
                         accent
                       )}
                     >
-                      {money.fmt(p.amount)}
+                      <span className="block">{money.fmt(p.amount)}</span>
+                      {recognitionDiffers && (
+                        <span className="block text-[11px] font-normal text-muted-foreground">
+                          {money.fmt(p.recognized_amount!)} cuenta como ingreso
+                        </span>
+                      )}
                     </DataTableCell>
                     <DataTableCell>
-                      <MethodBadge method={p.payment_method} />
+                      {p.concept === "product" && p.amount === 0 ? <span>{p.balance_pending > 0 ? "Fiado" : "Sin cobro"}</span> : <MethodBadge method={p.payment_method} />}
                     </DataTableCell>
                     <DataTableCell className="text-xs text-muted-foreground">
                       {p.operator_name || "—"}
                     </DataTableCell>
                     <DataTableCell className="text-right pr-5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setReceiptId(p.id);
-                          setReceiptFolio(p.reference || undefined);
-                        }}
-                        className="h-8"
-                      >
-                        Ver
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {p.concept === "product" &&
+                          p.sale_id &&
+                          (isOwner || p.operator_id === currentUserId) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSaleCorrectionTarget(p);
+                            }}
+                            className="h-8"
+                          >
+                            <Pencil className="h-3.5 w-3.5 mr-1" />
+                            Corregir
+                          </Button>
+                        )}
+                        {isOwner &&
+                          (p.concept === "membership" || p.concept === "other") &&
+                          p.amount > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setPaymentCorrectionTarget(p);
+                              }}
+                              className="h-8"
+                            >
+                              <Pencil className="mr-1 h-3.5 w-3.5" />
+                              Corregir
+                            </Button>
+                          )}
+                        {isOwner && p.concept === "product" && p.sale_id && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setRefundSaleId(p.sale_id ?? null);
+                            }}
+                            className="h-8 text-destructive hover:text-destructive"
+                          >
+                            <Undo2 className="mr-1 h-3.5 w-3.5" />
+                            Devolver
+                          </Button>
+                        )}
+                        {isOwner &&
+                          (p.concept === "membership" ||
+                            p.concept === "balance_settlement" ||
+                            p.concept === "other") &&
+                          p.amount > 0 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setRefundPayment(p);
+                              }}
+                              className="h-8 text-destructive hover:text-destructive"
+                            >
+                              <Undo2 className="mr-1 h-3.5 w-3.5" />
+                              Devolver
+                            </Button>
+                          )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setReceiptId(p.id);
+                            setReceiptFolio(p.reference || undefined);
+                          }}
+                          className="h-8"
+                        >
+                          Ver
+                        </Button>
+                      </div>
                     </DataTableCell>
                   </DataTableRow>
                 );
@@ -520,6 +597,34 @@ export default function CobrosPage() {
           currentMembership={pickedMember.data.current_membership}
           open={paymentOpen}
           onOpenChange={closePayment}
+        />
+      )}
+
+      <OtherIncomeDialog open={otherIncomeOpen} onOpenChange={setOtherIncomeOpen} />
+
+      <SaleCorrectionModal
+        saleId={saleCorrectionTarget?.sale_id ?? null}
+        open={!!saleCorrectionTarget}
+        onOpenChange={(next) => !next && setSaleCorrectionTarget(null)}
+      />
+
+      <PaymentCorrectionModal
+        payment={paymentCorrectionTarget}
+        open={paymentCorrectionTarget !== null}
+        onOpenChange={(next) => !next && setPaymentCorrectionTarget(null)}
+      />
+
+      <ProductRefundModal
+        saleId={refundSaleId}
+        open={refundSaleId !== null}
+        onOpenChange={(next) => !next && setRefundSaleId(null)}
+      />
+
+      {refundPayment && (
+        <RefundModal
+          payment={refundPayment}
+          open
+          onOpenChange={(next) => !next && setRefundPayment(null)}
         />
       )}
 

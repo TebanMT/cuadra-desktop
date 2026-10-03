@@ -40,11 +40,11 @@ export const members = {
       previous: "Anterior",
       next: "Siguiente",
       noResults: "Sin resultados",
-      empty: "Aún no tienes socios. Da de alta el primero.",
+      empty: "Aún no hay socios.",
     },
     rowActions: {
       pay: "Cobrar",
-      checkin: "Check-in",
+      checkin: "Registrar entrada",
       more: "Más",
       noPlan: "Sin plan",
     },
@@ -63,7 +63,7 @@ export const members = {
       none: "Este socio no tiene membresía activa.",
       pendingTitle: "Falta primer pago",
       pendingBody:
-        "Este socio aún no ha pagado su inscripción. Cobra cualquier monto (parcial está bien) para activar la membresía.",
+        "La membresía se activa con el primer pago, aunque sea parcial.",
       pendingChargeCta: "Cobrar ahora",
       vigente: "Vigente",
       expiring: (days: number) => `Vence en ${days} ${days === 1 ? "día" : "días"}`,
@@ -101,7 +101,7 @@ export const members = {
       notesEmpty: "Sin notas.",
     },
     actions: {
-      checkin: "Check-in",
+      checkin: "Registrar entrada",
       edit: "Editar",
       markInactive: "Marcar inactivo",
       markActive: "Reactivar",
@@ -111,7 +111,7 @@ export const members = {
     shortcuts: {
       title: "Atajos",
       pay: "P → cobrar",
-      checkin: "C → check-in",
+      checkin: "C → registrar entrada",
       edit: "E → editar",
       close: "Esc → cerrar",
     },
@@ -121,9 +121,8 @@ export const members = {
     titleEdit: "Editar socio",
     matches: {
       header: (n: number) =>
-        n === 1 ? "Tal vez ya está registrado:" : "Tal vez ya están registrados:",
-      hint: "Si es uno de estos, ábrelo en vez de crearlo otra vez.",
-      open: "Abrir perfil",
+        n === 1 ? "Posible coincidencia" : "Posibles coincidencias",
+      open: "Ver socio",
       dismiss: "Ocultar sugerencias",
       createNew: (name: string) => `Crear nuevo socio: "${name}"`,
       status: {
@@ -137,8 +136,6 @@ export const members = {
     },
     sections: {
       basics: "Datos básicos",
-      basicsHint:
-        "Sólo necesitamos nombre y teléfono — lo demás es opcional.",
       membership: "Membresía",
     },
     fields: {
@@ -198,16 +195,16 @@ export const members = {
     // Aviso bajo el check "Sin teléfono": deja claro qué se pierde (los
     // avisos de WhatsApp) para que sea decisión informada, no default cómodo.
     noPhoneHint:
-      "Este socio no recibirá avisos por WhatsApp (bienvenida, recordatorios de pago).",
+      "Sin teléfono no recibirá avisos por WhatsApp.",
     success: {
       created: (name: string, expiry: string) => `${name} agregado. Vence ${expiry}.`,
       updated: "Cambios guardados.",
     },
     errors: {
-      nameRequired: "Falta el nombre.",
+      nameRequired: "Escribe el nombre.",
       nameLength: "El nombre debe tener entre 3 y 100 caracteres.",
-      phoneRequired: "Necesito 10 dígitos (sin espacios ni guiones).",
-      phoneInvalid: "Necesito 10 dígitos (sin espacios ni guiones).",
+      phoneRequired: "Escribe un teléfono de 10 dígitos.",
+      phoneInvalid: "Escribe un teléfono de 10 dígitos.",
       emailInvalid: "Email no válido.",
       typeRequired: "Selecciona el tipo de membresía.",
       startDateInvalid: "La fecha de inicio no puede ser tan lejana.",
@@ -220,7 +217,7 @@ export const members = {
   status: {
     title: "Cambiar estado",
     label: "Estado",
-    reasonLabel: "Razón (opcional, queda en historial)",
+    reasonLabel: "Motivo (opcional)",
     reasonPlaceholder: "Ej. Se mudó, se dio de baja, …",
     options: {
       active: "Activo",
@@ -236,11 +233,11 @@ export const members = {
     modes: {
       extend: "Extender vigencia",
       set: "Establecer fecha",
-      reset: "Quitar ajustes manuales (volver al cálculo automático)",
+      reset: "Volver al vencimiento calculado",
     },
     daysSuffix: "días → nuevo vencimiento:",
-    reasonLabel: "Razón (queda en historial)",
-    reasonPlaceholder: "Ej. Cortesía COVID; freeze viaje 30d; compensación cobro doble del 14 abr",
+    reasonLabel: "Motivo",
+    reasonPlaceholder: "Ej. Pausa por viaje o compensación por cierre del gym",
     reasonRequired: "Escribe una razón (mínimo 5 caracteres).",
     daysRequired: "Indica cuántos días.",
     dateRequired: "Selecciona una fecha.",
@@ -256,7 +253,7 @@ export const members = {
     title: "Número de socio",
     titleChange: "Cambiar número de socio",
     description:
-      "Tinta le asignó un número de socio al inscribirlo. Puedes generar uno nuevo si se compartió por error — se reenvía automáticamente por WhatsApp.",
+      "El número anterior dejará de funcionar. Si el socio tiene WhatsApp, recibirá el nuevo número.",
     generating: "Generando número…",
     label: (name: string) => `Número de ${name}`,
     copy: "Copiar",
@@ -275,7 +272,7 @@ export const members = {
     // Copy del strip post-creación / modal de cambio. Cuando WhatsApp
     // está conectado y el socio tiene teléfono, mostramos a quién se
     // mandó; en cualquier otro caso, instrucción de copiarlo a mano.
-    sentToWhatsApp: (phone: string) => `Enviado por WhatsApp a ${phone}.`,
+    sentToWhatsApp: (phone: string) => `Se enviará por WhatsApp a ${phone}.`,
     notSent: "Escríbelo en la credencial.",
     notSentNoWhatsApp: "Conecta WhatsApp en Configuración para enviarlo automáticamente.",
     notSentNoPhone: "El socio no tiene teléfono — escríbelo en la credencial.",
@@ -380,7 +377,7 @@ export const members = {
       changesNotApplied:
         "Los cambios de precio o duración no afectan a socios actuales — solo a renovaciones futuras.",
       errors: {
-        nameRequired: "Falta el nombre.",
+        nameRequired: "Escribe el nombre.",
         nameLength: "El nombre debe tener entre 3 y 100 caracteres.",
         priceRequired: "El precio debe ser mayor a cero.",
         durationRequired: "Elige una duración.",
@@ -389,7 +386,7 @@ export const members = {
         generic: "No pudimos guardar. Vuelve a intentar.",
         // Deep-link ?edit=<id> desde el indicador de sync apuntó a un plan
         // que ya no está en la lista (lo borraron o cambió de equipo).
-        deepLinkNotFound: "No encontré ese plan — búscalo en la lista.",
+        deepLinkNotFound: "No encontramos esa membresía. Búscala en la lista.",
       },
       success: {
         created: "Membresía creada.",
@@ -447,8 +444,8 @@ export const members = {
           ? "1 teléfono ya está en tu base"
           : `${n} teléfonos ya están en tu base`,
       duplicatesHint:
-        "Por defecto los saltamos para no duplicar a tus socios. Si quieres importarlos igual, prende el toggle.",
-      allowDuplicates: "Importarlos igual (permitir teléfonos repetidos)",
+        "Los teléfonos repetidos se omiten, salvo que actives “Permitir teléfonos repetidos”.",
+      allowDuplicates: "Permitir teléfonos repetidos",
       back: "Atrás",
       cta: (n: number) =>
         n === 1 ? "Importar 1 socio" : `Importar ${n} socios`,

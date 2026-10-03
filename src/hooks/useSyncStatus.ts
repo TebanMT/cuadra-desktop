@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { queryClient } from "@/lib/queryClient";
 
@@ -12,6 +12,8 @@ import { queryClient } from "@/lib/queryClient";
 export type SyncLevel = "ok" | "syncing" | "offline" | "offlineLong" | "auth" | "stale" | "syncError";
 
 export interface SyncStatus {
+  // Local agent activity, including an accepted request waiting for its turn.
+  sync_in_progress?: boolean;
   state:
     | "online"
     | "offline_short"
@@ -91,7 +93,7 @@ export function useSyncStatus(enabled = true) {
   return useQuery<SyncStatus>({
     queryKey: ["sync", "status"],
     queryFn: () => api.get<SyncStatus>("/api/v1/sync/status"),
-    refetchInterval: 10_000,
+    refetchInterval: (query) => query.state.data?.sync_in_progress ? 1_000 : 10_000,
     refetchIntervalInBackground: true,
     enabled,
   });
@@ -129,28 +131,39 @@ export function useSyncPullRefresh() {
   }, [status.data, pulled]);
 }
 
-// useTriggerSync nudges the sidecar agent to run an immediate sync cycle
-// (push + pull) and refreshes the indicator afterwards. The endpoint is
-// fire-and-forget on the backend (returns 202 immediately); the actual
-// sync work happens on the agent's next tick which lands in the next
-// status refresh.
+// HTTP 202 only acknowledges the request. Keep the manual action pending
+// until the local agent finishes (including failures and backoff skips).
 export function useTriggerSync() {
-  return useMutation({
-    mutationFn: () => api.post<{ triggered: boolean }>("/api/v1/sync/trigger", {}),
+  const client = useQueryClient();
+  const pending = useIsMutating({ mutationKey: ["sync", "trigger"] });
+  const mutation = useMutation({
+    mutationKey: ["sync", "trigger"],
+    mutationFn: async () => {
+      const response = await api.post<{ triggered: boolean }>("/api/v1/sync/trigger", {});
+      for (;;) {
+        const status = await api.get<SyncStatus>("/api/v1/sync/status");
+        client.setQueryData(["sync", "status"], status);
+        // Older sidecars omit the field: refresh once without waiting forever.
+        if (!status.sync_in_progress) break;
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+      return response;
+    },
     onSettled: () => {
-      void queryClient.invalidateQueries({ queryKey: ["sync", "status"] });
+      void client.invalidateQueries({ queryKey: ["sync", "status"] });
     },
   });
+  return { ...mutation, isPending: mutation.isPending || pending > 0 };
 }
 
 export function levelOf(status?: SyncStatus | null): SyncLevel {
   if (!status) return "ok";
   switch (status.state) {
     case "online":
-    case "offline_short":
       return "ok";
     case "initial_syncing":
       return "syncing";
+    case "offline_short":
     case "offline_medium":
     case "offline_long":
       return "offline";

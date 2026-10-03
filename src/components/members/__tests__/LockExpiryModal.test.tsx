@@ -53,7 +53,7 @@ describe("LockExpiryModal", () => {
       />
     );
 
-    const reason = screen.getByLabelText(/razón/i);
+    const reason = screen.getByLabelText(/motivo/i);
     await user.type(reason, "Cortesía COVID");
     await user.click(screen.getByRole("button", { name: /guardar ajuste/i }));
 

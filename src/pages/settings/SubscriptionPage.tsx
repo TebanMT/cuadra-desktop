@@ -298,9 +298,7 @@ export default function SubscriptionPage() {
 
       <SectionCard title="Facturación">
         <p className="text-sm text-muted-foreground">
-          Procesamos los cobros con Stripe / Mercado Pago. Para cambiar tu plan,
-          actualizar tarjeta o descargar recibos abre tu dashboard. Si tienes
-          dudas sobre un cargo escríbenos por WhatsApp.
+          Abre Tinta en la web para cambiar tu plan, actualizar la tarjeta o descargar recibos.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={openDashboardBilling}>

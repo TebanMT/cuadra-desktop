@@ -32,7 +32,7 @@ describe("MemberStatusModal", () => {
       />
     );
 
-    const reason = screen.getByLabelText(/razón/i);
+    const reason = screen.getByLabelText(/motivo/i);
     await user.type(reason, "Se mudó");
 
     await user.click(screen.getByRole("button", { name: /guardar cambio/i }));

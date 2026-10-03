@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, Link } from "react-router-dom";
 import {
-  Bell,
   ChevronRight,
   DollarSign,
   Eye,
@@ -31,9 +30,7 @@ import { useLogout } from "@/hooks/useAuth";
 import { useReaderMissing } from "@/hooks/useBiometric";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useTheme } from "@/hooks/useTheme";
-import { useAttentionRequired } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
-import { countAttentionItems } from "@/lib/attention";
 import { openKioskWindow } from "@/lib/kioskWindow";
 import { openCheckinFloatWindow } from "@/lib/floatWindow";
 import { useWindowPresence } from "@/hooks/useWindowPresence";
@@ -48,15 +45,16 @@ import { SyncIndicator } from "./SyncIndicator";
 import { GlobalSearch } from "./GlobalSearch";
 
 const ROUTE_LABELS: Record<string, string> = {
-  "": "Dashboard",
-  "attention-required": "Atención",
+  "": "Inicio",
   members: "Socios",
-  billing: "Cobros",
+  billing: shell.nav.billing,
   sales: "Venta rápida",
   products: "Productos",
-  checkin: "Check-in",
+  expenses: "Gastos",
+  checkin: "Entradas",
   reports: "Reportes",
-  "cash-close": "Caja del día",
+  "cash-close": "Caja",
+  movements: "Entradas y salidas",
   settings: "Configuración",
   profile: "Mi perfil",
   gym: "Perfil del gym",
@@ -73,8 +71,11 @@ const ROUTE_LABELS: Record<string, string> = {
 };
 
 function buildBreadcrumbs(pathname: string): { label: string; href?: string }[] {
+  if (pathname === "/products/purchases/new") return [{ label: "Productos", href: "/products" }, { label: "Compras", href: "/products?view=purchases" }, { label: "Registrar compra" }];
+  if (pathname === "/reports/cash-close/movements") return [{ label: "Caja", href: "/reports/cash-close" }, { label: "Entradas y salidas" }];
+  if (pathname === "/reports/cash-close") return [{label:"Caja"}];
   const parts = pathname.split("/").filter(Boolean);
-  if (parts.length === 0) return [{ label: "Dashboard" }];
+  if (parts.length === 0) return [{ label: "Inicio" }];
   const crumbs: { label: string; href?: string }[] = [];
   let acc = "";
   for (let i = 0; i < parts.length; i++) {
@@ -92,13 +93,12 @@ export function TopBar() {
   const readOnly = useAuthStore((s) => s.readOnly);
   const logout = useLogout();
   const { resolved, toggle } = useTheme();
-  const attention = useAttentionRequired();
   const money = useMoneyVisibility();
   // Aviso gateado por "esta PC ya tuvo lector": un gym que opera por
   // número no ve un badge ámbar eterno. Ver useReaderMissing.
   const readerDisconnected = useReaderMissing();
 
-  // Exclusión mutua kiosko ↔ check-in flotante: son modos para
+  // Exclusión mutua kiosko ↔ ventana de entradas: son modos para
   // configuraciones físicas distintas (pantalla dedicada vs compartida) y
   // ambos corren stream biométrico + registran check-ins. Con uno abierto,
   // el launcher del otro se deshabilita; los open* de lib también lo
@@ -112,11 +112,6 @@ export function TopBar() {
   const palette = getAvatarPalette(user?.full_name);
 
   const breadcrumbs = buildBreadcrumbs(location.pathname);
-
-  // Mismo conteo que usa la página: socios deduplicados por member_id +
-  // productos con stock bajo. Sin dedup la campanita decía "5" cuando la
-  // página mostraba 3 socios (uno con tres issues).
-  const attentionCount = countAttentionItems(attention.data);
 
   // Cmd/Ctrl+K to focus the search
   useEffect(() => {
@@ -263,19 +258,7 @@ export function TopBar() {
         <SyncIndicator />
 
         {/* Attention bell */}
-        <Link
-          to="/attention-required"
-          className="relative inline-flex items-center justify-center h-9 w-9 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-          title="Atención requerida"
-          aria-label="Atención requerida"
-        >
-          <Bell className="h-4 w-4" />
-          {attentionCount > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 inline-flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold tabular leading-none">
-              {attentionCount > 99 ? "99+" : attentionCount}
-            </span>
-          )}
-        </Link>
+
 
         {/* Theme toggle */}
         <button

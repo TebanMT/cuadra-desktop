@@ -27,7 +27,7 @@ export interface Product {
   created_at: string;
   updated_at?: string;
   // Costo unitario promedio ponderado (pesos), o ausente cuando el
-  // producto no tiene costo capturado. Lo usa la ficha para "Costo prom ·
+  // producto no tiene costo capturado. Lo usa la ficha para "Costo promedio ·
   // Precio · Margen". Opcional a propósito: el costo es opcional al
   // crear/resurtir.
   avg_unit_cost?: number | null;
@@ -63,10 +63,9 @@ export interface ProductListResponse {
     total_value: number;
     low_count: number;
     out_count: number;
-    // Ganancia potencial sobre el stock (Standard). Montos en pesos, solo
-    // activos con costo capturado. margin_pct es null cuando ninguno tiene
-    // costo (el FE oculta el chip). products_with_cost/products_total es la
-    // cobertura para el hint "X de Y con costo".
+    // Analítica potencial de inventario (Plus). Standard puede capturar costo
+    // y compras, pero el servidor omite/enmascara estas magnitudes y el FE no
+    // las renderiza. products_with_cost/products_total expresa cobertura.
     potential_profit: number;
     cost_value: number;
     margin_pct?: number | null;
@@ -116,6 +115,12 @@ export interface AdjustStockInput {
   cost?: number;
   // Sólo restock: false = inventario preexistente, no es egreso.
   is_purchase?: boolean;
+  purchase_status?: "paid" | "unpaid";
+  paid_on?: string;
+  payment_method?: "cash" | "transfer" | "card";
+  paid_from?: "cash_drawer" | "gym_fund" | "external";
+  cash_drawer_id?: string;
+  idempotency_key: string;
   notes?: string;
 }
 
@@ -141,8 +146,9 @@ function buildQuery(filters: ListProductsInput): Record<string, string | number 
   };
 }
 
-export function useProductsList(filters: ListProductsInput) {
+export function useProductsList(filters: ListProductsInput, enabled = true) {
   return useQuery<ProductListResponse>({
+    enabled,
     queryKey: KEYS.list(filters),
     queryFn: () => api.get<ProductListResponse>("/api/v1/products", { query: buildQuery(filters) }),
     placeholderData: keepPreviousData,
@@ -253,6 +259,12 @@ interface AdjustStockWire {
   quantity: number;
   cost?: number;
   is_purchase?: boolean;
+  purchase_status?: "paid" | "unpaid";
+  paid_on?: string;
+  payment_method?: "cash" | "transfer" | "card";
+  paid_from?: "cash_drawer" | "gym_fund" | "external";
+  cash_drawer_id?: string;
+  idempotency_key: string;
   reason?: string;
 }
 
@@ -261,6 +273,7 @@ function toAdjustStockWire(input: AdjustStockInput): AdjustStockWire {
     return {
       movement_type: "count_correction",
       quantity: input.new_stock ?? 0,
+      idempotency_key: input.idempotency_key,
       reason: input.notes,
     };
   }
@@ -269,6 +282,12 @@ function toAdjustStockWire(input: AdjustStockInput): AdjustStockWire {
     quantity: input.quantity ?? 0,
     cost: input.cost,
     is_purchase: input.is_purchase,
+    purchase_status: input.purchase_status,
+    paid_on: input.paid_on,
+    payment_method: input.payment_method,
+    paid_from: input.paid_from,
+    cash_drawer_id: input.cash_drawer_id,
+    idempotency_key: input.idempotency_key,
     reason: input.notes,
   };
 }
@@ -277,12 +296,19 @@ export function useAdjustStock(productId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: AdjustStockInput) =>
-      api.post<Product>(`/api/v1/products/${productId}/adjust-stock`, toAdjustStockWire(input)),
+      api.post<{
+        new_stock: number;
+        delta: number;
+        movement_id: string;
+        purchase_id?: string;
+        cash_movement_id?: string;
+      }>(`/api/v1/products/${productId}/adjust-stock`, toAdjustStockWire(input)),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["products"] });
-      // Un restock con costo mueve "egresos por mercancía" y el stock
-      // crítico del dashboard/Reportes.
-      qc.invalidateQueries({ queryKey: ["reports"] });
+      // Una compra pagada puede cambiar inventario, Resultado y caja en un
+      // solo Command; una recepción pendiente sólo cambia inventario.
+      for (const key of ["products", "inventory-purchases", "cash-close", "reports", "dashboard", "analytics"]) {
+        qc.invalidateQueries({ queryKey: [key] });
+      }
     },
   });
 }

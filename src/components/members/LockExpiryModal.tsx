@@ -1,3 +1,5 @@
+import { validateDateFields } from "@/lib/date-input";
+import { DateInput } from "@/components/ui/date-input";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { addDays } from "date-fns";
@@ -107,7 +109,7 @@ export function LockExpiryModal({ membershipId, memberName, currentExpiry, open,
           <p className="text-sm text-muted-foreground">{t.lockExpiry.currentExpiry(fmtDate(currentExpiry))}</p>
         </DialogHeader>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmitCapture={validateDateFields} onSubmit={submit} className="space-y-4">
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -144,12 +146,12 @@ export function LockExpiryModal({ membershipId, memberName, currentExpiry, open,
                 </label>
                 {mode === "set" && (
                   <div className="pl-7">
-                    <Input
-                      type="date"
+                    <DateInput
+                      context="date"
                       value={date}
                       min={minDate}
-                      onChange={(e) => setDate(e.target.value)}
-                      className="w-48 h-9"
+                      onValueChange={(e) => setDate(e)}
+                      className="w-48 h-auto"
                     />
                   </div>
                 )}

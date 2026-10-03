@@ -26,13 +26,13 @@ const TONE: Record<SubscriptionBannerLevel, { bg: string; text: string; icon: ty
     icon: Hourglass,
   },
   trial_soon: {
-    bg: "bg-warning/10 border-warning/40",
+    bg: "bg-warning-soft border-warning/40",
     text: "text-warning-foreground",
     icon: Hourglass,
   },
   // Prueba vencida confirmada: recordatorio suave permanente, no bloqueo.
   trial_over: {
-    bg: "bg-warning/10 border-warning/40",
+    bg: "bg-warning-soft border-warning/40",
     text: "text-warning-foreground",
     icon: CreditCard,
   },
@@ -97,6 +97,7 @@ export function SubscriptionBanner() {
   const gym = useAuthStore((s) => s.gym);
   const { data: sync } = useSyncStatus();
   const trigger = useTriggerSync();
+  const syncing = trigger.isPending || sync?.sync_in_progress === true;
 
   const level = useMemo<SubscriptionBannerLevel>(
     () =>
@@ -138,11 +139,12 @@ export function SubscriptionBanner() {
         // otra laptop, el sync trae el plan nuevo y el banner desaparece.
         <button
           onClick={() => trigger.mutate()}
-          disabled={trigger.isPending}
+          disabled={syncing}
+          aria-busy={syncing}
           className="flex items-center gap-1 text-sm font-semibold underline underline-offset-2 hover:no-underline whitespace-nowrap disabled:opacity-50"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5", trigger.isPending && "animate-spin")} />
-          Sincronizar
+          <RefreshCw className={cn("h-3.5 w-3.5 motion-reduce:animate-none", syncing && "animate-spin")} />
+          {syncing ? "Sincronizando…" : "Sincronizar"}
         </button>
       ) : (
         <Link

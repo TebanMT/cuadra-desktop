@@ -29,7 +29,7 @@ export async function openKioskWindow(): Promise<OpenKioskWindowResult> {
   }
   const { WebviewWindow } = await getModule();
 
-  // Exclusión con el check-in flotante: ambos modos corren stream biométrico
+  // Exclusión con el ventana de entradas: ambos modos corren stream biométrico
   // alwaysOn y postean check-ins — a la vez duplicarían registro y feedback.
   // Ver floatWindow.ts para el guard en la otra dirección.
   const float = await WebviewWindow.getByLabel(CHECKIN_FLOAT_WINDOW_LABEL);

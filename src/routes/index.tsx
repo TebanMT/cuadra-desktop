@@ -1,3 +1,5 @@
+import CashMovementsReviewPage from "@/components/cash/CashMovementsReviewPage";
+import RegisterPurchasePage from "@/pages/products/RegisterPurchasePage";
 import { createBrowserRouter, Navigate } from "react-router-dom";
 import { OwnerOnlyRoute, ProtectedRoute, PublicOnlyRoute } from "@/components/shared/RouteGuards";
 import { UpdaterShell } from "@/components/shared/UpdaterShell";
@@ -39,8 +41,6 @@ import CobrosPage from "@/pages/billing/CobrosPage";
 import KioskPage from "@/pages/kiosk/KioskPage";
 import BroadcastPage from "@/pages/messaging/BroadcastPage";
 import AuditLogPage from "@/pages/admin/AuditLogPage";
-import ChallengesListPage from "@/pages/challenges/ChallengesListPage";
-import ChallengeDetailPage from "@/pages/challenges/ChallengeDetailPage";
 
 export const router = createBrowserRouter([
   {
@@ -104,10 +104,12 @@ export const router = createBrowserRouter([
           { path: "profile", element: <ProfilePage /> },
           { path: "billing", element: <CobrosPage /> },
           { path: "products", element: <ProductsPage /> },
-          { path: "expenses", element: <ExpensesPage /> },
+          { path: "products/purchases/new", element: <RegisterPurchasePage /> },
           { path: "sales", element: <QuickSalePage /> },
           { path: "checkin", element: <CheckinPage /> },
-          { path: "reports", element: <ReportsPage /> },
+          // Corte de caja se queda accesible para el OPERADOR — es su tarea
+          // de cierre (plan Reports-improve transversal §3). /reports (rango
+          // + exports + género) es del dueño y vive abajo en OwnerOnlyRoute.
           { path: "reports/cash-close", element: <CashClosePage /> },
           { path: "settings", element: <SettingsIndex /> },
           { path: "settings/about", element: <AboutTintaPage /> },
@@ -120,6 +122,14 @@ export const router = createBrowserRouter([
           {
             element: <OwnerOnlyRoute />,
             children: [
+              // Reportes es superficie del dueño (plan Reports-improve
+              // transversal §2). El BE lo refuerza con RequireOwner en
+              // /api/v1/reports — esto es la capa FE.
+              { path: "reports", element: <ReportsPage /> },
+              { path: "reports/cash-close/summary", element: <ReportsPage mode="cash" /> },
+              { path: "reports/analysis", element: <ReportsPage mode="analysis" /> },
+              { path: "expenses", element: <ExpensesPage /> },
+              { path: "reports/cash-close/movements", element: <CashMovementsReviewPage /> },
               { path: "settings/subscription", element: <SubscriptionPage /> },
               { path: "settings/operators", element: <OperatorsPage /> },
               { path: "settings/mensajes", element: <MensajesPage /> },
@@ -134,8 +144,6 @@ export const router = createBrowserRouter([
               { path: "messaging/broadcast", element: <BroadcastPage /> },
             ],
           },
-          { path: "retos", element: <ChallengesListPage /> },
-          { path: "retos/:id", element: <ChallengeDetailPage /> },
         ],
       },
         ],
