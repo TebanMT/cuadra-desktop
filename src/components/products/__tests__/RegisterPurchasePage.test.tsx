@@ -5,7 +5,7 @@ const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), role: "owner", use
 vi.mock("@/lib/api", () => ({ api: { get: mock.get, post: mock.post } }));
 vi.mock("@/stores/useAuthStore", () => ({ useAuthStore: (select: (s: unknown) => unknown) => select({ user: { role: mock.role, user_id: mock.user }, gym: { gym_id: mock.gym } }) }));
 vi.mock("@/hooks/useDebounce", () => ({ useDebounce: (s: string) => s }));
-vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: () => null }));
+vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: ({ value, onChange }: { value?: string; onChange: (value: string) => void }) => <select aria-label="Caja física" value={value || ""} onChange={e => onChange(e.target.value)}><option value="">Principal</option><option value="drawer-two">Segunda caja</option></select> }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 import RegisterPurchasePage from "@/pages/products/RegisterPurchasePage";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -24,7 +24,7 @@ describe("Registro de compra", () => {
     expect(screen.getByText("$262.50")).toBeInTheDocument();
     expect(screen.getByLabelText("Ya recibí los productos")).toHaveProperty("checked", desktop);
     expect(screen.queryByLabelText("Pagado desde")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("radio", { name: "Pagado por otro medio" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Pagado" }));
     fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "gym_fund" } });
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
     await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(1));
@@ -32,7 +32,7 @@ describe("Registro de compra", () => {
   });
   it("captura la fecha en español, bloquea una fecha imposible y conserva ISO en la compra", async () => {
     show(); await add("Agua", "2", "10");
-    fireEvent.click(screen.getByRole("radio", { name: "Pagado por otro medio" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Pagado" }));
     fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "gym_fund" } });
     const date = screen.getByLabelText("Fecha de pago");
     fireEvent.change(date, { target: { value: "31/02/2026" } });
@@ -66,9 +66,9 @@ describe("Registro de compra", () => {
   });
   it("deja la compra pendiente por defecto y limita las opciones del operador", async () => {
     mock.role = "operator"; show(); await add("Agua", "20", "10");
-    expect(screen.queryByRole("radio", { name: "Pagado por otro medio" })).not.toBeInTheDocument();
+    expect(!!screen.queryByRole("radio", { name: "Pagado" })).toBe(desktop);
     expect(screen.getByRole("radio", { name: "Pendiente de pago" })).toBeChecked();
-    expect(!!screen.queryByRole("radio", { name: "Pagado con dinero de caja" })).toBe(desktop);
+    expect(screen.queryByRole("radio", { name: "Pagado con dinero de caja" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
     await waitFor(() => expect(mock.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ paid: false })));
   });
@@ -172,15 +172,15 @@ describe("Registro de compra", () => {
   it("muestra las opciones disponibles sin desplegar campos antes de elegir", () => {
     show();
     expect(screen.getByRole("radio", { name: "Pendiente de pago" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "Pagado por otro medio" })).toBeVisible();
-    expect(!!screen.queryByRole("radio", { name: "Pagado con dinero de caja" })).toBe(desktop);
+    expect(screen.getByRole("radio", { name: "Pagado" })).toBeVisible();
+    expect(screen.queryByRole("radio", { name: "Pagado con dinero de caja" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Fecha de pago")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Método de pago")).not.toBeInTheDocument();
   });
 
   it("al volver a pendiente no envía datos del pago anterior", async () => {
     show(); await add("Agua", "2", "10");
-    fireEvent.click(screen.getByRole("radio", { name: "Pagado por otro medio" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Pagado" }));
     fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "external" } });
     fireEvent.click(screen.getByRole("radio", { name: "Pendiente de pago" }));
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
@@ -197,55 +197,73 @@ describe("Registro de compra", () => {
     const oldDraft = JSON.parse(localStorage.getItem(key)!);
     localStorage.setItem(key, JSON.stringify({ ...oldDraft, paid: true, method: "card", source: "external" }));
     show();
-    expect(screen.getByRole("radio", { name: "Pagado por otro medio" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Pagado" })).toBeChecked();
     expect(screen.getByLabelText("Método de pago")).toHaveValue("card");
     expect(screen.getByLabelText("Pagado desde")).toHaveValue("external");
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
     await waitFor(() => expect(mock.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ paid: true, payment_method: "card", paid_from: "external" })));
   });
 
-  it.each(["owner", "operator"])("%s paga desde caja en una sola solicitud, incluso al reintentar después de recargar", async role => {
+  it.each(desktop ? ["owner", "operator"] : ["owner"])("%s paga desde caja en una sola solicitud, incluso al reintentar después de recargar", async role => {
     mock.role = role;
     mock.post.mockRejectedValueOnce(new Error("lost response"));
     const first = show(); await add("Agua", "20", "10");
-    fireEvent.click(screen.getByRole("radio", { name: "Pagado con dinero de caja" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Pagado" }));
+    if (mock.role === "owner") fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "cash_drawer" } });
     expect(screen.queryByLabelText("Método de pago")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Pagado desde")).not.toBeInTheDocument();
+    expect(!!screen.queryByLabelText("Pagado desde")).toBe(role === "owner");
+    fireEvent.change(screen.getByLabelText("Caja física"), { target: { value: "drawer-two" } });
     expect(screen.getByText("Se descontarán $200.00 de caja.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
     await screen.findByRole("button", { name: "Reintentar registro" });
     const request = mock.post.mock.calls[0][1];
-    expect(request).toMatchObject({ paid: true, received: true, payment_method: "cash", paid_from: "cash_drawer", items: [{ product_id: "water", quantity: 20, unit_cost: 10 }] });
+    expect(request).toMatchObject({ paid: true, received: desktop, payment_method: "cash", paid_from: "cash_drawer", cash_drawer_id: "drawer-two", items: [{ product_id: "water", quantity: 20, unit_cost: 10 }] });
     first.unmount(); show();
-    expect(screen.getByRole("radio", { name: "Pagado con dinero de caja" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Pagado" })).toBeChecked();
+    expect(screen.getByLabelText("Caja física")).toHaveValue("drawer-two");
+    expect(screen.getByLabelText("Caja física")).toBeDisabled();
     expect(screen.getByRole("radio", { name: "Pendiente de pago" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Reintentar registro" }));
     await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(2));
     expect(mock.post.mock.calls[1]).toEqual(mock.post.mock.calls[0]);
   });
 
-  it("cambiar de caja a otro medio exige indicar de dónde salió el dinero", async () => {
+  it("exige el origen del dinero y limpia la caja al cambiar a fondos externos", async () => {
     show(); await add("Agua", "2", "10");
-    fireEvent.click(screen.getByRole("radio", { name: "Pagado con dinero de caja" }));
-    fireEvent.click(screen.getByRole("radio", { name: "Pagado por otro medio" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Pagado" }));
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
     expect(mock.post).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Pagado desde")).toHaveAttribute("aria-invalid", "true");
+    fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "cash_drawer" } });
+    fireEvent.change(screen.getByLabelText("Caja física"), { target: { value: "drawer-two" } });
     fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "gym_fund" } });
+    expect(screen.queryByLabelText("Caja física")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
     await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(1));
     expect(mock.post.mock.calls[0][1]).toMatchObject({ paid: true, paid_from: "gym_fund", payment_method: "transfer" });
     expect(mock.post.mock.calls[0][1]).not.toHaveProperty("cash_drawer_id");
   });
 
+  it("cambiar de transferencia a dinero de caja fija efectivo", async () => {
+    show(); await add("Agua", "2", "10");
+    fireEvent.click(screen.getByRole("radio", { name: "Pagado" }));
+    fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "external" } });
+    fireEvent.change(screen.getByLabelText("Método de pago"), { target: { value: "card" } });
+    fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "cash_drawer" } });
+    expect(screen.queryByLabelText("Método de pago")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
+    await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(1));
+    expect(mock.post.mock.calls[0][1]).toMatchObject({ paid: true, paid_from: "cash_drawer", payment_method: "cash" });
+  });
+
   it("un cambio de rol no convierte silenciosamente un pago del dueño en una compra pendiente", async () => {
     const first = show(); await add("Agua", "2", "10");
-    fireEvent.click(screen.getByRole("radio", { name: "Pagado por otro medio" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Pagado" }));
     fireEvent.change(screen.getByLabelText("Pagado desde"), { target: { value: "external" } });
     first.unmount(); mock.role = "operator"; show();
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
     expect(mock.post).not.toHaveBeenCalled();
-    expect(screen.getByText("En recepción puedes pagar con dinero de caja o dejar el pago pendiente.")).toBeInTheDocument();
+    expect(screen.getByText(desktop ? "En recepción puedes pagar con dinero de caja o dejar el pago pendiente." : "Solo el dueño puede registrar pagos desde la web.")).toBeInTheDocument();
   });
 
 });

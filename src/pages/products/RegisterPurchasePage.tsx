@@ -21,7 +21,7 @@ const money = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency",
 const validMoney = (value: string) => /^\d+(\.\d{1,2})?$/.test(value) && Number(value) > 0 && Number(value) <= 99999999.99;
 const subtotal = (line: PurchaseLine) => Math.round(Number(line.cost) * 100) * Number(line.quantity) / 100;
 
-type PurchasePayment = "pending" | "cash_drawer" | "other";
+type PurchasePayment = "pending" | "paid";
 
 type Entry = { returnTo?: string; initialProduct?: PurchaseProduct };
 export default function RegisterPurchasePage() {
@@ -33,7 +33,7 @@ export default function RegisterPurchasePage() {
 function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey: string }) {
   const role = useAuthStore(s => s.user?.role);
   const owner = role === "owner";
-  const canPayFromCash = isDesktop && (owner || role === "operator");
+  const canPayFromCash = owner || (isDesktop && role === "operator");
   const navigate = useNavigate();
   const location = useLocation();
   const entry = (location.state || {}) as Entry;
@@ -60,15 +60,23 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
   const searching = query !== draft.search || products.isLoading;
   const available = products.data?.items.filter(p => !draft.lines.some(l => l.id === p.id)) || [];
   const total = draft.lines.reduce((sum, line) => sum + Math.round(subtotal(line) * 100), 0) / 100;
-  const payment: PurchasePayment = !draft.paid ? "pending" : draft.source === "cash_drawer" ? "cash_drawer" : "other";
+  const payment: PurchasePayment = draft.paid ? "paid" : "pending";
   function choosePayment(value: PurchasePayment) {
-    if (locked || (value === "cash_drawer" && !canPayFromCash) || (value === "other" && !owner)) return;
-    update(d => ({ ...d, paid: value !== "pending",
-      method: value === "cash_drawer" ? "cash" : d.source === "cash_drawer" ? "transfer" : d.method,
-      source: value === "cash_drawer" ? "cash_drawer" : value === "other" && d.source !== "cash_drawer" ? d.source : "",
-      drawer: value === "cash_drawer" ? d.drawer : undefined,
+    if (locked || (value === "paid" && !canPayFromCash)) return;
+    update(d => ({ ...d, paid: value === "paid",
+      method: value === "paid" && !owner ? "cash" : d.source === "cash_drawer" ? "transfer" : d.method,
+      source: value === "paid" && !owner ? "cash_drawer" : "",
+      drawer: undefined,
     }));
     setFieldErrors(current => { const next = { ...current }; delete next.payment; delete next.source; delete next.day; return next; });
+  }
+  function chooseSource(source: string) {
+    if (locked || !owner) return;
+    update(d => ({ ...d, source,
+      method: source === "cash_drawer" ? "cash" : d.source === "cash_drawer" ? "transfer" : d.method,
+      drawer: source === "cash_drawer" ? d.drawer : undefined,
+    }));
+    setFieldErrors(current => { const next = { ...current }; delete next.payment; delete next.source; return next; });
   }
   function focusQuantity(id: string) { requestAnimationFrame(() => document.getElementById(`quantity-${id}`)?.focus()); }
   function addProduct(product: PurchaseProduct) {
@@ -120,9 +128,9 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
       }
     }
     if (draft.paid) {
-      if (payment === "cash_drawer" && !canPayFromCash) problems.payment = "Este pago debe registrarse desde recepción.";
-      else if (payment === "other" && !owner) problems.payment = "En recepción puedes pagar con dinero de caja o dejar el pago pendiente.";
-      if (payment === "cash_drawer" && draft.method !== "cash") problems.payment = "Vuelve a seleccionar el pago con dinero de caja.";
+      if (!canPayFromCash) problems.payment = "Solo el dueño puede registrar pagos desde la web.";
+      else if (draft.source !== "cash_drawer" && !owner) problems.payment = "En recepción puedes pagar con dinero de caja o dejar el pago pendiente.";
+      if (draft.source === "cash_drawer" && draft.method !== "cash") problems.payment = "Vuelve a seleccionar el pago con dinero de caja.";
       if (!draft.source) problems.source = "Selecciona de dónde salió el dinero.";
       if (!draft.day || draft.day > todayIso()) problems.day = "Revisa la fecha del pago.";
     }
@@ -213,11 +221,10 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
           <label className="flex items-center gap-3 text-sm"><input type="checkbox" className="h-4 w-4" checked={draft.received} onChange={e => update(d => ({ ...d, received: e.target.checked }))} />Ya recibí los productos</label>
           <fieldset className="space-y-3" aria-describedby={fieldErrors.payment ? "error-payment" : undefined}>
             <legend className="mb-3 text-sm font-medium">Pago</legend>
-            <div className={`grid gap-2 ${canPayFromCash && owner ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+            <div className="grid gap-2 sm:grid-cols-2">
               {([
                 ["pending", "Pendiente de pago"],
-                ...(canPayFromCash ? [["cash_drawer", "Pagado con dinero de caja"]] : []),
-                ...(owner ? [["other", "Pagado por otro medio"]] : []),
+                ...(canPayFromCash ? [["paid", "Pagado"]] : []),
               ] as [PurchasePayment, string][]).map(([value, label]) => <label key={value} className={`flex cursor-pointer items-center gap-3 rounded-lg border p-3 text-sm ${payment === value ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}>
                 <input type="radio" name="purchase-payment" className="h-4 w-4 shrink-0 accent-primary" checked={payment === value} onChange={() => choosePayment(value)} />
                 {label}
@@ -226,12 +233,10 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
             {fieldError("payment")}
           </fieldset>
           {draft.paid && <div className="grid sm:grid-cols-2 gap-4 pt-2">
+            {owner && <label className="text-sm sm:col-span-2">Pagado desde<select aria-label="Pagado desde" className="flex h-10 w-full rounded-md border bg-background px-3" value={draft.source} {...invalid("source")} onChange={e => chooseSource(e.target.value)}><option value="">Selecciona el origen del dinero</option><option value="cash_drawer">Dinero de caja</option><option value="gym_fund">Dinero del gimnasio fuera de caja</option><option value="external">Dinero personal</option></select>{fieldError("source")}</label>}
             <label className="text-sm">Fecha de pago<DateInput aria-label="Fecha de pago" context="recent" max={todayIso()} value={draft.day} {...invalid("day")} onValueChange={e => update(d => ({ ...d, day: e }))} />{fieldError("day")}</label>
-            {payment === "other" && owner && <>
-              <label className="text-sm">Método de pago<select className="flex h-10 w-full rounded-md border bg-background px-3" value={draft.method} onChange={e => update(d => ({ ...d, method: e.target.value }))}><option value="transfer">Transferencia</option><option value="cash">Efectivo</option><option value="card">Tarjeta</option></select></label>
-              <label className="text-sm sm:col-span-2">Pagado desde<select aria-label="Pagado desde" className="flex h-10 w-full rounded-md border bg-background px-3" value={draft.source} {...invalid("source")} onChange={e => update(d => ({ ...d, source: e.target.value }))}><option value="">Selecciona el origen del dinero</option><option value="gym_fund">Dinero del gimnasio fuera de caja</option><option value="external">Dinero personal o de otra persona</option></select>{fieldError("source")}</label>
-            </>}
-            {payment === "cash_drawer" && canPayFromCash && <>
+            {draft.source && draft.source !== "cash_drawer" && owner && <label className="text-sm">Método de pago<select className="flex h-10 w-full rounded-md border bg-background px-3" value={draft.method} onChange={e => update(d => ({ ...d, method: e.target.value }))}><option value="transfer">Transferencia</option><option value="cash">Efectivo</option><option value="card">Tarjeta</option></select></label>}
+            {draft.source === "cash_drawer" && canPayFromCash && <>
               <CashDrawerField value={draft.drawer} onChange={drawer => update(d => ({ ...d, drawer }))} />
               <p className="text-sm text-muted-foreground sm:col-span-2">Se descontarán {money(Number.isFinite(total) ? total : 0)} de caja.</p>
             </>}
