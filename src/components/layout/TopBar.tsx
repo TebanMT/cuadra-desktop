@@ -72,7 +72,7 @@ const ROUTE_LABELS: Record<string, string> = {
 
 function buildBreadcrumbs(pathname: string): { label: string; href?: string }[] {
   if (pathname === "/products/purchases/new") return [{ label: "Productos", href: "/products" }, { label: "Compras", href: "/products?view=purchases" }, { label: "Registrar compra" }];
-  if (pathname === "/reports/cash-close/movements") return [{ label: "Caja", href: "/reports/cash-close" }, { label: "Entradas y salidas" }];
+  if (pathname === "/reports/cash-close/movements") return [{ label: "Caja", href: "/reports/cash-close" }, { label: "Movimientos" }];
   if (pathname === "/reports/cash-close") return [{label:"Caja"}];
   const parts = pathname.split("/").filter(Boolean);
   if (parts.length === 0) return [{ label: "Inicio" }];

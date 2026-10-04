@@ -20,7 +20,7 @@ import { fmtDate, todayIso } from "@/lib/dates";
 import { cashDifference, cashWithdrawal } from "@/lib/cashSessionMath";
 import { moneyInputError } from "@/lib/moneyInput";
 import { CashDrawerManager } from "@/components/cash/CashDrawerManager";
-import { CashHistory, CashMovementList, differenceLabel, periodEntries, sessionFinished } from "@/components/cash/CashReview";
+import { CashHistory, CashMovementList, cashMovementReviewSearch, differenceLabel, periodEntries, sessionFinished } from "@/components/cash/CashReview";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { keyForPayload } from "@/lib/idempotency";
 
@@ -50,7 +50,7 @@ export default function CashClosePage() {
     <Tabs value={tab} onValueChange={setTab}><TabsList><TabsTrigger value="current">Caja actual</TabsTrigger><TabsTrigger value="history">Historial de cortes</TabsTrigger></TabsList>
       {tab === "history" && <div className="flex items-center gap-3 mt-5"><Label htmlFor="cash-history-date">Fecha</Label><DateInput id="cash-history-date" context="recent" value={historyDate} max={todayIso()} onValueChange={e => setHistoryDate(e || todayIso())} className="w-44" /></div>}
       {report.isLoading ? <div role="status" className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" /><span className="sr-only">Cargando caja</span></div> : report.isError ? <Alert variant="destructive"><AlertDescription>No pudimos cargar la caja. <Button variant="link" onClick={() => report.refetch()}>Reintentar</Button></AlertDescription></Alert> : report.data && <>
-        <TabsContent value="current"><ReportView key={`${date}:${report.data.cash_drawer_id}`} report={report.data} date={date} onReview={() => navigate(`/reports/cash-close/movements?from=${date}&to=${date}`)} canClose={report.data.drawers?.find(d => d.id === report.data?.cash_drawer_id)?.active !== false} onHistory={() => { setHistoryDate(date); setTab("history"); }} /></TabsContent>
+        <TabsContent value="current"><ReportView key={`${date}:${report.data.cash_drawer_id}`} report={report.data} date={date} onReview={() => navigate(`/reports/cash-close/movements?${cashMovementReviewSearch(date, report.data?.cash_drawer_id)}`)} canClose={report.data.drawers?.find(d => d.id === report.data?.cash_drawer_id)?.active !== false} onHistory={() => { setHistoryDate(date); setTab("history"); }} /></TabsContent>
         <TabsContent value="history"><CashHistory report={report.data} /></TabsContent>
       </>}
     </Tabs>
@@ -99,7 +99,7 @@ export function ReportView({ report, date, canClose, onHistory, onReview }: { re
       {canClose && <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => setMovementType("cash_in")}><ArrowDownToLine className="h-4 w-4" />Agregar efectivo</Button><Button variant="outline" onClick={() => setMovementType("cash_out")}><ArrowUpFromLine className="h-4 w-4" />Registrar salida</Button>{canWithdraw && <Button variant="ghost" onClick={() => setWithdrawing(true)}>Retirar efectivo</Button>}</div>}
     </section>
     {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
-    <section className="rounded-lg border bg-card p-5"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Movimientos de caja</h2>{isOwner && onReview && <Button variant="link" className="h-auto p-0 text-xs" onClick={onReview}>Revisar entradas y salidas</Button>}</div><CashMovementList entries={entries} timezone={report.timezone} /></section>
+    <section className="rounded-lg border bg-card p-5"><div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-sm font-semibold">Movimientos de caja</h2>{isOwner && onReview && <Button variant="link" className="h-auto p-0 text-xs" onClick={onReview}>Revisar movimientos</Button>}</div><CashMovementList entries={entries} timezone={report.timezone} /></section>
     <details className="rounded-lg border"><summary className="cursor-pointer p-4 text-sm font-medium">Resumen del día</summary><div className="p-4 pt-0 space-y-4">
       <dl className="grid grid-cols-2 gap-2 text-sm"><dt>Cobros en efectivo</dt><dd className="text-right tabular-nums">{money.fmt(report.by_method?.cash ?? 0)}</dd><dt>Tarjeta</dt><dd className="text-right tabular-nums">{money.fmt(report.by_method?.card ?? 0)}</dd><dt>Transferencias</dt><dd className="text-right tabular-nums">{money.fmt(report.by_method?.transfer ?? 0)}</dd><dt>Devoluciones en efectivo</dt><dd className="text-right tabular-nums">{money.fmt(report.refund_by_method?.cash ?? 0)}</dd></dl>
       <p className="text-xs text-muted-foreground">Tarjetas y transferencias son del gimnasio; no cambian el efectivo de esta caja.</p>

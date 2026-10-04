@@ -1,3 +1,4 @@
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const { closeMutate, reconcileMutate, withdrawMutate, movementMutate, expenseMutate, openMutate, identity } = vi.hoisted(() => ({
@@ -12,7 +13,9 @@ vi.mock("@/hooks/useMoneyVisibility", () => ({ useMoneyVisibility: () => ({ hidd
 vi.mock("@/hooks/useExpenses", () => ({ useCreateExpense: () => ({ mutateAsync: expenseMutate, isPending: false }) }));
 vi.mock("@/stores/useAuthStore", () => ({ useAuthStore: (selector: (state: { user: { role: string } }) => unknown) => selector({ user: identity }) }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
-import { ReportView } from "../CashClosePage";
+vi.mock("@/components/cash/CashDrawerManager", () => ({ CashDrawerManager: () => null }));
+import CashClosePage, { ReportView } from "../CashClosePage";
+import { useCashCloseReport } from "@/hooks/useCashClose";
 import { CashHistory, periodEntries } from "@/components/cash/CashReview";
 import type { CashCloseReport, CashSessionSnapshot } from "@/hooks/useCashClose";
 function report(overrides: Partial<CashCloseReport> = {}): CashCloseReport {
@@ -29,6 +32,19 @@ async function count(value: string) {
 }
 describe("Caja simple", () => {
   beforeEach(() => { vi.clearAllMocks(); identity.role = "operator"; closeMutate.mockResolvedValue({ cash_close_id: "session-1" }); movementMutate.mockResolvedValue({ id: "movement-1" }); expenseMutate.mockResolvedValue({ expense_id: "expense-1" }); openMutate.mockResolvedValue({ ...opened, id: "session-2", sequence: 2 }); });
+  it("abre el detalle con la misma caja y el período actual", () => {
+    identity.role = "owner";
+    vi.mocked(useCashCloseReport).mockReturnValue({ data: report({ cash_drawer_id: "drawer-secondary", session: opened }), isLoading: false, isError: false } as ReturnType<typeof useCashCloseReport>);
+    function Route() { const location = useLocation(); return <output aria-label="Ruta">{location.pathname}{location.search}</output>; }
+    render(<MemoryRouter><CashClosePage /><Route /></MemoryRouter>);
+    fireEvent.click(screen.getByRole("button", { name: "Revisar movimientos" }));
+    const target = new URL(screen.getByLabelText("Ruta").textContent!, "http://localhost");
+    expect(target.pathname).toBe("/reports/cash-close/movements");
+    expect(target.searchParams.get("view")).toBe("ledger");
+    expect(target.searchParams.get("period")).toBe("current");
+    expect(target.searchParams.get("cash_drawer_id")).toBe("drawer-secondary");
+    expect(target.searchParams.get("from")).toBe(target.searchParams.get("to"));
+  });
   it("respeta el milisegundo entre dos cortes y no mezcla movimientos del último segundo", () => {
     const session = { ...opened, opened_at: "2026-09-27T18:00:00.501Z" };
     const entries = [

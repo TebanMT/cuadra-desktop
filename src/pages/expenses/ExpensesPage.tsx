@@ -14,6 +14,7 @@ import {
   Copy,
   FileDown,
   Loader2,
+  Lock,
   Plus,
   PackagePlus,
   Receipt,
@@ -117,7 +118,7 @@ export function ExpensesWorkspace({ section = "expenses", embedded = false }: { 
   const isOwner = useAuthStore(s => s.user?.role === "owner");
   const [params, setParams] = useSearchParams();
   const requested = params.get("view");
-  const view = section !== "expenses" ? section : requested === "recurring" && isPlus ? "recurring" : requested === "pending" || requested === "recurring" ? "pending" : "movements";
+  const view = section !== "expenses" ? section : requested === "recurring" ? "recurring" : requested === "pending" ? "pending" : "movements";
   const pendingStatus = isPlus && params.get("status") === "skipped" ? "skipped" : "pending";
   const [from, setFrom] = useState(params.get("from") ?? firstOfMonth());
   const [to, setTo] = useState(params.get("to") ?? todayIso());
@@ -170,11 +171,14 @@ export function ExpensesWorkspace({ section = "expenses", embedded = false }: { 
     {section === "expenses" && <Tabs value={view} onValueChange={setView} className="space-y-4">
       <div className="flex items-center gap-2 border-b">
         <TabsList aria-label="Vistas de Gastos" className="h-auto min-w-0 flex-1 items-stretch gap-3 border-0 sm:gap-4">
-          <TabsTrigger value="movements" className="h-12 shrink-0 px-1">Pagados</TabsTrigger>
-          <TabsTrigger value="pending" className="h-12 shrink-0 px-1">
+          <TabsTrigger value="movements" className="min-h-12 shrink-0 px-1">Pagados</TabsTrigger>
+          <TabsTrigger value="pending" className="min-h-12 shrink-0 px-1">
             Por pagar{pendingCount > 0 && <span className="ml-2 text-xs">{pendingCount}</span>}
           </TabsTrigger>
-          {isPlus && <TabsTrigger value="recurring" className="min-h-12 min-w-0 whitespace-normal px-1 leading-tight">Pagos que se repiten</TabsTrigger>}
+          <TabsTrigger value="recurring" className="min-h-12 min-w-0 flex-col gap-1 whitespace-normal px-1 leading-tight sm:flex-row sm:gap-2">
+            <span>Pagos que se repiten</span>{" "}
+            {!isPlus && <span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium"><Lock aria-hidden="true" className="h-3 w-3" />Plus</span>}
+          </TabsTrigger>
         </TabsList>
         <button type="button" onClick={money.toggle} className="shrink-0 p-3 text-muted-foreground" aria-label={money.hidden ? "Mostrar montos" : "Ocultar montos"}>
           {money.hidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -205,9 +209,15 @@ export function ExpensesWorkspace({ section = "expenses", embedded = false }: { 
         {pendingStatus === "pending" && isOwner && ((purchases.data?.total ?? 0) > 0 || purchases.isLoading || !!purchases.error) && <InventoryPurchasesPanel items={purchases.data?.items ?? []} loading={purchases.isLoading} error={purchases.error} onPay={setPayingPurchase} onCorrect={setCorrectingPurchase} />}
         {isPlus && (pendingStatus === "skipped" || pendingItems.length > 0 || occurrences.isLoading || !!occurrences.error) && <OccurrencesPanel status={pendingStatus} items={occurrences.data?.items ?? []} loading={occurrences.isLoading} error={occurrences.error} isOwner={isOwner} onResolve={setResolvingOccurrence} onSkip={setSkippingOccurrence} onReopen={setReopeningOccurrence} />}
       </TabsContent>
-      {isPlus && <TabsContent value="recurring" className="space-y-4">
-        <RecurringPanel items={templates.data?.items ?? []} loading={templates.isLoading} error={templates.error} onEdit={setEditingTemplate} onCreate={()=>setTemplateOpen(true)} />
-      </TabsContent>}
+      <TabsContent value="recurring" className="space-y-4">
+        {isPlus ? (
+          <RecurringPanel items={templates.data?.items ?? []} loading={templates.isLoading} error={templates.error} onEdit={setEditingTemplate} onCreate={()=>setTemplateOpen(true)} />
+        ) : <section aria-label="Pagos que se repiten en Plus" className="rounded-xl border bg-card p-5 space-y-3">
+          <h2 className="font-semibold">Incluido en Plus</h2>
+          <p className="text-sm text-muted-foreground">Programa la renta, los servicios o la nómina para ver cuándo toca pagarlos.</p>
+          <Button variant="outline" asChild><Link to="/settings/subscription">Ver planes</Link></Button>
+        </section>}
+      </TabsContent>
     </Tabs>}
       {view === "purchases" && <InventoryPurchaseHistory response={purchaseHistory.data} loading={purchaseHistory.isLoading} error={purchaseHistory.error} from={from} to={to} onFrom={(value) => { setFrom(value); setPurchasePage(1); }} onTo={(value) => { setTo(value); setPurchasePage(1); }} onPage={setPurchasePage} onPay={setPayingPurchase} onCorrect={setCorrectingPurchase} onReopen={setReopeningPurchase} />}
       {view === "cash" && <><CashMovementHistoryPanel response={cashHistory.data} loading={cashHistory.isLoading} error={cashHistory.error} from={from} to={to} status={cashStatus} onFrom={setFrom} onTo={setTo} onStatus={(next) => { setCashStatus(next); setCashPage(1); }} onPage={setCashPage} operatorNames={operatorNames} onClassify={setClassifyingCash} onUnclassify={setUnclassifyingCash} onEdit={setEditingCash} onCorrectExpense={correctScheduledPayment} onCorrectPurchase={correctCashPurchase} /></>}

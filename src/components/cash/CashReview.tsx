@@ -21,6 +21,13 @@ export function sessionFinished(session?: CashSessionSnapshot | null) {
   return !!session?.finished_at || session?.status === "withdrawn";
 }
 
+// Preserve the same drawer and current cash period when opening the detail.
+export function cashMovementReviewSearch(date: string, drawerId?: string) {
+  const params = new URLSearchParams({ view: "ledger", from: date, to: date, period: "current" });
+  if (drawerId) params.set("cash_drawer_id", drawerId);
+  return params.toString();
+}
+
 export function periodEntries(report: CashCloseReport, session?: CashSessionSnapshot | null, afterLast = false) {
   const start = afterLast ? session?.finished_at ?? session?.withdrawn_at : session?.opened_at;
   const end = afterLast ? null : session?.finished_at ?? session?.withdrawn_at;
