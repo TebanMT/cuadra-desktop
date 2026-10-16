@@ -1,3 +1,4 @@
+import { normalizeSearchText as normalize } from "@/lib/search";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Loader2, Minus, Plus, Search, Tag, Trash2, X } from "lucide-react";
@@ -25,7 +26,6 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { changedSaleProducts, emptySaleDraft, moneyCents, saleTotals, useSaleDraft, type CartLine, type SaleAttempt } from "@/components/sales/saleDraft";
 
 interface LastSale { saleId: string; paymentId: string; folio: string; total: number; paid: number; balance: number; change?: number }
-const normalize = (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 
 export default function QuickSalePage() {
   const gym = useAuthStore(s => s.gym?.gym_id);

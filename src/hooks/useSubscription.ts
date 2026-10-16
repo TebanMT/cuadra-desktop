@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
-import { isDev } from "@/lib/runtime";
+import { canAccessFeature, type FeatureAccess } from "@/lib/features";
 
 export type SubscriptionStatus = "active" | "past_due" | "cancelled";
 export type SubscriptionPlan =
@@ -22,29 +22,9 @@ export function isPlusPlan(plan: string | undefined | null): boolean {
   return plan === "plus_monthly" || plan === "plus_annual";
 }
 
-/**
- * True si el gym debe ver las features Plus.
- *
- * HOY (Plus aún no se vende — landing dice "Próximamente"): trial NO pasa.
- * Mientras el bundle Plus no esté completo (faltan rutinas + app del socio),
- * mostrar features Plus al trial es prometer algo que no se vende. Trial
- * opera como Standard hasta que se libere Plus.
- *
- * CUANDO PLUS SE LIBERE: añadir `plan === "trial"` aquí — el trial debe
- * poder probar Plus para evaluar el upgrade (estrategia ADR-009). Buscar
- * este comentario al hacer el cambio.
- *
- * DEV-MODE BYPASS: cuando `VITE_TINTA_MODE=dev`, devuelve true para
- * cualquier plan. Espeja el bypass equivalente del backend en
- * `gymDomain.CanAccessPlusFeatures`. `isPlusPlan` e `isPaidPlan` NO se
- * tocan — billing y SubscriptionPage siguen viendo el SKU real.
- *
- * Espeja `gymDomain.CanAccessPlusFeatures` del backend — si cambia allá,
- * cambia acá.
- */
-export function canAccessPlusFeatures(plan: string | undefined | null): boolean {
-  if (isDev) return true;
-  return plan === "plus_monthly" || plan === "plus_annual";
+/** Bundle-level UI gate. Billing helpers continue to read the actual SKU. */
+export function canAccessPlusFeatures(access: FeatureAccess): boolean {
+  return canAccessFeature(access, "analytics");
 }
 
 /** Devuelve true si el gym está en cualquier SKU pagado (no trial). */
@@ -69,6 +49,9 @@ export interface SubscriptionEvent {
 }
 
 export interface SubscriptionDetail {
+  all_features_access?: boolean;
+  launch_offer_available?: boolean;
+  launch_slots_remaining?: number;
   plan: SubscriptionPlan | string;
   status: SubscriptionStatus;
   trial_ends_at?: string | null;

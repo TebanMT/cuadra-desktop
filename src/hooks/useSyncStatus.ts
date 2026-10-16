@@ -73,7 +73,7 @@ export interface SyncStatus {
 //   duplicate → la nube ya tiene ese valor (unique index): permanente
 //               hasta que el operador renombre/edite el registro local.
 //   other     → cualquier otro rechazo persistente (visible, sin CTA).
-export type StuckKind = "duplicate" | "other";
+export type StuckKind = "duplicate" | "financial_conflict" | "other";
 
 export interface QueueStuckItem {
   queue_id: string;

@@ -1,3 +1,4 @@
+import { StockCountButton } from "@/components/products/StockCount";
 import { ExpensesWorkspace } from "@/pages/expenses/ExpensesPage";
 import { PurchaseDeliveries } from "@/components/products/PurchaseDeliveries";
 import { useEffect, useMemo, useState } from "react";
@@ -64,7 +65,7 @@ import {
 } from "@/hooks/useProducts";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
-import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { canAccessFeature } from "@/lib/features";
 import { useCan } from "@/lib/permissions";
 import { ApiError } from "@/lib/api";
 import { cn, formatMoney } from "@/lib/utils";
@@ -192,9 +193,9 @@ export default function ProductsPage() {
   // El costo y los márgenes son sensibles y forman parte de Análisis Plus.
   // Se requieren ambas condiciones: permiso de dueño y plan Plus. Standard
   // conserva catálogo, stock, ventas, compras y captura de costos.
-  const plan = useAuthStore((state) => state.gym?.subscription_plan);
+  const plan = useAuthStore((state) => state.gym);
   const showMargins =
-    useCan("view_product_margins") && canAccessPlusFeatures(plan);
+    useCan("view_product_margins") && canAccessFeature(plan, "product_margins");
 
   useEffect(() => {
     setPage(1);
@@ -283,14 +284,14 @@ export default function ProductsPage() {
         title={t.page.title}
 
         actions={
-          <Button
+          <div className="flex gap-2">{!purchasesView && <StockCountButton desktop />}<Button
             size="lg"
             onClick={() => purchasesView ? openPurchase() : setCreateOpen(true)}
             className={cn("h-10 rounded-md font-semibold shadow-sm", purchasesView && "bg-foreground text-background hover:bg-foreground/90")}
           >
             {purchasesView ? <PackagePlus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
             {purchasesView ? "Registrar compra" : t.page.new}
-          </Button>
+          </Button></div>
         }
       />
 

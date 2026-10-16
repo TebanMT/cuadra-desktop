@@ -92,7 +92,7 @@ export function ReportsScreen({
     REPORT_VIEWS.find((item) => item.value === params.get("view"))?.value ??
     "money";
   const isPlus = canAccessPlusFeatures(
-    useAuthStore((state) => state.gym?.subscription_plan),
+    useAuthStore((state) => state.gym),
   );
   const locked = mode === "analysis" && !isPlus;
   const query = useReportsRange(
@@ -285,7 +285,7 @@ function ReportDownload({
   saveFile: SaveReport;
 }) {
   const isPlus = canAccessPlusFeatures(
-    useAuthStore((state) => state.gym?.subscription_plan),
+    useAuthStore((state) => state.gym),
   );
   const [exporting, setExporting] = useState(false);
   async function download(format: ExportFormat) {

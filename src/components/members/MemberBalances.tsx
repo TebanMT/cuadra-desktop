@@ -1,3 +1,4 @@
+import { normalizeSearchText } from "@/lib/search";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAttentionRequired } from "@/hooks/useReports";
@@ -13,9 +14,9 @@ export function MemberBalances({ search }: { search: string }) {
   const money = useMoneyVisibility();
   const [page, setPage] = useState(1);
   useEffect(() => setPage(1), [search]);
-  const term = search.trim().toLocaleLowerCase("es-MX");
+  const term = normalizeSearchText(search);
   const rows = (query.data?.pending_balance ?? []).filter(row =>
-    !term || row.full_name.toLocaleLowerCase("es-MX").includes(term) || row.phone.includes(term));
+    !term || normalizeSearchText(row.full_name).includes(term) || row.phone.includes(term));
   const pages = Math.max(1, Math.ceil(rows.length / 25));
   const current = Math.min(page, pages);
   if (query.isLoading) return <p role="status" className="py-10 text-center">Cargando saldos…</p>;

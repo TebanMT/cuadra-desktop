@@ -22,6 +22,7 @@ export interface AuthGym {
   name: string | null;
   setup_completed: boolean;
   trial_ends_at: string | null;
+  all_features_access?: boolean;
   subscription_plan: string;
   subscription_status: SubscriptionStatus;
   subscription_ends_at: string | null;

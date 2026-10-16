@@ -1,3 +1,4 @@
+import { normalizeSearchText as normalize } from "@/lib/search";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Package, Search, Users } from "lucide-react";
@@ -30,18 +31,6 @@ interface ProductHit {
   stock: number;
 }
 type Hit = MemberHit | ProductHit;
-
-// normalize — quita acentos y baja a lowercase. Para que "mineral"
-// pegue con "Agua mineral" y "ciel" con "Ciél". Mismo helper que en
-// QuickSalePage; lo duplicamos local para no introducir un módulo
-// nuevo solo por 4 líneas.
-function normalize(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .trim();
-}
 
 const MAX_PER_GROUP = 5;
 

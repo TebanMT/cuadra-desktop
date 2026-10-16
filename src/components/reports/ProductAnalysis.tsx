@@ -1,13 +1,11 @@
 import { useAuthStore } from "@/stores/useAuthStore";
-import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { canAccessFeature } from "@/lib/features";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import type { ReportsRangeData } from "@/hooks/useReports";
 import { SectionCard } from "@/components/shared/PagePrimitives";
 
 export function ProductAnalysis({ data }: { data: ReportsRangeData }) {
-  const isPlus = canAccessPlusFeatures(
-    useAuthStore((state) => state.gym?.subscription_plan),
-  );
+  const isPlus = canAccessFeature(useAuthStore((state) => state.gym), "product_margins");
   const money = useMoneyVisibility();
   if (!isPlus) return null;
   const profit = data.product_profitability;

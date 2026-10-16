@@ -22,10 +22,19 @@ import QuickSalePage from "../QuickSalePage";
 import { ApiError } from "@/lib/api";
 function app() { return <MemoryRouter><QuickSalePage /></MemoryRouter>; }
 beforeEach(() => {
- localStorage.clear(); state.user = "u1"; state.products[0].price = 20;
+ localStorage.clear(); state.user = "u1"; state.products[0].price = 20; state.products[0].name = "Agua botella";
  sell.mockReset().mockResolvedValue({ sale_id: "s1", payment_id: "p1", folio: "PRD-1", paid: 20, total: 20, balance_pending: 0 });
 });
 describe("Venta en curso", () => {
+ it.each(["proteína", "PROTEÍNA", "proteina", "piña", "PINA"])("encuentra y agrega el mismo producto buscando %s", term => {
+  state.products[0].name = "PROTEÍNA PIÑA";
+  render(app()); const search = screen.getByRole("textbox", { name: "Buscar producto" });
+  fireEvent.change(search, { target: { value: term } });
+  expect(screen.getByRole("button", { name: "Agregar PROTEÍNA PIÑA" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Agregar Botella shaker" })).not.toBeInTheDocument();
+  fireEvent.keyDown(search, { key: "Enter" });
+  expect(screen.getByLabelText("Cantidad de PROTEÍNA PIÑA")).toHaveValue("1");
+ });
  it("Enter vacío no agrega; la primera coincidencia visible sí", () => {
   render(app()); const search = screen.getByRole("textbox", { name: "Buscar producto" });
   fireEvent.keyDown(search, { key: "Enter" }); expect(screen.getByRole("button", { name: "Cobrar $0.00" })).toBeDisabled();

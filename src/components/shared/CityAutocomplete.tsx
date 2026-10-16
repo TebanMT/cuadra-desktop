@@ -1,3 +1,4 @@
+import { normalizeSearchText } from "@/lib/search";
 import { useMemo, useState } from "react";
 import { Check, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,10 +32,10 @@ export function CityAutocomplete({ value, onChange, placeholder, id }: Props) {
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
-    const q = (query || value || "").trim().toLowerCase();
+    const q = normalizeSearchText(query || value || "");
     if (!q) return ALL.slice(0, 50);
     return ALL.filter((c) =>
-      `${c.name} ${c.state}`.toLowerCase().includes(q)
+      normalizeSearchText(`${c.name} ${c.state}`).includes(q)
     ).slice(0, 50);
   }, [query, value]);
 

@@ -1,3 +1,4 @@
+import { normalizeSearchText } from "@/lib/search";
 import { StrictMode } from "react";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -9,7 +10,7 @@ import RegisterPurchasePage from "@/pages/products/RegisterPurchasePage";
 vi.mock("@/stores/useAuthStore", () => ({ useAuthStore: (select: (s: unknown) => unknown) => select({ user: { role: "owner", user_id: "search-user" }, gym: { gym_id: "search-gym" } }) }));
 vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: () => null }));
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
-const catalog = [{ id: "water", name: "Agua mineral" }, { id: "bar", name: "Barra de avena" }];
+const catalog = [{ id: "water", name: "Agua mineral" }, { id: "bar", name: "Barra de avena" }, { id: "protein", name: "PROTEÍNA sabor PIÑA" }];
 const requests: URL[] = [];
 const submissions: unknown[] = [];
 function show() {
@@ -22,8 +23,8 @@ describe("Buscador de la compra con API y espera reales", () => {
       const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url);
       if (url.pathname === "/api/v1/products") {
         requests.push(url);
-        const q = (url.searchParams.get("q") || "").trim().toLowerCase();
-        const items = catalog.filter(p => p.name.toLowerCase().includes(q));
+        const q = normalizeSearchText(url.searchParams.get("q") || "");
+        const items = catalog.filter(p => normalizeSearchText(p.name).includes(q));
         return new Response(JSON.stringify({ status_code: 200, data: { items, total: items.length, page: 1, page_size: 50 } }), { status: 200, headers: { "Content-Type": "application/json" } });
       }
       if (url.pathname === "/api/v1/inventory-purchase-registrations") {
@@ -34,6 +35,15 @@ describe("Buscador de la compra con API y espera reales", () => {
     }));
   });
   afterEach(() => vi.unstubAllGlobals());
+
+  it.each(["proteína", "PROTEÍNA", "pRoTeÍnA", "proteina", "piña", "PIÑA"])("permite elegir el producto buscando %s y conserva su nombre", async term => {
+    const user = userEvent.setup(); show();
+    await user.type(screen.getByLabelText("Buscar producto"), term);
+    await waitFor(() => expect(requests.some(url => url.searchParams.get("q") === term)).toBe(true));
+    await user.click(await screen.findByRole("button", { name: "PROTEÍNA sabor PIÑA" }));
+    expect(screen.getByLabelText("Cantidad de PROTEÍNA sabor PIÑA")).toHaveValue(1);
+    expect(screen.queryByLabelText("Cantidad de Agua mineral")).not.toBeInTheDocument();
+  });
 
   it("busca por parte del nombre y registra el producto encontrado", async () => {
     const user = userEvent.setup(); show();

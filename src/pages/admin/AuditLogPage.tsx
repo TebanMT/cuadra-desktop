@@ -47,7 +47,7 @@ const PAGE_SIZE = 50;
 
 export default function AuditLogPage() {
   const role = useAuthStore((s) => s.user?.role);
-  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const plan = useAuthStore((s) => s.gym);
   const isPlus = canAccessPlusFeatures(plan);
   const operators = useOperators(true);
 

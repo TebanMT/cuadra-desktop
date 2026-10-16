@@ -47,7 +47,7 @@ import {
   type Operator,
 } from "@/hooks/useOperators";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { canAccessFeature } from "@/lib/features";
 import { ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/dates";
 import { settings as t } from "@/strings/settings";
@@ -64,8 +64,8 @@ const SOFT_WARN = 5;
 export default function OperatorsPage() {
   const list = useOperators(true);
   const me = useAuthStore((s) => s.user);
-  const plan = useAuthStore((s) => s.gym?.subscription_plan);
-  const isPlus = canAccessPlusFeatures(plan);
+  const plan = useAuthStore((s) => s.gym);
+  const isPlus = canAccessFeature(plan, "extra_operators");
   const hardLimit = isPlus ? HARD_LIMIT_PLUS : HARD_LIMIT_STANDARD;
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Operator | null>(null);

@@ -58,7 +58,7 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/shared/PagePrimitives";
-import { canAccessPlusFeatures } from "@/hooks/useSubscription";
+import { canAccessFeature } from "@/lib/features";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
@@ -113,8 +113,8 @@ export default function ExpensesPage() {
 }
 
 export function ExpensesWorkspace({ section = "expenses", embedded = false }: { section?: "expenses" | "cash" | "purchases"; embedded?: boolean }) {
-  const plan = useAuthStore(s => s.gym?.subscription_plan);
-  const isPlus = canAccessPlusFeatures(plan);
+  const plan = useAuthStore(s => s.gym);
+  const isPlus = canAccessFeature(plan, "recurring_expenses");
   const isOwner = useAuthStore(s => s.user?.role === "owner");
   const [params, setParams] = useSearchParams();
   const requested = params.get("view");

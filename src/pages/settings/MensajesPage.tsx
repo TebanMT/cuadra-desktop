@@ -1,3 +1,4 @@
+import { HeldMessages } from "@/components/settings/HeldMessages";
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { settings as t } from "@/strings/settings";
@@ -52,7 +53,7 @@ function parseTab(raw: string | null, available: TabKey[]): TabKey {
 
 export default function MensajesPage() {
   const [params, setParams] = useSearchParams();
-  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const plan = useAuthStore((s) => s.gym);
   const isPlus = canAccessPlusFeatures(plan);
 
   const availableTabs: TabKey[] = (
@@ -124,6 +125,7 @@ export default function MensajesPage() {
           )}
         </Tabs>
       )}
+      <HeldMessages />
     </div>
   );
 }

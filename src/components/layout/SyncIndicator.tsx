@@ -50,12 +50,13 @@ export function stuckEditRoute(it: QueueStuckItem): string | null {
 
 export function SyncIndicator() {
   const [open, setOpen] = useState(false);
-  const { data } = useSyncStatus();
+  const { data, refetch } = useSyncStatus();
   const trigger = useTriggerSync();
   const syncing = trigger.isPending || data?.sync_in_progress === true;
   const navigate = useNavigate();
   const level = levelOf(data);
   const hasPending = (data?.queue_pending_count ?? 0) > 0;
+  const hasFinancialConflict = data?.queue_stuck_items?.some((item) => item.kind === "financial_conflict") ?? false;
 
   // Un lugar por nivel. Disciplina de severidad (offline-first): sin
   // conexión NO es error — gris calmado con nube; ámbar sólo cuando
@@ -75,7 +76,7 @@ export function SyncIndicator() {
   return (
     <div className="flex items-center gap-1">
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { setOpen(true); void refetch?.(); }}
         className={cn(
           "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-accent transition-colors",
           colorClass
@@ -129,6 +130,15 @@ export function SyncIndicator() {
               navigate(route);
             }}
           />
+          {(hasPending || (data?.quarantined_count ?? 0) > 0) && level !== "auth" && (
+            <DialogFooter className="flex-col gap-2 sm:flex-col">
+              {hasFinancialConflict && <p className="text-sm text-muted-foreground">La operación sigue guardada en esta recepción. Tinta volverá a enviar juntos el cobro y sus registros relacionados.</p>}
+              <Button disabled={syncing} onClick={() => trigger.mutate()}>
+                <RefreshCw className={cn("h-4 w-4", syncing && "animate-spin")} />
+                {syncing ? shell.sync.syncing : hasFinancialConflict ? "Reintentar operación completa" : shell.sync.triggerNow}
+              </Button>
+            </DialogFooter>
+          )}
           {level === "auth" && (
             <DialogFooter>
               <Button

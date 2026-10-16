@@ -108,7 +108,7 @@ const SECTIONS: Section[] = [
 
 export default function SettingsIndex() {
   const role = useAuthStore((s) => s.user?.role);
-  const plan = useAuthStore((s) => s.gym?.subscription_plan);
+  const plan = useAuthStore((s) => s.gym);
   const isPlus = canAccessPlusFeatures(plan);
   // Plus aún no se vende — ocultamos los cards Plus en lugar de mostrarlos
   // con badge "Próximamente". Cuando Plus se libere, revertir a render con

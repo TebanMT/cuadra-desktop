@@ -1,3 +1,4 @@
+import { normalizeSearchText } from "@/lib/search";
 import { useEffect, useMemo, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import { toast } from "sonner";
@@ -64,12 +65,12 @@ export function PromotionPickerModal({
   }, [open]);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizeSearchText(search);
     const rows = promosQuery.data ?? [];
     if (!q) return rows;
     return rows.filter((p) =>
-      p.name.toLowerCase().includes(q) ||
-      (p.code ?? "").toLowerCase().includes(q),
+      normalizeSearchText(p.name).includes(q) ||
+      normalizeSearchText(p.code ?? "").includes(q),
     );
   }, [promosQuery.data, search]);
 

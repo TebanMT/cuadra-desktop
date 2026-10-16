@@ -150,6 +150,7 @@ export default function SubscriptionPage() {
   // acabó de procesar un webhook).
   const plan = sub.data?.plan ?? gym?.subscription_plan;
   const status = sub.data?.status ?? gym?.subscription_status;
+  const fullAccess = sub.data?.all_features_access ?? gym?.all_features_access ?? false;
   const isTrial = plan === "trial";
   const isPastDue = status === "past_due";
 
@@ -183,6 +184,8 @@ export default function SubscriptionPage() {
           </AlertDescription>
         </Alert>
       )}
+
+      {fullAccess && <p className="text-sm">Acceso completo por lanzamiento. Conservas $799 al mes o $7,200 al año, con todas las funciones actuales y futuras.</p>}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <StatCard

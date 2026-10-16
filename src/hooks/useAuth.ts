@@ -23,6 +23,7 @@ interface LoginResponse {
   refresh_token: string;
   setup_completed: boolean;
   trial_ends_at: string | null;
+  all_features_access?: boolean;
   subscription_plan: string;
   subscription_status?: "active" | "past_due" | "cancelled";
   subscription_ends_at?: string | null;
@@ -49,6 +50,7 @@ export function useLogin() {
         name: data.gym_name,
         setup_completed: data.setup_completed,
         trial_ends_at: data.trial_ends_at,
+        all_features_access: data.all_features_access ?? false,
         subscription_plan: data.subscription_plan,
         subscription_status: data.subscription_status ?? "active",
         subscription_ends_at: data.subscription_ends_at ?? null,
@@ -102,6 +104,7 @@ interface RedeemInstallerResponse {
   refresh_token: string;
   setup_completed: boolean;
   trial_ends_at: string | null;
+  all_features_access?: boolean;
   subscription_plan: string;
   subscription_status?: "active" | "past_due" | "cancelled";
   subscription_ends_at?: string | null;
@@ -136,6 +139,7 @@ export function useRedeemInstallerBootstrap() {
           name: data.gym_name,
           setup_completed: data.setup_completed,
           trial_ends_at: data.trial_ends_at,
+          all_features_access: data.all_features_access ?? false,
           subscription_plan: data.subscription_plan,
           subscription_status: data.subscription_status ?? "active",
           subscription_ends_at: data.subscription_ends_at ?? null,
@@ -308,6 +312,7 @@ export function useLoginPIN() {
           name: data.gym_name,
           setup_completed: data.setup_completed,
           trial_ends_at: data.trial_ends_at,
+          all_features_access: data.all_features_access ?? false,
           subscription_plan: data.subscription_plan,
           subscription_status: data.subscription_status ?? "active",
           subscription_ends_at: data.subscription_ends_at ?? null,

@@ -28,7 +28,7 @@ import {
   type UpdateGymProfileInput,
 } from "@/hooks/useGym";
 import { useRefreshIdentity } from "@/hooks/useAuth";
-import { isPlusPlan } from "@/hooks/useSubscription";
+import { canAccessPlusFeatures } from "@/hooks/useSubscription";
 import { ApiError } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { settings as t } from "@/strings/settings";
@@ -66,8 +66,8 @@ export default function GymProfilePage() {
   const refreshIdentity = useRefreshIdentity();
   const role = useAuthStore((s) => s.user?.role);
   const canEdit = role === "owner";
-  const subscriptionPlan = useAuthStore((s) => s.gym?.subscription_plan);
-  const isPlus = isPlusPlan(subscriptionPlan);
+  const gym = useAuthStore((s) => s.gym);
+  const isPlus = canAccessPlusFeatures(gym);
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);

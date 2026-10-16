@@ -99,7 +99,7 @@ export function Sidebar() {
   const [version, setVersion] = useState<string | null>(null);
   const user = useAuthStore((s) => s.user);
   const gym = useAuthStore((s) => s.gym);
-  const isPlus = canAccessPlusFeatures(gym?.subscription_plan);
+  const isPlus = canAccessPlusFeatures(gym);
   const logout = useLogout();
   const navigate = useNavigate();
 
