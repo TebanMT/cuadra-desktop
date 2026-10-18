@@ -43,7 +43,19 @@ describe("cash close hooks — atribución por cajón", () => {
     });
   });
 
-  it("envía el cajón al cierre y refresca todas sus variantes del día", async () => {
+  it("resuelve el día actual en la API y actualiza la caja tras cerrar", async () => {
+    getMock.mockResolvedValueOnce({ date: "2026-08-24", session: { status: "open" } });
+    const { result } = renderHook(() => ({ report: useCashCloseReport(), close: useCloseCashRegister() }), { wrapper });
+    await waitFor(() => expect(result.current.report.data?.session?.status).toBe("open"));
+    expect(getMock).toHaveBeenCalledWith("/api/v1/cash-close", { query: { date: undefined, cash_drawer_id: undefined } });
+
+    getMock.mockResolvedValueOnce({ date: "2026-08-24", session: { status: "reconciled" } });
+    postMock.mockResolvedValueOnce({ cash_close_id: "session-1" });
+    await act(async () => { await result.current.close.mutateAsync({ date: "2026-08-24", counted_cash: 100 }); });
+    await waitFor(() => expect(result.current.report.data?.session?.status).toBe("reconciled"));
+  });
+
+  it("envía el cajón al cierre y refresca la caja actual y el historial", async () => {
     postMock.mockResolvedValueOnce({ cash_close_id: "session-1", calculated_cash: 100 });
     const invalidate = vi.spyOn(client, "invalidateQueries");
     const { result } = renderHook(() => useCloseCashRegister(), { wrapper });
@@ -58,7 +70,7 @@ describe("cash close hooks — atribución por cajón", () => {
     });
 
     expect(postMock).toHaveBeenCalledWith("/api/v1/cash-close", input);
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cash-close", "2026-08-24"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cash-close"] });
   });
 
   it("conserva la llave idempotente en una entrada o salida física", async () => {
@@ -82,7 +94,7 @@ describe("cash close hooks — atribución por cajón", () => {
 
     expect(postMock).toHaveBeenCalledWith("/api/v1/cash-movements", input);
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["expenses"] });
-    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cash-close", "2026-08-24"] });
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ["cash-close"] });
   });
 
   it("reabre por fecha, caja y motivo sin caer implícitamente en main", async () => {

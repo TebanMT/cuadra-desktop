@@ -184,17 +184,18 @@ export interface CashMovementResponse {
 }
 
 const KEYS = {
-  report: (date: string, cashDrawerId?: string) =>
-    ["cash-close", date, cashDrawerId ?? "main"] as const,
+  report: (date: string | undefined, cashDrawerId?: string) =>
+    ["cash-close", date ?? "current", cashDrawerId ?? "main"] as const,
 };
 
-export function useCashCloseReport(date: string, cashDrawerId?: string) {
+// Without a date, cloud/sidecar resolves today in the gym's timezone.
+export function useCashCloseReport(date?: string, cashDrawerId?: string) {
   return useQuery<CashCloseReport>({
     queryKey: KEYS.report(date, cashDrawerId),
     queryFn: () => api.get<CashCloseReport>("/api/v1/cash-close", {
       query: { date, cash_drawer_id: cashDrawerId },
     }),
-    enabled: !!date,
+    enabled: date !== "",
   });
 }
 
@@ -204,8 +205,8 @@ export function useCloseCashRegister() {
     mutationFn: (input: CloseCashRegisterInput) =>
       api.post<CloseCashRegisterResponse>("/api/v1/cash-close", input),
     onError: () => { qc.invalidateQueries({ queryKey: ["cash-close"] }); },
-    onSuccess: (_res, vars) => {
-      qc.invalidateQueries({ queryKey: ["cash-close", vars.date] });
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cash-close"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
     },
   });
@@ -216,8 +217,8 @@ export function useReopenCashRegister() {
   return useMutation({
     mutationFn: (input: { date: string; cash_drawer_id?: string; reason: string }) =>
       api.post<void>("/api/v1/cash-close/reopen", input),
-    onSuccess: (_res, input) => {
-      qc.invalidateQueries({ queryKey: ["cash-close", input.date] });
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cash-close"] });
       qc.invalidateQueries({ queryKey: ["reports"] });
     },
   });
@@ -267,8 +268,8 @@ export function useCreateCashMovement() {
   return useMutation({
     mutationFn: (input: CreateCashMovementInput) =>
       api.post<CashMovementResponse>("/api/v1/cash-movements", input),
-    onSuccess: (_res, input) => {
-      qc.invalidateQueries({ queryKey: ["cash-close", input.movement_on] });
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["cash-close"] });
       for (const key of [
         "cash-movements",
         "expenses",

@@ -36,11 +36,12 @@ function validCash(raw: string) {
 export default function CashClosePage() {
   const navigate = useNavigate();
   const [tab, setTab] = useState("current");
-  const [historyDate, setHistoryDate] = useState(todayIso);
+  const [historyDate, setHistoryDate] = useState<string>();
   const [drawer, setDrawer] = useState<string>();
   const [manager, setManager] = useState(false);
-  const date = tab === "current" ? todayIso() : historyDate;
-  const report = useCashCloseReport(date, drawer);
+  const report = useCashCloseReport(tab === "current" ? undefined : historyDate, drawer);
+  const date = report.data?.date ?? historyDate ?? "";
+  const today = todayIso(report.data?.timezone);
   const isOwner = useAuthStore(s => s.user?.role === "owner");
   return <div className="p-4 sm:p-6 space-y-5 max-w-5xl mx-auto pb-20">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="text-3xl font-bold tracking-tight">Caja</h1><p className="text-sm text-muted-foreground">{fmtDate(date)}</p></div>
@@ -48,7 +49,7 @@ export default function CashClosePage() {
         {isOwner && <Button variant="ghost" size="icon" title="Administrar cajas" aria-label="Administrar cajas" onClick={() => setManager(true)}><Settings2 className="h-4 w-4" /></Button>}</div>
     </div>
     <Tabs value={tab} onValueChange={setTab}><TabsList><TabsTrigger value="current">Caja actual</TabsTrigger><TabsTrigger value="history">Historial de cortes</TabsTrigger></TabsList>
-      {tab === "history" && <div className="flex items-center gap-3 mt-5"><Label htmlFor="cash-history-date">Fecha</Label><DateInput id="cash-history-date" context="recent" value={historyDate} max={todayIso()} onValueChange={e => setHistoryDate(e || todayIso())} className="w-44" /></div>}
+      {tab === "history" && <div className="flex items-center gap-3 mt-5"><Label htmlFor="cash-history-date">Fecha</Label><DateInput id="cash-history-date" context="recent" value={historyDate ?? date} max={today} today={today} onValueChange={e => setHistoryDate(e || today)} className="w-44" /></div>}
       {report.isLoading ? <div role="status" className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin" /><span className="sr-only">Cargando caja</span></div> : report.isError ? <Alert variant="destructive"><AlertDescription>No pudimos cargar la caja. <Button variant="link" onClick={() => report.refetch()}>Reintentar</Button></AlertDescription></Alert> : report.data && <>
         <TabsContent value="current"><ReportView key={`${date}:${report.data.cash_drawer_id}`} report={report.data} date={date} onReview={() => navigate(`/reports/cash-close/movements?${cashMovementReviewSearch(date, report.data?.cash_drawer_id)}`)} canClose={report.data.drawers?.find(d => d.id === report.data?.cash_drawer_id)?.active !== false} onHistory={() => { setHistoryDate(date); setTab("history"); }} /></TabsContent>
         <TabsContent value="history"><CashHistory report={report.data} /></TabsContent>

@@ -1,6 +1,6 @@
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { closeMutate, reconcileMutate, withdrawMutate, movementMutate, expenseMutate, openMutate, identity } = vi.hoisted(() => ({
   closeMutate: vi.fn(), reconcileMutate: vi.fn(), withdrawMutate: vi.fn(), movementMutate: vi.fn(), expenseMutate: vi.fn(), openMutate: vi.fn(), identity: { role: "operator" },
 }));
@@ -32,6 +32,22 @@ async function count(value: string) {
 }
 describe("Caja simple", () => {
   beforeEach(() => { vi.clearAllMocks(); identity.role = "operator"; closeMutate.mockResolvedValue({ cash_close_id: "session-1" }); movementMutate.mockResolvedValue({ id: "movement-1" }); expenseMutate.mockResolvedValue({ expense_id: "expense-1" }); openMutate.mockResolvedValue({ ...opened, id: "session-2", sequence: 2 }); });
+  afterEach(() => vi.useRealTimers());
+  it("abre caja con el día del gimnasio aunque la computadora esté en el día siguiente", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 28, 1));
+    vi.mocked(useCashCloseReport).mockReturnValue({ data: report({ timezone: "America/Mexico_City" }), isLoading: false, isError: false } as ReturnType<typeof useCashCloseReport>);
+    render(<MemoryRouter><CashClosePage /></MemoryRouter>);
+
+    fireEvent.click(screen.getByRole("button", { name: "Abrir caja" }));
+    const dialog = within(screen.getByRole("dialog"));
+    fireEvent.change(dialog.getByLabelText("¿Con cuánto efectivo empiezas?"), { target: { value: "500" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Confirmar efectivo inicial" }));
+
+    await waitFor(() => expect(openMutate).toHaveBeenCalledWith(expect.objectContaining({ date: "2026-09-27", opening_cash: 500 })));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(useCashCloseReport).toHaveBeenCalledWith(undefined, undefined);
+  });
   it("abre el detalle con la misma caja y el período actual", () => {
     identity.role = "owner";
     vi.mocked(useCashCloseReport).mockReturnValue({ data: report({ cash_drawer_id: "drawer-secondary", session: opened }), isLoading: false, isError: false } as ReturnType<typeof useCashCloseReport>);
@@ -43,7 +59,24 @@ describe("Caja simple", () => {
     expect(target.searchParams.get("view")).toBe("ledger");
     expect(target.searchParams.get("period")).toBe("current");
     expect(target.searchParams.get("cash_drawer_id")).toBe("drawer-secondary");
-    expect(target.searchParams.get("from")).toBe(target.searchParams.get("to"));
+    expect(target.searchParams.get("from")).toBe("2026-09-27");
+    expect(target.searchParams.get("to")).toBe("2026-09-27");
+  });
+  it("conserva la fecha elegida en historial y limita el calendario al día del gimnasio", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-09-28T02:00:00Z"));
+    vi.mocked(useCashCloseReport).mockImplementation(date => ({ data: report({ date: date ?? "2026-09-27", timezone: "America/Mexico_City" }), isLoading: false, isError: false }) as ReturnType<typeof useCashCloseReport>);
+    render(<MemoryRouter><CashClosePage /></MemoryRouter>);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Historial de cortes" }), { button: 0, ctrlKey: false });
+    const input = screen.getByLabelText("Fecha");
+    expect(input).toHaveValue("27/09/2026");
+    fireEvent.change(input, { target: { value: "26/09/2026" } });
+    expect(useCashCloseReport).toHaveBeenLastCalledWith("2026-09-26", undefined);
+    fireEvent.change(input, { target: { value: "28/09/2026" } });
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(useCashCloseReport).toHaveBeenLastCalledWith("2026-09-26", undefined);
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "Caja actual" }), { button: 0, ctrlKey: false });
+    expect(useCashCloseReport).toHaveBeenLastCalledWith(undefined, undefined);
   });
   it("respeta el milisegundo entre dos cortes y no mezcla movimientos del último segundo", () => {
     const session = { ...opened, opened_at: "2026-09-27T18:00:00.501Z" };
