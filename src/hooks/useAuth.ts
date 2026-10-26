@@ -4,6 +4,7 @@ import { useMutation } from "@tanstack/react-query";
 import { api, clearTokens, getAccessToken, setTokens } from "@/lib/api";
 import { useAuthStore, type AuthGym, type AuthUser } from "@/stores/useAuthStore";
 import { queryClient } from "@/lib/queryClient";
+import { useSyncStatus } from "@/hooks/useSyncStatus";
 
 // The sync agent now authenticates against cloud via the sk_live_*
 // sidecar credential the SidecarAuthProxy persists during login (ADR-008
@@ -344,6 +345,10 @@ export function useClearSelfPIN() {
 export function useHydrateAuth() {
   const setSession = useAuthStore((s) => s.setSession);
   const markHydrated = useAuthStore((s) => s.markHydrated);
+  const signedIn = useAuthStore((s) => s.user !== null);
+  // The session lives outside React Query: invalidating report queries after
+  // a pull does not refresh the plan or launch grant used by Plus gates.
+  const lastPulledAt = useSyncStatus(signedIn).data?.last_pulled_at;
 
   useEffect(() => {
     let alive = true;
@@ -383,5 +388,5 @@ export function useHydrateAuth() {
       alive = false;
       window.removeEventListener("focus", onFocus);
     };
-  }, [markHydrated, setSession]);
+  }, [markHydrated, setSession, lastPulledAt]);
 }
