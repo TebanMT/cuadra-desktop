@@ -14,11 +14,17 @@ export function ScheduledPaymentForm({ occurrence, onClose }: { occurrence: Expe
   const existing = useQuery({ queryKey: ["expenses", "matching-scheduled", occurrence.category], queryFn: () => fetchAllExpenses({ category: occurrence.category }) });
   const [selected, setSelected] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const selectionRef = useRef<HTMLSelectElement>(null);
   const attempt = useRef<{ fingerprint: string; key: string } | null>(null);
   const candidates = (existing.data ?? []).filter(e => !e.recurring_occurrence_id);
   const chosen = candidates.find(e => e.id === selected);
   const money = (n: number) => new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN" }).format(n);
   async function submit(payload: ExpenseFormSubmitPayload) {
+    if (candidates.length > 0 && !selected) {
+      setError("Selecciona si el pago corresponde a un gasto existente o es uno nuevo.");
+      selectionRef.current?.focus();
+      return;
+    }
     setError(null);
     const input = { ...payload, id: occurrence.id, paid_on: payload.expense_date, ...(chosen ? { expense_id: chosen.id } : {}) };
     attempt.current = keyForPayload(attempt.current, input);
@@ -33,9 +39,25 @@ export function ScheduledPaymentForm({ occurrence, onClose }: { occurrence: Expe
   if (cash.error || existing.error) return <div role="alert" className="space-y-3"><p>No pudimos consultar los registros existentes.</p><Button variant="outline" onClick={() => { cash.refetch(); existing.refetch(); }}>Reintentar</Button></div>;
   return <div className="space-y-4">
     <p className="text-sm text-muted-foreground">{occurrence.name || occurrence.payee_name || "Pago programado"} · vence {occurrence.due_on} · previsto {money(occurrence.expected_amount)}</p>
-    {candidates.length > 0 && <div className="space-y-2"><Label htmlFor="existing-scheduled-expense">Hay gastos registrados en esta categoría</Label><select id="existing-scheduled-expense" className="w-full h-10 rounded-md border bg-background px-3 text-sm" value={selected} onChange={e => { setSelected(e.target.value); setError(null); }}><option value="">Selecciona si alguno corresponde a este pago</option><option value="new">Es otro pago: registrar uno nuevo</option>{candidates.map(e => <option key={e.id} value={e.id}>{e.paid_on} · {e.description || e.payee_name || "Gasto"} · {money(e.amount)}</option>)}</select><p className="text-xs text-muted-foreground">Relacionar un gasto existente no vuelve a descontar dinero.</p></div>}
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {candidates.length > 0 && <div className="space-y-2">
+      <Label htmlFor="existing-scheduled-expense">Hay gastos registrados en esta categoría</Label>
+      <select
+        ref={selectionRef}
+        id="existing-scheduled-expense"
+        className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+        value={selected}
+        aria-invalid={!!error && !selected}
+        aria-describedby={error && !selected ? "scheduled-payment-error" : undefined}
+        onChange={e => { setSelected(e.target.value); setError(null); }}
+      >
+        <option value="">Selecciona si alguno corresponde a este pago</option>
+        <option value="new">Es otro pago: registrar uno nuevo</option>
+        {candidates.map(e => <option key={e.id} value={e.id}>{e.paid_on} · {e.description || e.payee_name || "Gasto"} · {money(e.amount)}</option>)}
+      </select>
+      <p className="text-xs text-muted-foreground">Relacionar un gasto existente no vuelve a descontar dinero.</p>
+    </div>}
+    {error && <p id="scheduled-payment-error" role="alert" className="text-sm text-destructive">{error}</p>}
     {chosen ? <div className="space-y-4"><p className="rounded-md bg-muted p-3 text-sm">{chosen.description || chosen.payee_name} · pagado el {chosen.paid_on} por {money(chosen.amount)}</p><Button className="w-full" disabled={pay.isPending} onClick={() => submit({ ...chosen, expense_date: chosen.paid_on, description: chosen.description ?? undefined, payee_name: chosen.payee_name ?? undefined, reference: chosen.reference ?? undefined, cash_drawer_id: chosen.cash_drawer_id ?? undefined, cash_movement_id: undefined, recurring_occurrence_id: undefined })}>Relacionar este gasto</Button></div>
-    : <ExpenseForm key={occurrence.id} mode="create" lockedCategory submitLabel="Registrar pago" initial={{ amount: String(occurrence.expected_amount), expense_date: todayIso(), category: occurrence.category, payment_method: occurrence.payment_method, description: occurrence.name ?? "", payee_name: occurrence.payee_name ?? "", classification: occurrence.classification }} cashMovements={cash.data?.items ?? []} submitting={pay.isPending || (candidates.length > 0 && !selected)} onSubmit={submit} onCancel={onClose} />}
+    : <ExpenseForm key={occurrence.id} mode="create" lockedCategory submitLabel="Registrar pago" initial={{ amount: String(occurrence.expected_amount), expense_date: todayIso(), category: occurrence.category, payment_method: occurrence.payment_method, description: occurrence.name ?? "", payee_name: occurrence.payee_name ?? "", classification: occurrence.classification }} cashMovements={cash.data?.items ?? []} submitting={pay.isPending} onSubmit={submit} onCancel={onClose} />}
   </div>;
 }
