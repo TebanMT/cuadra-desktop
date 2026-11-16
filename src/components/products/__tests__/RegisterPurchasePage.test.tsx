@@ -1,11 +1,14 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), role: "owner", user: "purchase-test-user", gym: "purchase-test-gym" }));
+const mock = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), role: "owner", permissions: undefined as string[] | undefined, user: "purchase-test-user", gym: "purchase-test-gym" }));
 vi.mock("@/lib/api", () => ({ api: { get: mock.get, post: mock.post } }));
-vi.mock("@/stores/useAuthStore", () => ({ useAuthStore: (select: (s: unknown) => unknown) => select({ user: { role: mock.role, user_id: mock.user }, gym: { gym_id: mock.gym } }) }));
+vi.mock("@/stores/useAuthStore", () => ({ useAuthStore: (select: (s: unknown) => unknown) => select({ user: { role: mock.role, user_id: mock.user, permissions: mock.permissions }, gym: { gym_id: mock.gym } }) }));
 vi.mock("@/hooks/useDebounce", () => ({ useDebounce: (s: string) => s }));
-vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: ({ value, onChange }: { value?: string; onChange: (value: string) => void }) => <select aria-label="Caja física" value={value || ""} onChange={e => onChange(e.target.value)}><option value="">Principal</option><option value="drawer-two">Segunda caja</option></select> }));
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({ CashDrawerField: ({ value, onChange }: { value?: string; onChange: (value: string) => void }) => <select aria-label="Caja física" value={value || ""} onChange={e => onChange(e.target.value)}><option value="">Principal</option><option value="drawer-two">Segunda caja</option></select> });
+});
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 import RegisterPurchasePage from "@/pages/products/RegisterPurchasePage";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -18,7 +21,7 @@ async function add(name: string, quantity: string, cost: string) {
   fireEvent.change(screen.getByLabelText(`Costo de ${name}`), { target: { value: cost } });
 }
 describe("Registro de compra", () => {
-  beforeEach(() => { sessionStorage.clear(); localStorage.clear(); vi.clearAllMocks(); mock.role = "owner"; mock.user = "purchase-test-user"; mock.gym = "purchase-test-gym"; mock.get.mockResolvedValue({ items: [{ id: "water", name: "Agua" }, { id: "bar", name: "Barra" }], total: 2 }); mock.post.mockResolvedValue({ items: [] }); });
+  beforeEach(() => { sessionStorage.clear(); localStorage.clear(); vi.clearAllMocks(); mock.role = "owner"; mock.permissions = undefined; mock.user = "purchase-test-user"; mock.gym = "purchase-test-gym"; mock.get.mockResolvedValue({ items: [{ id: "water", name: "Agua" }, { id: "bar", name: "Barra" }], total: 2 }); mock.post.mockResolvedValue({ items: [] }); });
   it("guarda varios productos en una sola operación y separa recepción de pago", async () => {
     show(); await add("Agua", "20", "10"); await add("Barra", "5", "12.50");
     expect(screen.getByText("$262.50")).toBeInTheDocument();
@@ -71,6 +74,26 @@ describe("Registro de compra", () => {
     expect(screen.queryByRole("radio", { name: "Pagado con dinero de caja" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
     await waitFor(() => expect(mock.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ paid: false })));
+  });
+  it("sin permiso de productos, el operador compra sólo productos que ya existen", async () => {
+    mock.role = "operator"; mock.permissions = []; show();
+    expect(screen.queryByRole("button", { name: "Nuevo producto" })).not.toBeInTheDocument();
+    expect(screen.getByText("Crear productos nuevos: Requiere el permiso «Productos y precios». Pídeselo al dueño.")).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Buscar producto"), { target: { value: "Bebida nueva" } });
+    expect(await screen.findByRole("button", { name: "Agua" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Crear “Bebida nueva”" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Buscar producto"), { target: { value: "" } });
+    await add("Agua", "2", "10");
+    fireEvent.click(screen.getByRole("button", { name: "Guardar compra" }));
+    await waitFor(() => expect(mock.post).toHaveBeenCalledTimes(1));
+    expect(mock.post.mock.calls[0][1].items[0]).not.toHaveProperty("new_product");
+  });
+  it("el dueño puede dar de alta un producto desde la compra", async () => {
+    mock.permissions = []; show();
+    expect(screen.getByRole("button", { name: "Nuevo producto" })).toBeInTheDocument();
+    expect(screen.queryByText(/Crear productos nuevos:/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Buscar producto"), { target: { value: "Bebida nueva" } });
+    expect(await screen.findByRole("button", { name: "Crear “Bebida nueva”" })).toBeInTheDocument();
   });
   it("crea el producto y la compra juntos, sin peticiones previas", async () => {
     show();

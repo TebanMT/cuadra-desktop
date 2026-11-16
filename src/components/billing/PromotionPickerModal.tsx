@@ -86,8 +86,7 @@ export function PromotionPickerModal({
       toast.success(t.picker.summary(p.name));
     } catch (e) {
       if (e instanceof ApiError) {
-        const data = e.details as Record<string, unknown> | null;
-        setCodeError((data?.exception as string | undefined) || t.picker.notFound);
+        setCodeError(e.message || t.picker.notFound);
       } else {
         setCodeError(t.picker.notFound);
       }
@@ -105,23 +104,33 @@ export function PromotionPickerModal({
 
         <div className="space-y-4">
           {/* Dropdown / lista de vigentes */}
-          <section className="space-y-2">
-            <Label className="text-xs uppercase tracking-wide text-muted-foreground">
+          <section className="space-y-2" aria-labelledby="promo-list-label">
+            <p id="promo-list-label" className="text-sm font-medium">
               {t.picker.chooseFromList}
-            </Label>
+            </p>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Search aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Buscar por nombre o código…"
+                aria-label="Buscar promoción por nombre o código"
                 className="pl-9"
               />
             </div>
             <div className="max-h-64 overflow-y-auto rounded-md border divide-y">
               {promosQuery.isLoading ? (
-                <div className="flex justify-center p-4">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                <p role="status" className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground">
+                  <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+                  Cargando promociones…
+                </p>
+              ) : promosQuery.isError ? (
+                // Un fallo no es «no hay promociones»: decirlo y ofrecer salida.
+                <div role="alert" className="space-y-2 p-3 text-sm">
+                  <p>No pudimos cargar las promociones. Puedes reintentar o usar un código.</p>
+                  <Button type="button" variant="outline" onClick={() => void promosQuery.refetch()}>
+                    Reintentar
+                  </Button>
                 </div>
               ) : filtered.length === 0 ? (
                 <p className="text-sm text-muted-foreground p-3 text-center">
@@ -137,20 +146,20 @@ export function PromotionPickerModal({
                       onOpenChange(false);
                       toast.success(t.picker.summary(p.name));
                     }}
-                    className="w-full text-left p-3 hover:bg-muted/50 flex items-center justify-between gap-3"
+                    className="flex min-h-12 w-full items-center justify-between gap-3 p-3 text-left hover:bg-muted/60"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-medium truncate">{p.name}</div>
                       <div className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
                         <span>{promotionKindLabels[p.kind]}</span>
                         {p.code && (
-                          <Badge variant="outline" className="font-mono text-[10px] py-0">
+                          <Badge variant="outline" className="py-0 font-mono text-xs">
                             {p.code.toUpperCase()}
                           </Badge>
                         )}
                       </div>
                     </div>
-                    <div className="text-sm font-semibold tabular-nums">
+                    <div className="text-sm font-semibold tabular">
                       {formatPromotionValue(p.kind, p.value, p.companion_count)}
                     </div>
                   </button>
@@ -159,15 +168,10 @@ export function PromotionPickerModal({
             </div>
           </section>
 
-          <div className="flex items-center gap-2">
-            <div className="flex-1 h-px bg-border" />
-            <span className="text-[11px] uppercase tracking-wide text-muted-foreground">o</span>
-            <div className="flex-1 h-px bg-border" />
-          </div>
-
-          {/* Input de código */}
-          <section className="space-y-2">
-            <Label htmlFor="promo-code-input" className="text-xs uppercase tracking-wide text-muted-foreground">
+          {/* Input de código. Su rótulo ya dice «O usa un código»: basta
+              un divisor fino, sin una «o» suelta repetida. */}
+          <section className="space-y-2 border-t pt-4">
+            <Label htmlFor="promo-code-input">
               {t.picker.enterCode}
             </Label>
             <div className="flex gap-2">

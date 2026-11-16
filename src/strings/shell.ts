@@ -10,14 +10,15 @@ export const shell = {
     checkin: "Entradas",
     reports: "Reportes",
     cashClose: "Caja",
-    settings: "Ajustes",
+    settings: "Configuración",
   },
   navGroups: {
     operation: "Operación",
     catalog: "Catálogo",
     reports: "Reportes",
-    settings: "Ajustes",
+    settings: "Configuración",
   },
+  roles: { owner: "Dueño", operator: "Operador" },
   user: {
     logout: "Cerrar sesión",
     profile: "Mi perfil",

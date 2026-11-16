@@ -1,6 +1,18 @@
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
+/** Shared page origin. Narrow forms align with catalogs instead of recentering.
+ * Embedded modules inherit their parent's gutters; workspaces use pane insets. */
+export function PageContainer({ children, className, contentWidth = "full", embedded = false }: {
+  children: React.ReactNode;
+  className?: string;
+  contentWidth?: "full" | "form" | "reading";
+  embedded?: boolean;
+}) {
+  const content = <div className={cn("min-w-0", !embedded && contentWidth === "form" && "max-w-3xl", !embedded && contentWidth === "reading" && "max-w-4xl", className)}>{children}</div>;
+  return embedded ? content : <div className="mx-auto w-full min-w-0 max-w-7xl p-6">{content}</div>;
+}
+
 interface PageHeaderProps {
   title: string;
   subtitle?: React.ReactNode;
@@ -8,9 +20,8 @@ interface PageHeaderProps {
 }
 
 /**
- * Petzul-style page header: title + subtitle on the left, primary actions
- * on the right. No KPIs in the header — those live in StatCards directly
- * inside the page body.
+ * Page header: title + subtitle on the left, primary actions
+ * on the right. Keep the title and contextual actions together.
  */
 export function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
   return (
@@ -39,9 +50,10 @@ interface SectionCardProps {
   action?: React.ReactNode;
   /** When true, content is rendered without padding (use for tables / lists). */
   flush?: boolean;
+  appearance?: "contained" | "plain";
 }
 
-/** Petzul-style Card with optional CardHeader area. */
+/** Sections may use open composition or a contained surface. */
 export function SectionCard({
   children,
   className,
@@ -49,16 +61,17 @@ export function SectionCard({
   description,
   action,
   flush = false,
+  appearance = "contained",
 }: SectionCardProps) {
   return (
     <section
       className={cn(
-        "rounded-xl border border-border bg-card text-card-foreground shadow-sm",
+        appearance === "plain" ? "text-foreground" : "rounded-xl border border-border bg-card text-card-foreground",
         className
       )}
     >
       {(title || action) && (
-        <header className="flex items-start justify-between gap-3 px-6 pt-5 pb-4">
+        <header className={cn("flex items-start justify-between gap-3 pb-4", appearance === "contained" && "px-6 pt-5")}>
           <div>
             {title && (
               <h2 className="text-base font-semibold text-foreground tracking-tight leading-none">
@@ -72,7 +85,7 @@ export function SectionCard({
           {action && <div className="flex items-center gap-2">{action}</div>}
         </header>
       )}
-      <div className={cn(!flush && "px-6 pb-6", title || action ? "" : "pt-6")}>
+      <div className={cn(appearance === "contained" && !flush && "px-6 pb-6", appearance === "contained" && !flush && !title && !action && "pt-6")}>
         {children}
       </div>
     </section>
@@ -86,14 +99,15 @@ interface FilterPillProps {
   onClick(): void;
 }
 
-/** Tab-style segment used as filter (Petzul tabs). */
+/** Named filter with a visible selection state. */
 export function FilterPill({ active, label, count, onClick }: FilterPillProps) {
   return (
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={active}
       className={cn(
-        "inline-flex items-center gap-2 h-9 px-3.5 rounded-md text-sm font-medium transition-colors shrink-0",
+        "inline-flex items-center gap-2 h-11 px-3.5 rounded-md text-sm font-medium transition-colors shrink-0",
         active
           ? "bg-foreground text-background"
           : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -121,16 +135,7 @@ interface EmptyStateProps {
   action?: React.ReactNode;
 }
 
-/**
- * Empty state — espacio respirado, heading en Fraunces (uno de los pocos
- * lugares donde la app usa display serif), subtítulo semantic
- * muted-foreground con max-w para que el copy no se estire en pantallas
- * anchas.
- *
- * Icon container: paper-200 en light, ink-700 lift en dark. Icon es
- * opcional; sin él, el heading queda solo (variante austera para empty
- * states dentro de widgets pequeños).
- */
+/** Estado vacío con acción de recuperación cuando está disponible. */
 export function EmptyState({ icon, title, hint, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-14 sm:py-16 px-6 text-center">
@@ -139,9 +144,9 @@ export function EmptyState({ icon, title, hint, action }: EmptyStateProps) {
           {icon}
         </div>
       )}
-      <h3 className="font-display text-2xl font-semibold text-foreground leading-tight">
+      <h2 className="font-display text-2xl text-foreground leading-tight">
         {title}
-      </h3>
+      </h2>
       {hint && (
         <p className="text-sm text-muted-foreground mt-2 max-w-md mx-auto leading-relaxed">
           {hint}
@@ -152,7 +157,7 @@ export function EmptyState({ icon, title, hint, action }: EmptyStateProps) {
   );
 }
 
-/** Plain table built to Petzul style (thead bg-muted/40, divide-y body). */
+/** Table with separators and aligned operational data. */
 export function DataTable({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
     <div className={cn("overflow-x-auto", className)}>
@@ -180,7 +185,7 @@ export function DataTableTh({
     <th
       scope="col"
       className={cn(
-        "px-5 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground",
+        "px-5 py-3 text-left text-xs font-semibold text-muted-foreground",
         className
       )}
     >

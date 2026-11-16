@@ -63,7 +63,9 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn() },
 }));
 
-vi.mock("@/components/cash/CashDrawerField", () => ({
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({
   CashDrawerField: ({
     value,
     onChange,
@@ -81,7 +83,8 @@ vi.mock("@/components/cash/CashDrawerField", () => ({
       <option value="drawer-back">Caja secundaria</option>
     </select>
   ),
-}));
+});
+});
 
 import { ProductRefundModal } from "../ProductRefundModal";
 

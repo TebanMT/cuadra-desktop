@@ -10,7 +10,9 @@ export const products = {
       statusAll: "Todos",
       statusActive: "Activos",
       statusInactive: "Desactivados",
-      lowStockOnly: "Solo existencias bajas",
+      // Mismo criterio y nombre que «Por surtir» en Inicio: existencias en o
+      // bajo el mínimo, incluidos los agotados.
+      lowStockOnly: "Solo por surtir",
     },
     columns: {
       photo: "",
@@ -22,8 +24,8 @@ export const products = {
       actions: "Acciones",
     },
     badges: {
-      ok: "OK",
-      low: "Bajo",
+      ok: "Con existencias",
+      low: "Pocas existencias",
       out: "Agotado",
       active: "Activo",
       inactive: "Desactivado",
@@ -48,6 +50,19 @@ export const products = {
     noResults: "No encontramos productos con esos filtros.",
     rowEdit: "Editar",
     rowAdjust: "Ajustar existencias",
+    rowAdjustLabel: (name: string) => `Ajustar existencias de ${name}`,
+    rowEditLabel: (name: string) => `Editar ${name}`,
+    stockSummary: {
+      low: "con pocas existencias",
+      out: (n: number) => (n === 1 ? "agotado" : "agotados"),
+    },
+    restricted: {
+      edit: "No puedes crear ni editar productos.",
+      adjust: "No puedes ajustar ni contar existencias.",
+    },
+    purchases: {
+      ownerHistory: "El historial de compras y sus pagos los consulta el dueño.",
+    },
     rowDeactivate: "Desactivar",
     rowReactivate: "Reactivar",
     deactivateConfirm: {

@@ -1,3 +1,5 @@
+import { useCanWrite } from "@/lib/writeAccess";
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { validateDateFields } from "@/lib/date-input";
 import { DateInput } from "@/components/ui/date-input";
 import { useEffect, useRef, useState } from "react";
@@ -9,6 +11,7 @@ import { api } from "@/lib/api";
 import { todayIso } from "@/lib/dates";
 import { createIdempotencyKey } from "@/lib/idempotency";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { permissionHint, usePermission } from "@/lib/permissions";
 import { useDebounce } from "@/hooks/useDebounce";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,12 +36,19 @@ export default function RegisterPurchasePage() {
 function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey: string }) {
   const role = useAuthStore(s => s.user?.role);
   const owner = role === "owner";
-  const canPayFromCash = owner || (isDesktop && role === "operator");
+  // Reception pays a purchase only with drawer cash, which takes money out
+  // of the caja: that needs "cash_out". Leaving it pending stays open.
+  const mayCashOut = usePermission("cash_out");
+  // A new product inside the purchase creates it with a sale price, which
+  // is the "products" permission. Picking existing products stays open.
+  const mayCreateProducts = usePermission("products");
+  const canPayFromCash = owner || (isDesktop && role === "operator" && mayCashOut);
   const navigate = useNavigate();
   const location = useLocation();
   const entry = (location.state || {}) as Entry;
   const returnTo = entry.returnTo && /^\/(products|expenses)(\?|$)/.test(entry.returnTo) && (owner || !entry.returnTo.startsWith("/expenses")) ? entry.returnTo : "/products?view=purchases";
   const { draft, update, clear, reload, conflict, blocked, storageError } = usePurchaseDraft(storageKey, legacyKey, isDesktop);
+  const [cashReady, setCashReady] = useState(false);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -98,13 +108,14 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
     setFieldErrors(current => { const next = { ...current }; delete next[`${id}:${field}`]; return next; });
   }
   function startNewProduct() {
+    if (!mayCreateProducts) return;
     if (update(d => ({ ...d, newProduct: { name: d.search.trim(), price: "" } }))) {
       setPicking(false); setFieldErrors({});
       requestAnimationFrame(() => document.getElementById("new-product-name")?.focus());
     }
   }
   function addNewProduct() {
-    if (!draft.newProduct || locked) return;
+    if (!draft.newProduct || locked || !mayCreateProducts) return;
     const name = draft.newProduct.name.trim();
     const problems: Record<string, string> = {};
     if (name.length < 2 || name.length > 100) problems.newName = "Escribe un nombre de 2 a 100 caracteres.";
@@ -128,7 +139,8 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
       }
     }
     if (draft.paid) {
-      if (!canPayFromCash) problems.payment = "Solo el dueño puede registrar pagos desde la web.";
+      if (draft.source === "cash_drawer" && !cashReady) problems.source = "Confirma la caja antes de guardar.";
+      if (!canPayFromCash) problems.payment = role === "operator" && !mayCashOut ? `Para pagar con dinero de caja: ${permissionHint("cash_out")} Déjala pendiente de pago.` : "Solo el dueño puede registrar pagos desde la web.";
       else if (draft.source !== "cash_drawer" && !owner) problems.payment = "En recepción puedes pagar con dinero de caja o dejar el pago pendiente.";
       if (draft.source === "cash_drawer" && draft.method !== "cash") problems.payment = "Vuelve a seleccionar el pago con dinero de caja.";
       if (!draft.source) problems.source = "Selecciona de dónde salió el dinero.";
@@ -138,13 +150,16 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
     if (Object.keys(problems).length) requestAnimationFrame(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
     return !Object.keys(problems).length;
   }
+  const canWrite = useCanWrite();
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (sending.current || blocked) return;
+    if (!canWrite || sending.current || blocked) return;
     setError(null);
     const retry = !!draft.attempt;
     if (!retry && !validate()) return;
     if (!retry && draft.newProduct) { setError("Agrega el producto nuevo a la compra o cancela su captura."); return; }
+    // A draft saved before the permission was turned off may still carry one.
+    if (!mayCreateProducts && (draft.newProduct || draft.lines.some(line => line.newProduct))) { setError(`Para crear productos nuevos: ${permissionHint("products")} Quítalos de la compra.`); return; }
     const request = draft.attempt || {
       id: draft.id, items: draft.lines.map(line => ({ product_id: line.id, quantity: Number(line.quantity), unit_cost: Number(line.cost),
         ...(line.newProduct ? { new_product: { name: line.name.trim(), price: Number(line.newProduct.price) } } : {}) })),
@@ -169,7 +184,7 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
   }
   function fieldError(key: string) { return fieldErrors[key] ? <p id={`error-${key}`} className="text-xs text-destructive mt-1">{fieldErrors[key]}</p> : null; }
   const invalid = (key: string) => ({ "aria-invalid": !!fieldErrors[key], "aria-describedby": fieldErrors[key] ? `error-${key}` : undefined });
-  return <div className="mx-auto max-w-5xl p-4 sm:p-6 pb-32 sm:pb-32">
+  return <PageContainer className="pb-32 sm:pb-32">
     <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-2"><Button type="button" variant="ghost" size="icon" aria-label="Volver" onClick={() => navigate(returnTo)}><ArrowLeft /></Button><h1 className="text-xl sm:text-2xl font-semibold">Registrar compra</h1></div>
       {hasDraft && !draft.attempt && !conflict && <span role="status" className="text-xs text-muted-foreground">Borrador guardado en este dispositivo</span>}
@@ -177,7 +192,7 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
     {conflict && <div role="alert" className="mb-4 rounded-lg border p-4 text-sm">Esta compra cambió en otra pestaña. Carga el borrador actual para continuar. <Button variant="link" onClick={reload}>Cargar borrador</Button></div>}
     {storageError && <p role="alert" className="mb-4 text-sm text-destructive">{storageError}</p>}
     <form onSubmitCapture={validateDateFields} onSubmit={submit} noValidate className="space-y-6">
-      <fieldset disabled={locked} className="min-w-0 space-y-6">
+      <fieldset disabled={!canWrite || locked} className="min-w-0 space-y-6">
         <section aria-label="Productos de la compra" className="rounded-xl border bg-card">
           <div className="p-4 sm:p-5 border-b space-y-3">
             <h2 className="font-semibold">Productos</h2>
@@ -185,14 +200,15 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
               <Input ref={searchRef} className="flex-1 min-w-40" aria-label="Buscar producto" {...invalid("products")} placeholder={draft.lines.length ? "Agregar otro producto" : "Buscar producto"} value={draft.search} onFocus={() => setPicking(true)} onChange={e => { update(d => ({ ...d, search: e.target.value })); setPicking(true); }} onKeyDown={e => {
                 if (e.key === "Enter") { e.preventDefault(); if (!searching && !products.isError && available.length === 1) addProduct(available[0]); }
               }} />
-              <Button type="button" variant="outline" disabled={!!draft.newProduct || draft.lines.length >= 100} onClick={startNewProduct}><Plus />Nuevo producto</Button>
+              {mayCreateProducts && <Button type="button" variant="outline" disabled={!!draft.newProduct || draft.lines.length >= 100} onClick={startNewProduct}><Plus />Nuevo producto</Button>}
             </div>
+            {!mayCreateProducts && <p className="text-xs text-muted-foreground">Crear productos nuevos: {permissionHint("products")}</p>}
             {fieldError("products")}
             {(picking || (!draft.newProduct && (draft.search.trim() || !draft.lines.length))) && <div className="max-h-52 overflow-y-auto">
               {searching ? <p role="status" className="py-2 text-sm text-muted-foreground">Buscando productos…</p> : products.isError ? <p role="alert" className="text-sm">No se pudieron cargar los productos. <Button type="button" variant="link" onClick={() => products.refetch()}>Reintentar</Button></p> : <>
                 {available.map(p => <button type="button" key={p.id} disabled={draft.lines.length >= 100} className="w-full flex items-center gap-2 rounded-md px-2 py-2.5 text-left text-sm hover:bg-muted disabled:opacity-50" onClick={() => addProduct(p)}><Plus className="h-4 w-4 shrink-0" />{p.name}</button>)}
                 {!available.length && <p className="py-2 text-sm text-muted-foreground">{draft.search.trim() ? "No encontramos otro producto con ese nombre." : draft.lines.length ? "Los productos de esta lista ya están agregados." : "Agrega el primer producto de tu catálogo."}</p>}
-                {!draft.newProduct && draft.search.trim().length >= 2 && !products.data?.items.some(p => p.name.toLocaleLowerCase() === draft.search.trim().toLocaleLowerCase()) && <Button type="button" variant="link" disabled={draft.lines.length >= 100} className="h-auto whitespace-normal text-left" onClick={startNewProduct}>Crear “{draft.search.trim()}”</Button>}
+                {mayCreateProducts && !draft.newProduct && draft.search.trim().length >= 2 && !products.data?.items.some(p => p.name.toLocaleLowerCase() === draft.search.trim().toLocaleLowerCase()) && <Button requiresWrite type="button" variant="link" disabled={draft.lines.length >= 100} className="h-auto whitespace-normal text-left min-h-11" onClick={startNewProduct}>Crear “{draft.search.trim()}”</Button>}
               </>}
             </div>}
             {draft.newProduct && <div className="rounded-lg bg-muted/50 p-4 space-y-3" aria-label="Nuevo producto">
@@ -230,14 +246,15 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
                 {label}
               </label>)}
             </div>
+            {role === "operator" && !mayCashOut && <p className="text-xs text-muted-foreground">Pagar con dinero de caja: {permissionHint("cash_out")}</p>}
             {fieldError("payment")}
           </fieldset>
           {draft.paid && <div className="grid sm:grid-cols-2 gap-4 pt-2">
-            {owner && <label className="text-sm sm:col-span-2">Pagado desde<select aria-label="Pagado desde" className="flex h-10 w-full rounded-md border bg-background px-3" value={draft.source} {...invalid("source")} onChange={e => chooseSource(e.target.value)}><option value="">Selecciona el origen del dinero</option><option value="cash_drawer">Dinero de caja</option><option value="gym_fund">Dinero del gimnasio fuera de caja</option><option value="external">Dinero personal</option></select>{fieldError("source")}</label>}
+            {owner && <label className="text-sm sm:col-span-2">Pagado desde<select aria-label="Pagado desde" className="flex h-11 w-full rounded-md border bg-background px-3" value={draft.source} {...invalid("source")} onChange={e => chooseSource(e.target.value)}><option value="">Selecciona el origen del dinero</option><option value="cash_drawer">Dinero de caja</option><option value="gym_fund">Dinero del gimnasio fuera de caja</option><option value="external">Dinero personal</option></select>{fieldError("source")}</label>}
             <label className="text-sm">Fecha de pago<DateInput aria-label="Fecha de pago" context="recent" max={todayIso()} value={draft.day} {...invalid("day")} onValueChange={e => update(d => ({ ...d, day: e }))} />{fieldError("day")}</label>
-            {draft.source && draft.source !== "cash_drawer" && owner && <label className="text-sm">Método de pago<select className="flex h-10 w-full rounded-md border bg-background px-3" value={draft.method} onChange={e => update(d => ({ ...d, method: e.target.value }))}><option value="transfer">Transferencia</option><option value="cash">Efectivo</option><option value="card">Tarjeta</option></select></label>}
+            {draft.source && draft.source !== "cash_drawer" && owner && <label className="text-sm">Método de pago<select className="flex h-11 w-full rounded-md border bg-background px-3" value={draft.method} onChange={e => update(d => ({ ...d, method: e.target.value }))}><option value="transfer">Transferencia</option><option value="cash">Efectivo</option><option value="card">Tarjeta</option></select></label>}
             {draft.source === "cash_drawer" && canPayFromCash && <>
-              <CashDrawerField value={draft.drawer} onChange={drawer => update(d => ({ ...d, drawer }))} />
+              <CashDrawerField onReadyChange={setCashReady} value={draft.drawer} onChange={drawer => update(d => ({ ...d, drawer }))} />
               <p className="text-sm text-muted-foreground sm:col-span-2">Se descontarán {money(Number.isFinite(total) ? total : 0)} de caja.</p>
             </>}
           </div>}
@@ -246,10 +263,10 @@ function PurchasePage({ storageKey, legacyKey }: { storageKey: string; legacyKey
       {draft.attempt && !save.isPending && !error && <p role="alert" className="text-sm">Falta confirmar si se guardó la compra. Vuelve a intentar.</p>}
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {hasDraft && !draft.attempt && <Button type="button" variant="ghost" disabled={locked} onClick={() => setDiscarding(true)}>Descartar borrador</Button>}
-      <div className="fixed bottom-0 left-[70px] right-0 z-30 border-t bg-background px-4 py-3 sm:px-6">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-3"><div><p className="text-xs text-muted-foreground">Total</p><p className="text-xl font-semibold tabular-nums">{money(Number.isFinite(total) ? total : 0)}</p></div><Button type="submit" disabled={save.isPending || blocked}>{save.isPending ? "Guardando…" : draft.attempt ? "Reintentar registro" : "Guardar compra"}</Button></div>
+      <div className="fixed bottom-0 left-[var(--sidebar-width,70px)] right-0 z-30 border-t bg-background py-3">
+        <div className="mx-auto flex max-w-7xl px-6 items-center justify-between gap-3"><div><p className="text-xs text-muted-foreground">Total</p><p className="text-xl font-semibold tabular-nums">{money(Number.isFinite(total) ? total : 0)}</p></div><Button requiresWrite type="submit" disabled={save.isPending || blocked || (!draft.attempt && draft.paid && draft.source === "cash_drawer" && !cashReady)}>{save.isPending ? "Guardando…" : draft.attempt ? "Reintentar registro" : "Guardar compra"}</Button></div>
       </div>
     </form>
     <Dialog open={discarding} onOpenChange={setDiscarding}><DialogContent><DialogHeader><DialogTitle>¿Descartar esta compra?</DialogTitle><DialogDescription>Se quitarán los datos del borrador. La compra todavía no se ha registrado.</DialogDescription></DialogHeader><DialogFooter><Button type="button" variant="outline" onClick={() => setDiscarding(false)}>Seguir capturando</Button><Button type="button" onClick={() => { if (update(() => emptyPurchaseDraft(isDesktop))) { setFieldErrors({}); setError(null); setPicking(false); setDiscarding(false); } }}>Descartar borrador</Button></DialogFooter></DialogContent></Dialog>
-  </div>;
+  </PageContainer>;
 }

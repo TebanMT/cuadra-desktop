@@ -81,7 +81,7 @@ export function MemberAssociator({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t.page.associateSearchPlaceholder}
-          className="pl-9 pr-9 h-10"
+          className="pl-9 pr-9 h-11"
           onKeyDown={(e) => {
             // Esc colapsa la búsqueda SIN cerrar el modal de cobro.
             if (e.key === "Escape") {

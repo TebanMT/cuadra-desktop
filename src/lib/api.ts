@@ -1,3 +1,4 @@
+import { assertRequestAllowed } from "./writeAccess";
 import { apiErrorMessage } from "./apiErrorMessage";
 import {
   getLocalAuthToken,
@@ -124,7 +125,8 @@ export function setOnAuthExpired(handler: (() => void) | null) {
 // el FE pueda forzar la pantalla de bloqueo aun si el operador estaba a
 // mitad de un flujo cuando el sync trajo el flip a cancelled.
 export interface SubscriptionInactivePayload {
-  error: "subscription_inactive";
+  // subscription_read_only: prueba vencida, la recepción queda en solo lectura.
+  error: "subscription_inactive" | "subscription_read_only";
   message: string;
   subscription_status: string;
   subscription_ends_at: string | null;
@@ -211,6 +213,7 @@ async function rawRequest<T>(
   path: string,
   opts: RequestOptions = {}
 ): Promise<T> {
+  assertRequestAllowed(method, path);
   const { baseUrl, localToken } = await boot();
   const url = new URL(path.startsWith("http") ? path : `${baseUrl}${path}`);
   if (opts.query) {
@@ -262,9 +265,12 @@ async function rawRequest<T>(
       // auth store (subscription_status='cancelled') y redirigir. El throw
       // se mantiene para que el caller que disparó el request vea el error
       // y deje de procesar.
+      // subscription_read_only (prueba vencida) usa el mismo callback: al
+      // actualizar el gym, el store recalcula readOnly y la app pasa a solo
+      // lectura sin sacar al operador de su pantalla.
       if (
         res.status === 402 &&
-        payload?.error === "subscription_inactive" &&
+        (payload?.error === "subscription_inactive" || payload?.error === "subscription_read_only") &&
         onSubscriptionInactive
       ) {
         onSubscriptionInactive(payload as SubscriptionInactivePayload);
@@ -377,6 +383,7 @@ async function postFormData<T>(
   data: FormData,
   query?: RequestOptions["query"]
 ): Promise<T> {
+  assertRequestAllowed("POST", path);
   const { baseUrl, localToken } = await boot();
   const url = new URL(path.startsWith("http") ? path : `${baseUrl}${path}`);
   if (query) {

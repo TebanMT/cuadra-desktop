@@ -4,7 +4,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { income, entry, success } = vi.hoisted(() => ({ income: vi.fn(), entry: vi.fn(), success: vi.fn() }));
 vi.mock("@/hooks/useBilling", () => ({ useRegisterOtherIncome: () => ({ mutateAsync: income, isPending: false }) }));
 vi.mock("@/hooks/useExpenses", () => ({ useRecordCashEntry: () => ({ mutateAsync: entry, isPending: false }) }));
-vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: () => null }));
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({ CashDrawerField: () => null });
+});
 vi.mock("sonner", () => ({ toast: { success } }));
 import { OtherIncomeDialog } from "../OtherIncomeDialog";
 

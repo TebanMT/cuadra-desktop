@@ -1,3 +1,5 @@
+import { fireEvent } from "@testing-library/react";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -15,6 +17,7 @@ vi.mock("@/lib/api", async () => {
       // de planes renderiza Links sin Router y el test truena según el
       // timing. Miembros → lista vacía; todo lo demás → los planes.
       get: vi.fn(async (path: string) => {
+        if (path.endsWith("/charge-settings")) return {};
         // OJO: "/membership-types" también contiene "/members" — el match
         // debe ser del endpoint exacto (con ? o fin de string).
         if (typeof path === "string" && /\/members(\?|$)/.test(path)) {
@@ -41,7 +44,7 @@ vi.mock("@/lib/api", async () => {
 });
 
 describe("MemberForm", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => { vi.clearAllMocks(); useAuthStore.setState({ readOnly: false }); });
 
   function renderCreateForm(onSubmit: ReturnType<typeof vi.fn>) {
     return renderWithProviders(
@@ -61,7 +64,7 @@ describe("MemberForm", () => {
     const onSubmit = vi.fn();
     renderCreateForm(onSubmit);
 
-    await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
+    await user.click(screen.getByRole("button", { name: /inscribir y cobrar/i }));
 
     expect(await screen.findByText(/el nombre debe tener entre 3 y 100/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -76,7 +79,7 @@ describe("MemberForm", () => {
     // /^teléfono/ y no /teléfono/: el label del check "Sin teléfono"
     // también contiene la palabra y el matcher laxo daría ambigüedad.
     await user.type(screen.getByLabelText(/^teléfono/i), "12345");
-    await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
+    await user.click(screen.getByRole("button", { name: /inscribir y cobrar/i }));
 
     expect(await screen.findByText(/teléfono de 10 dígitos/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
@@ -90,7 +93,7 @@ describe("MemberForm", () => {
     await user.type(screen.getByLabelText(/nombre completo/i), "Juan Pérez");
 
     // Sin el check, teléfono vacío rebota.
-    await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
+    await user.click(screen.getByRole("button", { name: /inscribir y cobrar/i }));
     expect(await screen.findByText(/teléfono de 10 dígitos/i)).toBeInTheDocument();
     expect(onSubmit).not.toHaveBeenCalled();
 
@@ -100,7 +103,7 @@ describe("MemberForm", () => {
     expect(screen.getByLabelText(/^teléfono/i)).toBeDisabled();
     expect(screen.getByText(/no recibirá avisos por whatsapp/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
+    await user.click(screen.getByRole("button", { name: /inscribir y cobrar/i }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
     const payload = onSubmit.mock.calls[0][0];
     expect(payload.values.no_phone).toBe(true);
@@ -116,8 +119,19 @@ describe("MemberForm", () => {
     await user.type(screen.getByLabelText(/^teléfono/i), "4421234567");
     await user.click(screen.getByLabelText(/sin teléfono/i));
 
-    await user.click(screen.getByRole("button", { name: /inscribir socio/i }));
+    await user.click(screen.getByRole("button", { name: /inscribir y cobrar/i }));
     expect(onSubmit).toHaveBeenCalledTimes(1);
     expect(onSubmit.mock.calls[0][0].values.phone).toBe("");
   });
+  it("declares the charge and blocks both click and form submit in read-only", async () => {
+    useAuthStore.setState({ readOnly: true });
+    const onSubmit = vi.fn();
+    renderCreateForm(onSubmit);
+    const submit = screen.getByRole("button", { name: /inscribir y cobrar/i });
+    expect(submit).toBeDisabled();
+    fireEvent.submit(submit.closest("form")!);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.getByText(/la recepción está en solo lectura/)).toBeInTheDocument();
+  });
+
 });

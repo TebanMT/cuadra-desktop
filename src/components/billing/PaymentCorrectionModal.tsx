@@ -51,7 +51,6 @@ function errorMessage(error: unknown): string {
   if (!(error instanceof ApiError)) return "No pudimos guardar la corrección.";
   const details = error.details as Record<string, unknown> | undefined;
   return (
-    (typeof details?.exception === "string" && details.exception) ||
     (typeof details?.message === "string" && details.message) ||
     error.message ||
     "No pudimos guardar la corrección."
@@ -63,6 +62,7 @@ function errorMessage(error: unknown): string {
  * It deliberately does not perform a refund or rewrite the service delivered.
  */
 export function PaymentCorrectionModal({ payment, open, onOpenChange }: Props) {
+  const [cashReady, setCashReady] = useState(false);
   const correction = useCorrectPayment(payment?.id ?? "");
   const history = usePaymentCorrectionHistory(payment?.id, open);
   const [amount, setAmount] = useState("");
@@ -113,6 +113,7 @@ export function PaymentCorrectionModal({ payment, open, onOpenChange }: Props) {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (!annul && method === "cash" && cashDestination === "cash_drawer" && !cashReady) return setError("Confirma la caja antes de corregir el cobro.");
     setError(null);
     if (!payment) return;
     if (!annul && (!Number.isFinite(numericAmount) || numericAmount <= 0)) {
@@ -172,7 +173,7 @@ export function PaymentCorrectionModal({ payment, open, onOpenChange }: Props) {
   const supported = payment?.concept === "membership" || payment?.concept === "other";
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} busy={correction.isPending} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Corregir cobro capturado</DialogTitle>
@@ -248,10 +249,10 @@ export function PaymentCorrectionModal({ payment, open, onOpenChange }: Props) {
                   </SelectContent>
                 </Select>
               </div>
-              {payment?.concept === "other" && method === "cash" && <div className="space-y-2 sm:col-span-2"><Label htmlFor="correct-income-destination">¿Dónde quedó el efectivo?</Label><select id="correct-income-destination" className="w-full h-10 border rounded-md bg-background px-3 text-sm" value={cashDestination} onChange={e => setCashDestination(e.target.value as typeof cashDestination)}><option value="cash_drawer">Caja de recepción</option><option value="gym_fund">Dinero del gimnasio fuera de caja</option></select></div>}
+              {payment?.concept === "other" && method === "cash" && <div className="space-y-2 sm:col-span-2"><Label htmlFor="correct-income-destination">¿Dónde quedó el efectivo?</Label><select id="correct-income-destination" className="w-full h-11 border rounded-md bg-background px-3 text-sm" value={cashDestination} onChange={e => setCashDestination(e.target.value as typeof cashDestination)}><option value="cash_drawer">Caja de recepción</option><option value="gym_fund">Dinero del gimnasio fuera de caja</option></select></div>}
               {method === "cash" && cashDestination === "cash_drawer" && (
                 <div className="sm:col-span-2">
-                  <CashDrawerField
+                  <CashDrawerField onReadyChange={setCashReady}
                     id="payment-correction-drawer"
                     value={cashDrawerId}
                     onChange={setCashDrawerId}
@@ -280,10 +281,10 @@ export function PaymentCorrectionModal({ payment, open, onOpenChange }: Props) {
               <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>
             )}
             <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" disabled={correction.isPending} onClick={() => onOpenChange(false)}>
                 Cancelar
               </Button>
-              <Button type="submit" disabled={correction.isPending}>
+              <Button requiresWrite type="submit" disabled={(!annul && method === "cash" && cashDestination === "cash_drawer") && !cashReady || correction.isPending}>
                 {correction.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 {annul ? "Anular ingreso" : "Guardar corrección"}
               </Button>

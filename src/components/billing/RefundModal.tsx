@@ -37,6 +37,7 @@ interface Props {
 }
 
 export function RefundModal({ payment, open, onOpenChange }: Props) {
+  const [cashReady, setCashReady] = useState(false);
   const isMembership = payment.concept === "membership";
   const isProduct = payment.concept === "product";
   const isSettlement = payment.concept === "balance_settlement";
@@ -88,6 +89,7 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    if (moneyReturned === "cash" && !cashReady) return setError("Confirma la caja antes de devolver el dinero.");
     setError(null);
     if (isProduct) {
       setError(t.refund.productRequiresLines);
@@ -139,8 +141,7 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
       onOpenChange(false);
     } catch (err) {
       if (err instanceof ApiError) {
-        const data = err.details as Record<string, unknown> | null;
-        setError((data?.exception as string | undefined) || t.refund.errors.generic);
+                setError(err.message || t.refund.errors.generic);
       } else {
         setError(t.refund.errors.generic);
       }
@@ -148,9 +149,9 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+    <Dialog open={open} busy={refund.isPending} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-w-md flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 px-6 pb-4 pt-6 pr-12">
           <DialogTitle>Registrar devolución</DialogTitle>
           <DialogDescription>
             Registra el dinero que entregas al cliente.
@@ -158,7 +159,7 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
         </DialogHeader>
 
         {isProduct ? (
-          <div className="space-y-4">
+          <div className="space-y-4 overflow-y-auto px-6 pb-6">
             <Alert variant="warning">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>{t.refund.productRequiresLines}</AlertDescription>
@@ -170,7 +171,8 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
             </div>
           </div>
         ) : (
-          <form onSubmitCapture={validateDateFields} onSubmit={submit} className="space-y-4">
+          <form onSubmitCapture={validateDateFields} onSubmit={submit} className="flex min-h-0 flex-col">
+            <div className="min-h-0 space-y-4 overflow-y-auto px-6 pb-4">
             {error && (
               <Alert variant="destructive">
                 <AlertDescription>{error}</AlertDescription>
@@ -269,7 +271,7 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
 
             <div className="space-y-2">
               <Label>{t.refund.moneyLabel}</Label>
-              <RadioGroup
+              <RadioGroup aria-label="Método de pago"
                 value={moneyReturned}
                 onValueChange={(value) => setMoneyReturned(value as RefundMoneyReturn)}
                 className="space-y-1.5"
@@ -290,7 +292,7 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
             </div>
 
             {moneyReturned === "cash" && (
-              <CashDrawerField
+              <CashDrawerField onReadyChange={setCashReady}
                 value={cashDrawerId}
                 onChange={setCashDrawerId}
                 id="membership-refund-cash-drawer"
@@ -302,7 +304,10 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
               <span>{t.refund.disclaimer}</span>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            </div>
+            <div className="shrink-0 space-y-3 border-t bg-background px-6 py-4">
+              <p className="text-sm">Devolverás <strong className="tabular-nums">{fmtMoney(Number.isFinite(amountValue) ? amountValue : 0)}</strong> · {t.refund.money[moneyReturned]}</p>
+              <div className="flex flex-wrap justify-end gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -311,14 +316,15 @@ export function RefundModal({ payment, open, onOpenChange }: Props) {
               >
                 {t.refund.cancel}
               </Button>
-              <Button
+              <Button requiresWrite
                 type="submit"
                 variant="destructive"
-                disabled={refund.isPending || preview.isLoading || !preview.data}
+                disabled={(moneyReturned === "cash") && !cashReady || refund.isPending || preview.isLoading || !preview.data}
               >
                 {refund.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {t.refund.submit}
               </Button>
+            </div>
             </div>
           </form>
         )}

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { api, clearTokens, getAccessToken, setTokens } from "@/lib/api";
 import { useAuthStore, type AuthGym, type AuthUser } from "@/stores/useAuthStore";
+import type { Permission } from "@/lib/permissions";
 import { queryClient } from "@/lib/queryClient";
 import { useSyncStatus } from "@/hooks/useSyncStatus";
 
@@ -10,6 +11,8 @@ import { useSyncStatus } from "@/hooks/useSyncStatus";
 // sidecar credential the SidecarAuthProxy persists during login (ADR-008
 // §3.3). The desktop no longer relays the operator JWT to the sidecar —
 // auth and sync are decoupled at the credential layer.
+
+let sessionGeneration = 0;
 
 interface LoginResponse {
   user_id: string;
@@ -29,6 +32,7 @@ interface LoginResponse {
   subscription_status?: "active" | "past_due" | "cancelled";
   subscription_ends_at?: string | null;
   must_change_password?: boolean;
+  permissions?: Permission[];
 }
 
 export function useLogin() {
@@ -38,6 +42,7 @@ export function useLogin() {
     mutationFn: async (input: { email: string; password: string; remember?: boolean }) => {
       const data = await api.post<LoginResponse>("/api/v1/auth/login", input, { skipAuth: true });
       await setTokens(data.access_token, data.refresh_token);
+      sessionGeneration += 1;
       const user: AuthUser = {
         user_id: data.user_id,
         full_name: data.full_name,
@@ -45,6 +50,8 @@ export function useLogin() {
         phone: data.phone ?? null,
         role: data.role,
         has_pin: data.has_pin ?? false,
+        must_change_password: data.must_change_password ?? false,
+        permissions: data.permissions,
       };
       const gym: AuthGym = {
         gym_id: data.gym_id,
@@ -68,6 +75,7 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: async () => {
+      sessionGeneration += 1;
       try {
         await api.post("/api/v1/auth/logout", {});
       } catch {
@@ -93,6 +101,7 @@ interface SignupResponse {
 }
 
 interface RedeemInstallerResponse {
+  must_change_password?: boolean;
   user_id: string;
   gym_id: string;
   full_name: string;
@@ -110,6 +119,7 @@ interface RedeemInstallerResponse {
   subscription_status?: "active" | "past_due" | "cancelled";
   subscription_ends_at?: string | null;
   sidecar_token?: string;
+  permissions?: Permission[];
 }
 
 // useRedeemInstallerBootstrap swaps the one-time installer code for a full
@@ -134,6 +144,8 @@ export function useRedeemInstallerBootstrap() {
           phone: data.phone ?? null,
           role: data.role,
           has_pin: data.has_pin ?? false,
+          must_change_password: data.must_change_password ?? false,
+          permissions: data.permissions,
         },
         {
           gym_id: data.gym_id,
@@ -159,6 +171,10 @@ export function useSignup() {
       full_name: string;
       email: string;
       password: string;
+      // El cloud rechaza el alta sin la aceptación de Términos y Aviso
+      // de Privacidad. Hoy el alta vive en el dashboard; esto evita que
+      // un caller nuevo la omita.
+      accepted_legal: boolean;
     }) => {
       const data = await api.post<SignupResponse>(
         "/api/v1/auth/signup",
@@ -174,6 +190,7 @@ export function useSignup() {
           phone: null,
           role: "owner",
           has_pin: data.has_pin ?? true,
+          must_change_password: false,
         },
         {
           gym_id: data.gym_id,
@@ -201,6 +218,12 @@ export function useConfirmPasswordReset() {
   return useMutation({
     mutationFn: (input: { token: string; new_password: string }) =>
       api.post("/api/v1/auth/reset-password", input, { skipAuth: true }),
+    onSuccess: async () => {
+      sessionGeneration += 1;
+      await clearTokens();
+      useAuthStore.getState().clear();
+      queryClient.clear();
+    },
   });
 }
 
@@ -226,7 +249,9 @@ export function useUpdateMe() {
       return api.patch<AuthUser>("/api/v1/auth/me", input);
     },
     onSuccess: (updated) => {
-      if (gym) setSession(updated, gym);
+      // PATCH /auth/me edits the profile only; keep the permissions we have.
+      const permissions = updated.permissions ?? useAuthStore.getState().user?.permissions;
+      if (gym) setSession({ ...updated, permissions }, gym);
     },
   });
 }
@@ -307,6 +332,8 @@ export function useLoginPIN() {
           role: data.role,
           // Logging in via PIN proves the user has one.
           has_pin: data.has_pin ?? true,
+          must_change_password: data.must_change_password ?? false,
+          permissions: data.permissions,
         },
         {
           gym_id: data.gym_id,
@@ -354,11 +381,12 @@ export function useHydrateAuth() {
     let alive = true;
 
     const reload = async () => {
+      const generation = sessionGeneration;
       const token = await getAccessToken();
       if (!token) return;
       try {
         const me = await api.get<MeResponse>("/api/v1/auth/me");
-        if (alive) setSession(me.user, me.gym);
+        if (alive && generation === sessionGeneration) setSession(me.user, me.gym);
       } catch {
         // /auth/me failed — sidecar might be booting, JWT_SECRET might
         // have rotated, network might be flaky. None of these justify

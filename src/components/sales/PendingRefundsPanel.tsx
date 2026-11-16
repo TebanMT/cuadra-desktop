@@ -46,6 +46,7 @@ export function PendingRefundsPanel({
   const isOwner = useAuthStore((state) => state.user?.role === "owner");
   const [selected, setSelected] = useState<PendingSaleRefund | null>(null);
   const [method, setMethod] = useState<PaymentMethod>(defaultMethod ?? "cash");
+  const [cashReady, setCashReady] = useState(false);
   const [cashDrawerId, setCashDrawerId] = useState<string>();
   const [date, setDate] = useState(todayIso());
   const [idempotencyKey, setIdempotencyKey] = useState(createIdempotencyKey);
@@ -71,6 +72,7 @@ export function PendingRefundsPanel({
 
   async function settle() {
     if (!selected || !isOwner) return;
+    if (method === "cash" && !cashReady) return setError("Confirma la caja antes de registrar la devolución.");
     setError(null);
     try {
       const response = await settlement.mutateAsync({
@@ -85,9 +87,7 @@ export function PendingRefundsPanel({
       if (caught instanceof ApiError) {
         const details = caught.details as Record<string, unknown> | null;
         setError(
-          (details?.exception as string | undefined) ||
-            (details?.message as string | undefined) ||
-            caught.message ||
+          caught.message ||
             t.page.pendingRefund.error
         );
         return;
@@ -168,7 +168,7 @@ export function PendingRefundsPanel({
                     </RadioGroup>
                   </fieldset>
                   {method === "cash" && (
-                    <CashDrawerField
+                    <CashDrawerField onReadyChange={setCashReady}
                       date={date}
                       value={cashDrawerId}
                       onChange={setCashDrawerId}

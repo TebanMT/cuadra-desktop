@@ -103,17 +103,47 @@ describe("bannerLevelFor", () => {
     ).toBe("past_due");
   });
 
-  it("cancelled → cancelled", () => {
+  it("plan de pago cancelled → cancelled", () => {
+    expect(
+      bannerLevelFor(
+        {
+          subscription_plan: "standard",
+          subscription_status: "cancelled",
+          trial_ends_at: null,
+        },
+        NOW
+      )
+    ).toBe("cancelled");
+  });
+
+  it("prueba cerrada con gracia vigente → trial_grace (nunca cancelled)", () => {
     expect(
       bannerLevelFor(
         {
           subscription_plan: "trial",
           subscription_status: "cancelled",
-          trial_ends_at: iso(inDays(10)),
+          trial_ends_at: iso(inDays(-1)),
+          period_ends_at: iso(inDays(2)),
         },
         NOW
       )
-    ).toBe("cancelled");
+    ).toBe("trial_grace");
+  });
+
+  it("prueba cerrada con gracia vencida o sin fecha → trial_read_only", () => {
+    for (const period_ends_at of [iso(inDays(-1)), null]) {
+      expect(
+        bannerLevelFor(
+          {
+            subscription_plan: "trial",
+            subscription_status: "cancelled",
+            trial_ends_at: iso(inDays(-4)),
+            period_ends_at,
+          },
+          NOW
+        )
+      ).toBe("trial_read_only");
+    }
   });
 
   it("trial sin fecha de fin → ok (no inventamos countdown)", () => {

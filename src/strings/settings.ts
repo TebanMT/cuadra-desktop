@@ -2,10 +2,20 @@ export const settings = {
   index: {
     title: "Configuración",
     subtitle: "Ajusta los datos del gym, métodos de pago, planes y operadores.",
+    subtitleOwner: "Administra la operación del gimnasio, tu equipo y tu cuenta.",
+    subtitleOperator: "Consulta los datos del gimnasio, ajusta tu perfil o busca ayuda.",
+    // Enlace de regreso común a todas las subpáginas (SettingsBackLink).
+    back: "Volver a Configuración",
+    groups: {
+      operation: "Operación del gimnasio",
+      account: "Cuenta y equipo",
+      help: "Ayuda y aplicación",
+    },
     sections: {
       gymProfile: {
         title: "Datos del gym",
-        body: "Nombre, ciudad, datos fiscales, logo y colores.",
+        body: "Nombre, ciudad, horario, métodos de pago y aviso de entrada.",
+        bodyOperator: "Consulta nombre, horario y métodos de pago del gimnasio.",
       },
       subscription: {
         title: "Suscripción",
@@ -45,11 +55,15 @@ export const settings = {
       // y recordatorios — necesita editar esas plantillas).
       mensajes: {
         title: "Mensajes",
-        body: "Personaliza los comprobantes y recordatorios que reciben tus socios.",
+        body: "Elige qué comprobantes y recordatorios reciben tus socios y revisa sus mensajes.",
       },
       profile: {
         title: "Mi perfil",
         body: "Tu nombre, teléfono y PIN de recepción.",
+      },
+      help: {
+        title: "Ayuda para recepción",
+        body: "Instrucciones para las tareas diarias, atajos de teclado y contacto de soporte.",
       },
       aboutTinta: {
         title: "Sobre Tinta",
@@ -64,15 +78,15 @@ export const settings = {
     // WhatsApp completo entren en producción, el copy en TODOS los gates
     // habla de "Próximamente" para alinear con landing/pricing público.
     // Cuando se libere, cambia "Próximamente" por "Disponible".
-    badge: "Próximamente en Plus",
-    cta: "Saber más",
+    badge: "Acceso no habilitado",
+    cta: "Consultar ayuda",
     fiscalLocked:
-      "Captura RFC, razón social y régimen fiscal para emitir comprobantes formales con datos de tu gym. Próximamente en Plus.",
+      "Captura RFC, razón social y régimen fiscal para emitir comprobantes formales con datos de tu gym. Acceso no habilitado.",
     hardwareLocked:
       "Abre un torniquete o cerradura al registrar una entrada.",
     // Copy genérico para PlusFeatureLock — cada página le pasa un title +
     // body adaptado a su feature.
-    lockedTitle: "Próximamente en Plus",
+    lockedTitle: "Acceso no habilitado",
     lockedBody:
       "Esta función aún no está disponible.",
   },
@@ -99,7 +113,18 @@ export const settings = {
     saveError: "No pudimos guardar.",
     loadError: "No pudimos cargar los datos del gym.",
     readOnlyForOperator:
-      "Solo el dueño puede editar los datos del gym. Si necesitas un cambio, pídeselo al dueño.",
+      "Solo el dueño puede cambiar estos datos. Si algo está mal, pídele que lo corrija.",
+    readOnlySession:
+      "La recepción está en solo lectura: puedes consultar estos datos, pero no cambiarlos.",
+    subtitleOperator: "Así aparece el gimnasio en comprobantes, recordatorios y la app.",
+    notSet: "Sin capturar",
+    hours: (open: string, close: string) => `${open} a ${close}`,
+    saveBoth: {
+      methodsFailed: (reason?: string) =>
+        reason
+          ? `Se guardaron los datos del gym, pero no los métodos de pago: ${reason.replace(/\.?$/, ".")} Vuelve a guardar.`
+          : "Se guardaron los datos del gym, pero no los métodos de pago. Vuelve a guardar.",
+    },
     sections: {
       general: "Datos generales",
       tax: "Datos fiscales (opcional)",
@@ -121,7 +146,7 @@ export const settings = {
       secondaryColor: "Color secundario",
       openTime: "Hora de apertura",
       closeTime: "Hora de cierre",
-      kioskVolume: "Volumen del kiosko",
+      kioskVolume: "Volumen del kiosco",
       kioskFeedbackTtl: "Duración del aviso de entrada",
     },
     placeholders: {
@@ -133,10 +158,39 @@ export const settings = {
     help: {
       logo: "PNG, JPG o WEBP, máx 2MB.",
       taxOptional: "Todos los campos fiscales son opcionales. Llénalos si emites comprobantes formales.",
-      kioskFeedbackTtl: (s: number) => `${s.toFixed(1)} segundos`,
+      // 4 → «4 segundos»; 4.5 → «4.5 segundos». Nunca «4.0».
+      kioskFeedbackTtl: (s: number) =>
+        `${s.toLocaleString("es-MX", { maximumFractionDigits: 1 })} ${s === 1 ? "segundo" : "segundos"}`,
       kioskVolume: (v: number) => `${v}%`,
     },
     save: "Guardar cambios",
+    // Nombres de ciudad para el selector. Se guarda siempre el identificador
+    // IANA (America/Mexico_City); esto sólo cambia lo que se lee.
+    timezoneNames: {
+      "America/Mexico_City": "Ciudad de México",
+      "America/Cancun": "Cancún",
+      "America/Chihuahua": "Chihuahua",
+      "America/Hermosillo": "Hermosillo",
+      "America/Mazatlan": "Mazatlán",
+      "America/Monterrey": "Monterrey",
+      "America/Tijuana": "Tijuana",
+      "America/Merida": "Mérida",
+      "America/Bahia_Banderas": "Bahía de Banderas",
+      "America/Matamoros": "Matamoros",
+      "America/Ojinaga": "Ojinaga",
+    } as Record<string, string>,
+    paymentMethods: {
+      title: "Métodos de pago",
+      body: "Las formas de pago que aparecen al cobrar una venta en recepción.",
+      options: { cash: "Efectivo", transfer: "Transferencia", card: "Tarjeta" },
+      save: "Guardar métodos de pago",
+      saving: "Guardando…",
+      saved: "Métodos de pago actualizados.",
+      needOne: "Elige al menos un método de pago.",
+      saveError: "No pudimos guardar los métodos de pago. Vuelve a intentar.",
+      loadError: "No pudimos leer los métodos de pago.",
+      retry: "Reintentar",
+    },
     transferOwnership: "Transferir gym a otra persona",
     transferDescription:
       "Transfiere el control completo del gym. Tú quedarás como operador.",
@@ -152,8 +206,17 @@ export const settings = {
   },
   operators: {
     title: "Operadores",
-    subtitle: (limit: number, count: number) =>
-      `${count} de ${limit} operadores. ${limit - count} disponibles.`,
+    // El cupo cuenta igual que el servidor (CountOperatorsByGym): sólo los
+    // operadores activos. El dueño y los desactivados no ocupan lugar.
+    capacity: (limit: number, used: number, inactive: number) => {
+      const free = limit - used;
+      const rest = free > 0 ? ` Puedes agregar o activar ${free} más.` : "";
+      const notCounted =
+        inactive > 0
+          ? `El dueño y ${inactive === 1 ? "el operador inactivo" : `los ${inactive} operadores inactivos`} no ocupan lugar.`
+          : "El dueño no ocupa lugar.";
+      return `Cupo de operadores: ${used} de ${limit} activos. ${notCounted}${rest}`;
+    },
     create: "Agregar operador",
     edit: "Editar operador",
     columns: {
@@ -184,10 +247,45 @@ export const settings = {
       edit: "Editar",
     },
     softWarning: "Estás cerca del límite de 10 operadores.",
-    hardLimit: "Llegaste al límite de 10 operadores. Desactiva uno para crear otro.",
+    hardLimit:
+      "Llegaste al límite de 10 operadores activos. Para dar acceso a otra persona, desactiva a quien ya no trabaje en el gimnasio: su lugar queda libre.",
+    activateAtLimit: "El cupo de operadores activos está lleno. Desactiva a alguien para activar a esta persona.",
+    standardLimit:
+      "Esta instalación tiene habilitado 1 operador activo. Para dar acceso a otra persona, desactiva a quien ya no trabaje en el gimnasio: su lugar queda libre.",
+    // Qué puede hacer un operador y qué decide el dueño. Lo «siempre» viene
+    // del servidor: lo que no está en el catálogo de permisos está abierto a
+    // todo operador (shared/domain/permissions.go).
+    permissions: {
+      title: "Permisos",
+      intro: "Empiezan apagados. Activa sólo lo que esta persona necesite.",
+      introEdit: "Activa sólo lo que esta persona necesite.",
+      always:
+        "Siempre puede cobrar membresías completas, registrar entradas, inscribir socios, vender productos y hacer el corte de caja.",
+      allOn: "Activar todos",
+      allOff: "Quitar todos",
+      summaryLabel: "Podrá hacer:",
+      summary: (on: number, total: number) =>
+        on === 0
+          ? "lo básico de recepción"
+          : on === total
+            ? `lo básico y los ${total} permisos`
+            : `lo básico de recepción y ${on} ${on === 1 ? "permiso" : "permisos"} más`,
+    },
+    noEmail: "Sin correo",
     loadError: "No pudimos cargar los operadores.",
     createForm: {
       title: "Nuevo operador",
+      // El cupo se dice antes de pedir datos: con el cupo lleno el servidor
+      // rechaza el alta.
+      seat: (free: number) =>
+        free > 1
+          ? `Ocupará 1 de los ${free} lugares libres para operadores activos.`
+          : "Ocupará el último lugar libre para operadores activos.",
+      checkingSeat: "Revisando el cupo de operadores…",
+      seatUnknown: "No pudimos revisar el cupo de operadores.",
+      retrySeat: "Reintentar",
+      fullTitle: "No hay lugar para otro operador",
+      fullDone: "Entendido",
       phoneHint:
         "Le enviamos el PIN por WhatsApp a este número. Elige el país y escribe el celular.",
       copied: "Copiado.",
@@ -349,7 +447,7 @@ export const settings = {
     disabled: "Desactivada",
     customized: "Personalizada",
     isDefault: "Texto por defecto",
-    textFixed: "Texto fijo · personalizar requiere tu propio número",
+    textFixed: "Texto aprobado para envíos desde Tinta",
     toggleSaved: "Listo.",
     toggleError: "No pudimos guardar el cambio.",
     // Llaves exactas del BE (cuadra-core/.../template.go DefaultLibrary).
@@ -410,7 +508,7 @@ export const settings = {
       title: (name: string) => name,
       bodyLabel: "Mensaje",
       plusOnlyBody:
-        "WhatsApp usa un texto fijo aprobado. Para personalizar mensajes, conecta tu número con Plus.",
+        "Los envíos desde Tinta usan un texto aprobado. Puedes activar o desactivar el mensaje. La conexión de un número propio está pendiente de disponibilidad.",
       previewLabel: "Vista previa",
       previewHint: "Las variables se reemplazan con datos de ejemplo.",
       variablesLabel: "Variables disponibles",
@@ -433,7 +531,7 @@ export const settings = {
   alerts: {
     title: "Alertas al dueño",
     subtitle:
-      "Elige qué eventos te avisamos por WhatsApp y personaliza el texto que recibes en cada uno.",
+      "Elige qué alertas recibes por WhatsApp y revisa sus mensajes.",
     loadError: "No pudimos cargar las alertas.",
     saving: "Guardando…",
     saved: "Cambio guardado.",
@@ -446,7 +544,7 @@ export const settings = {
       enabledLabel: "Recibir esta alerta",
       bodyLabel: "Mensaje que recibes",
       plusOnlyBody:
-        "WhatsApp usa un texto fijo aprobado. Para personalizar mensajes, conecta tu número con Plus.",
+        "Los envíos desde Tinta usan un texto aprobado. Puedes activar o desactivar el mensaje. La conexión de un número propio está pendiente de disponibilidad.",
       previewLabel: "Vista previa",
       previewHint: "Las variables se reemplazan con datos de ejemplo.",
       variablesLabel: "Variables disponibles",
@@ -492,3 +590,8 @@ export const settings = {
     },
   },
 };
+
+/** «America/Mexico_City» → «Ciudad de México». Se guarda el identificador IANA. */
+export function timezoneName(tz: string): string {
+  return settings.gymProfile.timezoneNames[tz] ?? (tz.split("/").pop() ?? tz).replaceAll("_", " ");
+}

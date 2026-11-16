@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { ExpenseForm, type ExpenseFormSubmitPayload } from "@/components/expenses/ExpenseForm";
@@ -8,8 +8,9 @@ import { fetchAllExpenses, usePayOccurrence, useUnclassifiedCash, type ExpenseOc
 import { todayIso } from "@/lib/dates";
 import { keyForPayload } from "@/lib/idempotency";
 
-export function ScheduledPaymentForm({ occurrence, onClose }: { occurrence: ExpenseOccurrence; onClose(): void }) {
+export function ScheduledPaymentForm({ occurrence, onClose, onBusyChange }: { occurrence: ExpenseOccurrence; onClose(): void; onBusyChange?(busy: boolean): void }) {
   const pay = usePayOccurrence();
+  useEffect(() => { onBusyChange?.(pay.isPending); return () => onBusyChange?.(false); }, [pay.isPending, onBusyChange]);
   const cash = useUnclassifiedCash();
   const existing = useQuery({ queryKey: ["expenses", "matching-scheduled", occurrence.category], queryFn: () => fetchAllExpenses({ category: occurrence.category }) });
   const [selected, setSelected] = useState("");
@@ -44,7 +45,7 @@ export function ScheduledPaymentForm({ occurrence, onClose }: { occurrence: Expe
       <select
         ref={selectionRef}
         id="existing-scheduled-expense"
-        className="w-full h-10 rounded-md border bg-background px-3 text-sm"
+        className="w-full h-11 rounded-md border bg-background px-3 text-sm"
         value={selected}
         aria-invalid={!!error && !selected}
         aria-describedby={error && !selected ? "scheduled-payment-error" : undefined}
@@ -57,7 +58,7 @@ export function ScheduledPaymentForm({ occurrence, onClose }: { occurrence: Expe
       <p className="text-xs text-muted-foreground">Relacionar un gasto existente no vuelve a descontar dinero.</p>
     </div>}
     {error && <p id="scheduled-payment-error" role="alert" className="text-sm text-destructive">{error}</p>}
-    {chosen ? <div className="space-y-4"><p className="rounded-md bg-muted p-3 text-sm">{chosen.description || chosen.payee_name} · pagado el {chosen.paid_on} por {money(chosen.amount)}</p><Button className="w-full" disabled={pay.isPending} onClick={() => submit({ ...chosen, expense_date: chosen.paid_on, description: chosen.description ?? undefined, payee_name: chosen.payee_name ?? undefined, reference: chosen.reference ?? undefined, cash_drawer_id: chosen.cash_drawer_id ?? undefined, cash_movement_id: undefined, recurring_occurrence_id: undefined })}>Relacionar este gasto</Button></div>
+    {chosen ? <div className="space-y-4"><p className="rounded-md bg-muted p-3 text-sm">{chosen.description || chosen.payee_name} · pagado el {chosen.paid_on} por {money(chosen.amount)}</p><Button requiresWrite className="w-full" disabled={pay.isPending} onClick={() => submit({ ...chosen, expense_date: chosen.paid_on, description: chosen.description ?? undefined, payee_name: chosen.payee_name ?? undefined, reference: chosen.reference ?? undefined, cash_drawer_id: chosen.cash_drawer_id ?? undefined, cash_movement_id: undefined, recurring_occurrence_id: undefined })}>Relacionar este gasto</Button></div>
     : <ExpenseForm key={occurrence.id} mode="create" lockedCategory submitLabel="Registrar pago" initial={{ amount: String(occurrence.expected_amount), expense_date: todayIso(), category: occurrence.category, payment_method: occurrence.payment_method, description: occurrence.name ?? "", payee_name: occurrence.payee_name ?? "", classification: occurrence.classification }} cashMovements={cash.data?.items ?? []} submitting={pay.isPending} onSubmit={submit} onCancel={onClose} />}
   </div>;
 }

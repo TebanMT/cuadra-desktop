@@ -80,7 +80,7 @@ export function OperatorRotatePinModal({ operator, open, onOpenChange }: Props) 
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={rotate.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogAction requiresWrite
               onClick={(e) => {
                 e.preventDefault();
                 doRotate();
@@ -97,7 +97,7 @@ export function OperatorRotatePinModal({ operator, open, onOpenChange }: Props) 
       <Dialog open={open && !!result} onOpenChange={close}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>✓ {t.operators.rotatePin.success}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0 text-success-text" />{t.operators.rotatePin.success}</DialogTitle>
             <DialogDescription>
               {t.operators.rotatePin.resultHint(operator.full_name)}
             </DialogDescription>
@@ -105,10 +105,10 @@ export function OperatorRotatePinModal({ operator, open, onOpenChange }: Props) 
           {result && (
             <>
               <div className="rounded-md border bg-muted/40 p-6 space-y-3 text-center">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                <p className="text-sm font-medium text-muted-foreground">
                   {t.operators.createForm.pinLabel}
                 </p>
-                <p className="text-5xl font-mono font-bold tracking-[0.3em]">
+                <p className="font-display text-5xl tabular tracking-[0.3em]">
                   {result.pin}
                 </p>
               </div>

@@ -13,15 +13,17 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const m = useRequestPasswordReset();
+  const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     try {
       await m.mutateAsync({ email });
+      setSubmitted(true);
     } catch {
-      // Always succeed UX-wise (security: no leak)
+      setError("No pudimos solicitar el enlace. Revisa la conexión e intenta de nuevo.");
     }
-    setSubmitted(true);
   }
 
   return (
@@ -35,6 +37,7 @@ export default function ForgotPassword() {
         </p>
       </div>
 
+      {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       {submitted ? (
         <div className="space-y-6">
           <Alert>

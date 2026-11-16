@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { SettingsBackLink } from "@/components/settings/SettingsBackLink";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { auditActionLabel, auditEntityLabel } from "@/strings/audit";
 import { useEffect, useMemo, useState } from "react";
@@ -78,19 +80,19 @@ export default function AuditLogPage() {
 
   if (role !== "owner") {
     return (
-      <div className="p-8 max-w-2xl">
+      <PageContainer contentWidth="form" className="">
         <Alert variant="warning">
           <AlertDescription>{t.audit.notAuthorized}</AlertDescription>
         </Alert>
-      </div>
+      </PageContainer>
     );
   }
   if (!isPlus) {
     return (
       <PlusFeatureLock
         icon={History}
-        title="Bitácora es parte de Plus"
-        body="Consulta el historial completo de cambios del gym: quién hizo qué, cuándo y desde dónde. Disponible al mejorar a Plus."
+        title="Bitácora no habilitada"
+        body="Consulta el historial completo de cambios del gym: quién hizo qué, cuándo y desde dónde. El acceso no está habilitado en esta instalación."
       />
     );
   }
@@ -107,8 +109,9 @@ export default function AuditLogPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <PageContainer className="space-y-6">
       <div className="space-y-1">
+        <SettingsBackLink />
         <h1
           className="text-3xl font-bold text-foreground"
           style={{ letterSpacing: "-0.02em" }}
@@ -123,9 +126,9 @@ export default function AuditLogPage() {
         <CardContent className="pt-5 pb-5 space-y-4">
           <div className="grid gap-3 grid-cols-2 md:grid-cols-4">
             <div>
-              <Label className="text-xs">{t.audit.filters.entity}</Label>
+              <Label htmlFor="audit-entity" className="text-xs">{t.audit.filters.entity}</Label>
               <Select value={entityType} onValueChange={(v) => setEntityType(v === "_all" ? "" : v)}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger id="audit-entity" className="h-11">
                   <SelectValue placeholder={t.audit.filters.entityAll} />
                 </SelectTrigger>
                 <SelectContent>
@@ -139,9 +142,9 @@ export default function AuditLogPage() {
               </Select>
             </div>
             <div>
-              <Label className="text-xs">{t.audit.filters.actor}</Label>
+              <Label htmlFor="audit-actor" className="text-xs">{t.audit.filters.actor}</Label>
               <Select value={actorID} onValueChange={(v) => setActorID(v === "_all" ? "" : v)}>
-                <SelectTrigger className="h-9">
+                <SelectTrigger id="audit-actor" className="h-11">
                   <SelectValue placeholder={t.audit.filters.actorAll} />
                 </SelectTrigger>
                 <SelectContent>
@@ -256,7 +259,7 @@ export default function AuditLogPage() {
 
       <DetailModal entry={detail} onClose={() => setDetail(null)} />
       </div>
-    </div>
+    </PageContainer>
   );
 }
 

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
+import { api } from "@/lib/api";
 import { LockExpiryModal } from "../LockExpiryModal";
 
 vi.mock("@/lib/api", async () => {
@@ -58,5 +59,30 @@ describe("LockExpiryModal", () => {
     await user.click(screen.getByRole("button", { name: /guardar ajuste/i }));
 
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+  });
+
+  it("vuelve al vencimiento calculado con el modo que acepta el backend", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    renderWithProviders(
+      <LockExpiryModal
+        membershipId="m1"
+        memberName="Juan"
+        currentExpiry="2026-05-12"
+        open
+        onOpenChange={onOpenChange}
+      />
+    );
+
+    await user.click(screen.getByRole("radio", { name: /volver al vencimiento calculado/i }));
+    expect(screen.getByText(/los días de promociones se quedan/i)).toBeInTheDocument();
+    await user.type(screen.getByLabelText(/motivo/i), "Me equivoqué de socio");
+    await user.click(screen.getByRole("button", { name: /guardar ajuste/i }));
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(api.post).toHaveBeenCalledWith(
+      expect.stringContaining("/lock-expiry"),
+      { mode: "reset", reason: "Me equivoqué de socio" },
+    );
   });
 });

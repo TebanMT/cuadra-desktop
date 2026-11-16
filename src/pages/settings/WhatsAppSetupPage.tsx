@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, MessageCircle, PhoneCall, PlugZap, Power } from "lucide-react";
 import { toast } from "sonner";
@@ -33,7 +34,7 @@ import { fmtDate } from "@/lib/dates";
 import { settings as t } from "@/strings/settings";
 
 
-export default function WhatsAppSetupPage() {
+export default function WhatsAppSetupPage({ embedded = false }: { embedded?: boolean } = {}) {
   const state = useWhatsappState();
 
   if (state.isLoading) {
@@ -46,17 +47,17 @@ export default function WhatsAppSetupPage() {
 
   if (state.error) {
     return (
-      <div className="p-8 max-w-2xl">
+      <PageContainer contentWidth="form" className="">
         <Alert variant="destructive">
-          <AlertDescription>{t.whatsapp.errors.loadError}</AlertDescription>
+          <AlertDescription>{t.whatsapp.errors.loadError} <Button variant="outline" onClick={() => void state.refetch()}>Reintentar</Button></AlertDescription>
         </Alert>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <div className="space-y-1">
+    <PageContainer embedded={embedded} contentWidth="form" className="space-y-6">
+      {!embedded && (<div className="space-y-1">
         <h1
           className="text-3xl font-bold text-foreground"
           style={{ letterSpacing: "-0.02em" }}
@@ -64,14 +65,18 @@ export default function WhatsAppSetupPage() {
           {t.whatsapp.title}
         </h1>
         <p className="text-sm text-muted-foreground">{t.whatsapp.subtitle}</p>
-      </div>
+      </div>)}
 
       {state.data?.status === "connected" ? (
         <ConnectedView state={state.data} />
       ) : (
-        <ConnectFlow />
+        <section className="space-y-3 rounded-lg border p-5">
+          <h2 className="text-lg font-semibold">Envíos desde Tinta</h2>
+          <p className="text-sm leading-relaxed">Los comprobantes y recordatorios se envían desde el número de Tinta. Revisa los mensajes automáticos y el teléfono de cada socio antes de enviar. Necesitas conexión a internet.</p>
+          <p className="text-sm text-muted-foreground">La conexión de un número propio del gimnasio está pendiente de disponibilidad. No necesitas conectarlo para usar los envíos actuales.</p>
+        </section>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -168,7 +173,7 @@ function ConnectedView({ state }: { state: StateLike }) {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={disconnect.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogAction requiresWrite
               onClick={(e) => {
                 e.preventDefault();
                 doDisconnect();
@@ -352,7 +357,7 @@ function ConnectFlow() {
               <Button variant="outline" onClick={() => setStep("phone")} disabled={confirm.isPending}>
                 {t.whatsapp.notConnected.back}
               </Button>
-              <Button onClick={submitCode} disabled={confirm.isPending}>
+              <Button requiresWrite onClick={submitCode} disabled={confirm.isPending}>
                 {confirm.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {confirm.isPending
                   ? t.whatsapp.notConnected.codeSubmitting

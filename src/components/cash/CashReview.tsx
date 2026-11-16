@@ -21,10 +21,16 @@ export function sessionFinished(session?: CashSessionSnapshot | null) {
   return !!session?.finished_at || session?.status === "withdrawn";
 }
 
+export function cashDayLedgerSearch(date: string, drawerId?: string) {
+  const params = new URLSearchParams({ view: "ledger", from: date, to: date });
+  if (drawerId) params.set("cash_drawer_id", drawerId);
+  return params;
+}
+
 // Preserve the same drawer and current cash period when opening the detail.
 export function cashMovementReviewSearch(date: string, drawerId?: string) {
-  const params = new URLSearchParams({ view: "ledger", from: date, to: date, period: "current" });
-  if (drawerId) params.set("cash_drawer_id", drawerId);
+  const params = cashDayLedgerSearch(date, drawerId);
+  params.set("period", "current");
   return params.toString();
 }
 
@@ -43,17 +49,31 @@ const concepts: Record<string, string> = {
   other: "Otro ingreso", refund: "Devolución", cash_in: "Entrada de efectivo", cash_out: "Salida de efectivo",
 };
 
-export function CashMovementList({ entries, timezone }: { entries: CashLedgerEntry[]; timezone?: string }) {
+export function CashMovementList({ entries, timezone, canVoid, onVoid }: {
+  entries: CashLedgerEntry[];
+  timezone?: string;
+  // Front-desk self-correction: only for the operator's own movements while
+  // the drawer is open. The backend enforces the same rule.
+  canVoid?: (entry: CashLedgerEntry) => boolean;
+  onVoid?: (entry: CashLedgerEntry) => void;
+}) {
   const money = useMoneyVisibility();
   const [visible, setVisible] = useState(20);
   return <div>
     {!entries.length ? <p className="py-8 text-center text-sm text-muted-foreground">Sin movimientos de efectivo.</p> : <>
       <ul className="divide-y">
-        {entries.slice(0, visible).map(entry => <li key={entry.id} className="flex items-start justify-between gap-4 py-3 text-sm">
-          <div className="min-w-0"><p className="font-medium break-words">{entry.reason || concepts[entry.concept] || "Movimiento de efectivo"}</p>
-            <p className="text-xs text-muted-foreground">{cashTime(entry.recorded_at, timezone)}{entry.operator_name && ` · ${entry.operator_name}`}</p></div>
-          <span className={`shrink-0 tabular-nums font-medium ${entry.amount < 0 ? "text-destructive" : ""}`}>{entry.amount < 0 ? "−" : "+"}{money.fmt(Math.abs(entry.amount))}</span>
-        </li>)}
+        {entries.slice(0, visible).map(entry => {
+          const title = entry.reason || concepts[entry.concept] || "Movimiento de efectivo";
+          const voidable = !!onVoid && !!canVoid?.(entry);
+          return <li key={entry.id} className="flex items-start justify-between gap-4 py-3 text-sm">
+            <div className="min-w-0"><p className="font-medium break-words">{title}</p>
+              <p className="text-xs text-muted-foreground">{cashTime(entry.recorded_at, timezone)}{entry.operator_name && ` · ${entry.operator_name}`}</p></div>
+            <div className="flex shrink-0 flex-col items-end">
+              <span className={`tabular-nums font-medium ${entry.amount < 0 ? "text-destructive" : ""}`}>{entry.amount < 0 ? "−" : "+"}{money.fmt(Math.abs(entry.amount))}</span>
+              {voidable && <Button requiresWrite variant="link" className="h-auto min-h-11 p-0 text-xs text-muted-foreground" aria-label={`Anular ${title}`} onClick={() => onVoid?.(entry)}>Anular</Button>}
+            </div>
+          </li>;
+        })}
       </ul>
       {entries.length > visible && <Button variant="ghost" className="w-full" onClick={() => setVisible(n => n + 20)}>Ver más movimientos</Button>}
     </>}
@@ -67,11 +87,12 @@ export function CashHistory({ report }: { report: CashCloseReport }) {
     .filter(s => s.status !== "open" && (!report.cash_drawer_id || !s.drawer_id || s.drawer_id === report.cash_drawer_id));
   function result(s: CashSessionSnapshot) {
     if (s.is_stale || s.adjusted_after_withdrawal || s.status === "stale") return "Movimientos corregidos";
+    if (s.reviewed_without_count) return "Cerrado por el dueño · sin conteo";
     if (!s.opening_cash_known) return "Sin efectivo inicial";
     return s.difference == null ? "Sin conteo" : differenceLabel(s.difference, money.fmt);
   }
   return <section className="w-full min-w-0 max-w-full overflow-hidden rounded-lg border bg-card">
-    {!sessions.length ? <p className="py-12 text-center text-sm text-muted-foreground">No hay cortes en esta fecha.</p> : <><div className="divide-y sm:hidden">{[...sessions].reverse().map(s => <button key={s.id} type="button" aria-label={`Abrir corte ${s.sequence}`} className="block w-full p-4 text-left space-y-3 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" onClick={() => setSelected(s)}><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium">Corte {s.sequence} · {cashTime(s.finished_at ?? s.closed_at, report.timezone)}</p><p className="text-xs text-muted-foreground">{fmtDate(s.operational_date)} · {s.closed_by_name || "Sin responsable"}</p></div><span className="text-sm text-primary">Ver detalle</span></div><div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">Esperado</p><p className="tabular-nums">{s.opening_cash_known ? money.fmt(s.expected_cash) : "—"}</p></div><div><p className="text-xs text-muted-foreground">Contado</p><p className="tabular-nums">{s.counted_cash == null ? "—" : money.fmt(s.counted_cash)}</p></div></div><p className="text-sm font-medium">{result(s)}</p></button>)}</div><div className="hidden overflow-x-auto sm:block">
+    {!sessions.length ? <p className="py-12 text-center text-sm text-muted-foreground">{report.date ? `No hay cortes del ${fmtDate(report.date)}.` : "No hay cortes en esta fecha."}</p> : <><div className="divide-y sm:hidden">{[...sessions].reverse().map(s => <button key={s.id} type="button" aria-label={`Abrir corte ${s.sequence}`} className="block w-full p-4 text-left space-y-3 hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring" onClick={() => setSelected(s)}><div className="flex items-start justify-between gap-3"><div><p className="text-sm font-medium">Corte {s.sequence} · {cashTime(s.finished_at ?? s.closed_at, report.timezone)}</p><p className="text-xs text-muted-foreground">{fmtDate(s.operational_date)} · {s.closed_by_name || "Sin responsable"}</p></div><span className="text-sm text-primary">Ver detalle</span></div><div className="grid grid-cols-2 gap-3 text-sm"><div><p className="text-xs text-muted-foreground">Esperado</p><p className="tabular-nums">{s.opening_cash_known ? money.fmt(s.expected_cash) : "—"}</p></div><div><p className="text-xs text-muted-foreground">Contado</p><p className="tabular-nums">{s.counted_cash == null ? "—" : money.fmt(s.counted_cash)}</p></div></div><p className="text-sm font-medium">{result(s)}</p></button>)}</div><div className="hidden overflow-x-auto sm:block">
       <table className="w-full text-sm"><thead className="text-left text-muted-foreground"><tr className="border-b"><th className="p-4 font-medium">Corte</th><th className="p-4 font-medium">Responsable</th><th className="p-4 text-right font-medium">Esperado</th><th className="p-4 text-right font-medium">Contado</th><th className="p-4 font-medium">Resultado</th><th><span className="sr-only">Detalle</span></th></tr></thead>
         <tbody>{[...sessions].reverse().map(s => <tr key={s.id} className="border-b last:border-0">
           <td className="p-4 whitespace-nowrap">{fmtDate(s.operational_date)}<span className="block text-xs text-muted-foreground">{cashTime(s.finished_at ?? s.closed_at, report.timezone)} · #{s.sequence}</span></td>
@@ -88,6 +109,9 @@ export function CashHistory({ report }: { report: CashCloseReport }) {
           <dt>Retirado</dt><dd className="text-right tabular-nums">{money.fmt(selected.withdrawn_cash ?? 0)}</dd>
           <dt>Se quedó en caja</dt><dd className="text-right tabular-nums">{selected.cash_left == null ? "Sin registrar" : money.fmt(selected.cash_left)}</dd></dl>
         {selected.discrepancy_reason && <p className="text-sm">Nota: {selected.discrepancy_reason}</p>}
+        {selected.reviewed_without_count && selected.review_note && <p className="text-sm">Nota del dueño: {selected.review_note}</p>}
+        {selected.opening_difference != null && <p className="text-sm">Al abrir: {differenceLabel(selected.opening_difference, money.fmt)} respecto al corte anterior (debía haber {money.fmt(selected.opening_expected_cash ?? 0)}).{selected.opening_note && ` Nota: ${selected.opening_note}`}</p>}
+        {selected.opening_difference == null && selected.opening_note && <p className="text-sm">Al abrir: coincidió con el corte anterior. Nota: {selected.opening_note}</p>}
         {(selected.is_stale || selected.adjusted_after_withdrawal || selected.status === "stale") && <p className="text-sm text-muted-foreground">Se corrigieron movimientos después del conteo. Revisa el detalle antes de dar por aclarada la diferencia.</p>}
         <div><h3 className="font-medium text-sm">Movimientos de este corte</h3><CashMovementList entries={periodEntries(report, selected)} timezone={report.timezone} /></div>
       </div>}

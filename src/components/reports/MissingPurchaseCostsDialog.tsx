@@ -63,8 +63,8 @@ export function MissingPurchaseCostsDialog({ from, to, onClose }: { from: string
         <p className="text-xs text-muted-foreground">Se incluirá en el reporte del {fmtDate(selected.recorded_on)}. Si no conoces el costo, déjalo pendiente.</p>
         {save.isError && <p role="alert" className="text-sm text-destructive">{save.error instanceof Error ? save.error.message : "No se pudo guardar el costo. Intenta de nuevo."}</p>}
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" disabled={save.isPending} onClick={() => { setSelected(null); save.reset(); }}>Volver</Button>
-          <Button type="submit" disabled={!validCost || (!!reason.trim() && reason.trim().length < 3) || save.isPending}>{save.isPending ? "Guardando…" : "Guardar costo"}</Button>
+          <Button  type="button" variant="outline" disabled={save.isPending} onClick={() => { setSelected(null); save.reset(); }}>Volver</Button>
+          <Button requiresWrite type="submit" disabled={!validCost || (!!reason.trim() && reason.trim().length < 3) || save.isPending}>{save.isPending ? "Guardando…" : "Guardar costo"}</Button>
         </div>
       </form> : <>
         <p className="text-xs text-muted-foreground">{fmtDate(from)} — {fmtDate(to)}</p>
@@ -72,7 +72,7 @@ export function MissingPurchaseCostsDialog({ from, to, onClose }: { from: string
           <ul className="divide-y rounded-md border">
             {query.data.items.map(row => <li key={row.movement_id} className="flex items-center justify-between gap-3 p-3">
               <div className="min-w-0 text-sm"><strong className="block break-words">{row.product_name}</strong><span className="text-muted-foreground">{fmtDate(row.recorded_on)} · {row.quantity} {row.quantity === 1 ? "unidad" : "unidades"}</span></div>
-              <Button size="sm" variant="outline" disabled={row.quantity <= 0} aria-label={`Completar costo de ${row.product_name}`} onClick={() => { setSelected(row); setCost(""); setReason(""); save.reset(); }}>Completar</Button>
+              <Button requiresWrite size="sm" variant="outline" disabled={row.quantity <= 0} aria-label={`Completar costo de ${row.product_name}`} onClick={() => { setSelected(row); setCost(""); setReason(""); save.reset(); }}>Completar</Button>
             </li>)}
           </ul>
           <div className="flex items-center justify-between gap-2 text-sm"><span>{query.data.total} {query.data.total === 1 ? "compra pendiente" : "compras pendientes"}</span><div className="flex gap-2"><Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Anterior</Button><Button variant="ghost" size="sm" disabled={page * query.data.page_size >= query.data.total} onClick={() => setPage(page + 1)}>Siguiente</Button></div></div>

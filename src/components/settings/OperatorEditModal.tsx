@@ -9,18 +9,20 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  DEFAULT_DIAL_CODE,
-  PhoneInput,
-  formatE164,
-  phoneNumberValid,
-  splitE164,
-} from "@/components/shared/PhoneInput";
+import { DEFAULT_DIAL_CODE, formatE164, splitE164 } from "@/components/shared/PhoneInput";
 import { useUpdateOperator, type Operator } from "@/hooks/useOperators";
-import { ApiError } from "@/lib/api";
+import type { Permission } from "@/lib/permissions";
+import { OperatorPermissionsFields } from "@/components/settings/OperatorPermissionsFields";
+import { OperatorIdentityFields } from "@/components/settings/OperatorIdentityFields";
+import {
+  operatorSaveError,
+  permissionsSummary,
+  useOperatorFieldFocus,
+  validateOperatorIdentity,
+  type OperatorFieldErrors,
+  type OperatorIdentity,
+} from "@/components/settings/operatorForm";
 import { settings as t } from "@/strings/settings";
 
 interface Props {
@@ -29,133 +31,147 @@ interface Props {
   onOpenChange(o: boolean): void;
 }
 
+const ID_PREFIX = "op-edit";
+const EMPTY: OperatorIdentity = { fullName: "", dialCode: DEFAULT_DIAL_CODE, phoneNumber: "", email: "" };
+
 export function OperatorEditModal({ operator, open, onOpenChange }: Props) {
   const update = useUpdateOperator(operator?.id ?? "");
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phoneDialCode, setPhoneDialCode] = useState<string>(DEFAULT_DIAL_CODE);
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const focusField = useOperatorFieldFocus(ID_PREFIX, update.isPending);
+  const [identity, setIdentity] = useState<OperatorIdentity>(EMPTY);
+  const [fieldErrors, setFieldErrors] = useState<OperatorFieldErrors>({});
+  const [permissions, setPermissions] = useState<Permission[]>([]);
+  const [permissionsTouched, setPermissionsTouched] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     if (open && operator) {
-      setFullName(operator.full_name);
-      setEmail(operator.email);
       const split = splitE164(operator.phone ?? "");
-      setPhoneDialCode(split.dialCode);
-      setPhoneNumber(split.number);
-      setError(null);
+      setIdentity({
+        fullName: operator.full_name,
+        dialCode: split.dialCode,
+        phoneNumber: split.number,
+        email: operator.email,
+      });
+      setPermissions(operator.permissions ?? []);
+      setPermissionsTouched(false);
+      setFieldErrors({});
+      setFormError(null);
     }
   }, [open, operator]);
+
+  // The owner always has every permission; only operators get the switches.
+  const editsPermissions = operator?.role === "operator";
 
   // Un operador es "legacy pendiente migrar" cuando no tiene PIN y
   // tampoco tiene teléfono. Forzar phone+PIN lo migra al modelo nuevo.
   const isLegacyPending = !!operator && !operator.has_pin && !operator.phone;
 
+  function changeIdentity(next: OperatorIdentity) {
+    setFieldErrors((prev) => {
+      const rest = { ...prev };
+      if (next.fullName !== identity.fullName) delete rest.name;
+      if (next.dialCode !== identity.dialCode || next.phoneNumber !== identity.phoneNumber) delete rest.phone;
+      if (next.email !== identity.email) delete rest.email;
+      return rest;
+    });
+    setIdentity(next);
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setFormError(null);
     if (!operator) return;
 
-    if (fullName.trim().length < 3) {
-      setError(t.operators.errors.nameShort);
+    const invalid = validateOperatorIdentity(identity);
+    if (invalid) {
+      setFieldErrors({ [invalid.field]: invalid.message });
+      focusField(invalid.field);
       return;
     }
-    if (!phoneNumberValid(phoneDialCode, phoneNumber)) {
-      setError(t.operators.errors.phoneRequired);
-      return;
-    }
-    // Email opcional — solo validamos cuando viene no-vacío.
-    const emailClean = email.trim();
-    if (emailClean && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailClean)) {
-      setError(t.operators.errors.emailInvalid);
-      return;
-    }
+    setFieldErrors({});
 
     try {
       await update.mutateAsync({
-        full_name: fullName.trim(),
+        full_name: identity.fullName.trim(),
         // "" significa "limpiar el correo" — el BE lo permite para operators.
-        email: emailClean.toLowerCase(),
-        phone: formatE164(phoneDialCode, phoneNumber),
+        email: identity.email.trim().toLowerCase(),
+        phone: formatE164(identity.dialCode, identity.phoneNumber),
+        // A response without permissions (older sidecar) is not "none":
+        // only send them when we know them or the owner changed them.
+        ...(editsPermissions && (operator.permissions || permissionsTouched) ? { permissions } : {}),
       });
       toast.success(t.operators.editForm.success);
       onOpenChange(false);
     } catch (err) {
-      if (err instanceof ApiError) {
-        if (err.code === "email_already_in_use") {
-          setError(t.operators.errors.emailDuplicated);
-        } else if (err.code === "phone_taken_in_gym") {
-          setError(t.operators.errors.phoneDuplicated);
-        } else {
-          setError(err.message);
-        }
+      const mapped = operatorSaveError(err);
+      if (mapped.field) {
+        setFieldErrors({ [mapped.field]: mapped.message });
+        focusField(mapped.field);
       } else {
-        setError(t.operators.errors.generic);
+        setFormError(mapped.message);
       }
     }
   }
 
+  const pending = update.isPending;
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
+    <Dialog open={open} busy={pending} onOpenChange={onOpenChange}>
+      <DialogContent className="flex max-w-xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b px-6 py-5">
           <DialogTitle>{t.operators.edit}</DialogTitle>
           <DialogDescription className="sr-only">Editar operador.</DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4" noValidate>
-          {isLegacyPending && (
-            <Alert variant="warning">
-              <AlertDescription>{t.operators.editForm.legacyMigrate}</AlertDescription>
-            </Alert>
-          )}
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-          <div className="space-y-1">
-            <Label htmlFor="op-edit-name">{t.operators.fields.fullName}</Label>
-            <Input
-              id="op-edit-name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+        <form onSubmit={submit} noValidate className="flex min-h-0 flex-col">
+          <div className="min-h-0 space-y-8 overflow-y-auto px-6 py-5">
+            {isLegacyPending && (
+              <Alert variant="warning">
+                <AlertDescription>{t.operators.editForm.legacyMigrate}</AlertDescription>
+              </Alert>
+            )}
+            <OperatorIdentityFields
+              idPrefix={ID_PREFIX}
+              value={identity}
+              errors={fieldErrors}
+              onChange={changeIdentity}
+              disabled={pending}
               autoFocus
             />
+            {editsPermissions && (
+              <OperatorPermissionsFields
+                value={permissions}
+                onChange={(next) => {
+                  setPermissions(next);
+                  setPermissionsTouched(true);
+                }}
+                disabled={pending}
+                editing
+              />
+            )}
           </div>
-          <div className="space-y-1">
-            <Label htmlFor="op-edit-phone">{t.operators.fields.phone}</Label>
-            <PhoneInput
-              id="op-edit-phone"
-              dialCode={phoneDialCode}
-              number={phoneNumber}
-              onDialCodeChange={setPhoneDialCode}
-              onNumberChange={setPhoneNumber}
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="op-edit-email">{t.operators.fields.emailOptional}</Label>
-            <Input
-              id="op-edit-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="opcional@correo.com"
-            />
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={update.isPending}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={update.isPending}>
-              {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {update.isPending ? t.operators.editForm.submitting : t.operators.editForm.submit}
-            </Button>
+          <div className="shrink-0 space-y-3 border-t bg-background px-6 py-4">
+            {formError && (
+              <Alert variant="destructive" className="py-3">
+                <AlertDescription>{formError}</AlertDescription>
+              </Alert>
+            )}
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+              {editsPermissions && (
+                <p className="min-w-0 text-sm" aria-live="polite">
+                  <span className="text-muted-foreground">{t.operators.permissions.summaryLabel}</span>{" "}
+                  <span className="font-medium text-foreground">{permissionsSummary(permissions)}</span>
+                </p>
+              )}
+              <div className="ml-auto flex gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
+                  Cancelar
+                </Button>
+                <Button requiresWrite type="submit" disabled={pending}>
+                  {pending && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />}
+                  {pending ? t.operators.editForm.submitting : t.operators.editForm.submit}
+                </Button>
+              </div>
+            </div>
           </div>
         </form>
       </DialogContent>

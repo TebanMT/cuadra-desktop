@@ -45,7 +45,7 @@ function HeldList() {
         <div className="flex flex-wrap gap-2 justify-between"><p className="font-medium">{row.recipient}</p><p className="text-xs text-muted-foreground">{new Date(row.created_at).toLocaleString("es-MX", { timeZone: gym.data?.timezone ?? "America/Mexico_City", dateStyle: "medium", timeStyle: "short" })}</p></div>
         <p className="text-sm">{names[row.template_key] ?? "Aviso del gimnasio"} · {row.channel === "whatsapp" ? "WhatsApp" : "Correo"}</p>
         <p className="text-sm text-muted-foreground">{row.reason ?? "Pasó demasiado tiempo desde que se creó."}</p>
-        {row.blocked && <p className="text-sm text-amber-700 dark:text-amber-400">{row.blocked}</p>}
+        {row.blocked && <p className="text-sm text-warning dark:text-amber-400">{row.blocked}</p>}
         <div className="flex justify-end gap-2"><Button size="sm" variant="ghost" onClick={() => { setChoice({ row, action: "discard" }); setError(""); }}>Descartar</Button><Button size="sm" variant="outline" disabled={!!row.blocked} onClick={() => { setChoice({ row, action: "send" }); setError(""); }}>Enviar</Button></div>
       </article>)}</div>}
       {(total ?? 0) > 20 && <div className="flex items-center gap-3 justify-end"><Button variant="outline" disabled={page === 1} onClick={() => setPage(p => p - 1)}>Anterior</Button><span>{page}</span><Button variant="outline" disabled={page * 20 >= (total ?? 0)} onClick={() => setPage(p => p + 1)}>Siguiente</Button></div>}

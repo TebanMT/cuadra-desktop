@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ExpenseForm } from "../ExpenseForm";
-vi.mock("@/components/cash/CashDrawerField",()=>({CashDrawerField:()=>null}));
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({CashDrawerField:()=>null});
+});
 describe("ExpenseForm simple",()=>{
  it("exige elegir una categoría y el origen del pago antes de guardar",async()=>{
   const submit=vi.fn();render(<ExpenseForm mode="create" submitting={false} onSubmit={submit} onCancel={()=>{}}/>);

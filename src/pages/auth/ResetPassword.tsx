@@ -35,7 +35,7 @@ export default function ResetPassword() {
         if (e.code === "token_expired" || e.status === 410) return setError(auth.reset.expired);
         if (e.status === 400 || e.status === 404) return setError(auth.reset.invalidLink);
       }
-      setError(auth.reset.invalidLink);
+      setError("No pudimos cambiar la contraseña. Revisa la conexión e intenta de nuevo.");
     }
   }
 
@@ -61,7 +61,7 @@ export default function ResetPassword() {
           Pon una contraseña nueva.
         </h1>
         <p className="text-muted-foreground">
-          La que te quede más cómoda.
+          Usa al menos 8 caracteres. Evita reutilizar contraseñas de otras cuentas.
         </p>
       </div>
 
@@ -77,6 +77,8 @@ export default function ResetPassword() {
           <Input
             id="pwd"
             type="password"
+            autoComplete="new-password"
+            minLength={8}
             required
             value={pwd}
             onChange={(e) => setPwd(e.target.value)}
@@ -88,12 +90,15 @@ export default function ResetPassword() {
           <Input
             id="confirm"
             type="password"
+            autoComplete="new-password"
+            minLength={8}
             required
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
             disabled={m.isPending}
           />
         </div>
+        {error && <Button asChild variant="link"><Link to="/auth/forgot-password">{auth.reset.requestNew}</Link></Button>}
         <Button type="submit" size="lg" className="w-full" disabled={m.isPending}>
           {m.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : auth.reset.submit}
         </Button>

@@ -76,7 +76,7 @@ describe("kioskWindow", () => {
     expect(state.constructorCalls[0].label).toBe(KIOSK_WINDOW_LABEL);
     expect(state.constructorCalls[0].options).toMatchObject({
       url: "/kiosk",
-      title: "Tinta · Kiosko",
+      title: "Tinta · Kiosco",
       // El kiosko ya no corre fullscreen sin decoraciones; ahora es una
       // ventana normal maximizada con X del OS y barra inferior visible.
       fullscreen: false,

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Copy, Loader2 } from "lucide-react";
+import { CheckCircle2, Copy, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -70,7 +70,7 @@ export function OperatorResetPasswordModal({ operator, open, onOpenChange }: Pro
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={reset.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogAction requiresWrite
               onClick={(e) => {
                 e.preventDefault();
                 doReset();
@@ -87,7 +87,7 @@ export function OperatorResetPasswordModal({ operator, open, onOpenChange }: Pro
       <Dialog open={!!generated} onOpenChange={close}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>✓ {t.operators.resetPwd.success}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2"><CheckCircle2 aria-hidden="true" className="h-5 w-5 shrink-0 text-success-text" />{t.operators.resetPwd.success}</DialogTitle>
             <DialogDescription>{t.operators.createForm.successHint(operator.full_name)}</DialogDescription>
           </DialogHeader>
           <div className="rounded-md border bg-muted/40 p-4 space-y-2 font-mono text-sm">

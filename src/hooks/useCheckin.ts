@@ -1,14 +1,19 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiError } from "@/lib/api";
+import { ReadOnlyError } from "@/lib/writeAccess";
 
 export type CheckinMethod = "fingerprint" | "number" | "manual";
 export type CheckinResult =
   | "allowed_active"
   | "allowed_expiring_soon"
+  // Entrada forzada por el operador ("Permitir de todos modos", DA-29.2).
+  | "allowed_override"
   | "denied_expired"
   | "denied_inactive"
   | "denied_no_membership"
+  // Socio inscrito cuya primera membresía sigue esperando el pago.
+  | "denied_unpaid_enrollment"
   | "denied_not_found";
 
 export interface CheckinEvent {
@@ -38,9 +43,8 @@ export interface OverrideCheckinInput {
 }
 
 export function checkinErrorMessage(err: unknown, fallback: string): string {
-  if (err instanceof ApiError) {
-    const data = err.details as Record<string, unknown> | null;
-    return (data?.exception as string | undefined) || err.message || fallback;
+  if (err instanceof ApiError || err instanceof ReadOnlyError) {
+    return err.message || fallback;
   }
   return fallback;
 }
@@ -115,6 +119,9 @@ interface RecentCheckinsResponse {
 export function useRecentCheckins() {
   const qc = useQueryClient();
   const [items, setItems] = useState<CheckinEvent[]>([]);
+  // Un fallo de la consulta no es «aún no hay entradas»: lo distinguimos
+  // para no decirle a recepción que nadie ha entrado cuando no sabemos.
+  const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -123,9 +130,10 @@ export function useRecentCheckins() {
       .then((res) => {
         if (cancelled) return;
         setItems(res.items ?? []);
+        setFailed(false);
       })
       .catch(() => {
-        if (!cancelled) setItems([]);
+        if (!cancelled) setFailed(true);
       });
     return () => {
       cancelled = true;
@@ -134,10 +142,11 @@ export function useRecentCheckins() {
 
   function prepend(ev: CheckinEvent) {
     setItems((prev) => [ev, ...prev].slice(0, 5));
+    setFailed(false);
     qc.invalidateQueries({ queryKey: ["checkins"] });
   }
 
-  return { items, prepend };
+  return { items, failed, prepend };
 }
 
 // useMemberCheckins lista las asistencias del socio para la pestaña

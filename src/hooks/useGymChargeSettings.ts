@@ -1,3 +1,4 @@
+import { useCanWrite } from "@/lib/writeAccess";
 import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
@@ -32,6 +33,7 @@ async function patchSettings(input: Partial<GymChargeSettings>): Promise<GymChar
 // backend y borra el LS. Cero pérdida de datos para gyms ya configurados
 // antes de este cambio.
 export function useGymChargeSettings() {
+  const canWrite = useCanWrite();
   const qc = useQueryClient();
   const migratedRef = useRef(false);
   const query = useQuery<GymChargeSettings>({
@@ -41,7 +43,7 @@ export function useGymChargeSettings() {
   });
 
   useEffect(() => {
-    if (migratedRef.current) return;
+    if (!canWrite || migratedRef.current) return;
     if (!query.data) return;
     // Sólo migramos cuando el backend reportó valores vacíos. Si ya hay
     // algo configurado, la fuente de verdad es backend y el LS legacy
@@ -72,7 +74,7 @@ export function useGymChargeSettings() {
         // memoria. El operador puede re-guardar manualmente desde
         // Ajustes y los valores vuelven a aplicarse.
       });
-  }, [query.data, qc]);
+  }, [query.data, qc, canWrite]);
 
   return query;
 }

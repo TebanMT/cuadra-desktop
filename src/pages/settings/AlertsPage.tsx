@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { SettingsBackLink } from "@/components/settings/SettingsBackLink";
 import { useEffect, useState } from "react";
 import { Loader2, Lock, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -32,7 +34,7 @@ const SAMPLE_DATA: Record<string, string> = {
   "{product_name}": "Proteína Whey 2kg",
   "{stock}": "3",
   "{count}": "7",
-  "{diff_amount}": "120.50",
+  "{diff_amount}": "120.50 (faltante) · contó Ana · 14 may · Nota: no había cambio",
   "{days_inactive}": "21",
   "{date}": "14 may 2026",
 };
@@ -47,8 +49,9 @@ export default function AlertsPage() {
   const sample = { ...SAMPLE_DATA, "{gym_name}": gymName };
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
+    <PageContainer className="space-y-6">
       <div className="space-y-1">
+        <SettingsBackLink />
         <h1
           className="text-3xl font-bold text-foreground"
           style={{ letterSpacing: "-0.02em" }}
@@ -77,7 +80,7 @@ export default function AlertsPage() {
           ))}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -180,12 +183,12 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              {customized && <Badge variant="outline">{t.alerts.customized}</Badge>}
+              {customized && canEditText && <Badge variant="outline">{t.alerts.customized}</Badge>}
               {update.isPending && (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               )}
               <div className="flex items-center gap-2">
-                <Switch
+                <Switch requiresWrite
                   id={`alert-toggle-${cfg.key}`}
                   checked={cfg.enabled}
                   onCheckedChange={toggle}
@@ -201,7 +204,7 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
             </div>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
+          {canEditText ? <div className="grid gap-4 lg:grid-cols-[2fr_1fr]">
             <div className="space-y-3">
               {bodyError && (
                 <Alert variant="destructive">
@@ -216,7 +219,7 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
                 onChange={(e) => setBody(e.target.value)}
                 readOnly={!canEditText}
                 className={
-                  "font-mono text-sm" +
+                  "text-sm" +
                   (!canEditText ? " opacity-70 cursor-not-allowed bg-muted/40" : "")
                 }
               />
@@ -233,7 +236,7 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
                 <p className="text-sm whitespace-pre-wrap">
                   {renderPreview(effectiveBody, sample)}
                 </p>
-                <p className="text-[10px] text-muted-foreground mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   {editor.previewHint}
                 </p>
               </div>
@@ -252,7 +255,7 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
                     <RotateCcw className="h-4 w-4" />
                     {editor.reset}
                   </Button>
-                  <Button
+                  <Button requiresWrite
                     type="button"
                     size="sm"
                     onClick={saveBody}
@@ -266,7 +269,7 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
             </div>
 
             <div className="rounded-md border bg-muted/30 px-3 py-3 self-start">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              <p className="text-sm font-medium text-muted-foreground mb-2">
                 {editor.variablesLabel}
               </p>
               <ul className="space-y-1 text-sm font-mono">
@@ -287,7 +290,11 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
                 ))}
               </ul>
             </div>
-          </div>
+          </div> : <div className="space-y-3">
+            <p className="text-sm font-medium">{editor.bodyLabel}</p>
+            <p className="whitespace-pre-wrap text-sm leading-relaxed">{renderPreview(effectiveBody, sample)}</p>
+            <p className="flex items-start gap-2 text-sm text-muted-foreground"><Lock aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />{editor.plusOnlyBody}</p>
+          </div>}
         </CardContent>
       </Card>
 
@@ -299,7 +306,7 @@ function AlertCard({ cfg, sample }: { cfg: AlertConfig; sample: Record<string, s
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={update.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogAction requiresWrite
               onClick={(e) => {
                 e.preventDefault();
                 restoreDefault();

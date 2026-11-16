@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { useEffect, useState } from "react";
 import { Loader2, Lock, Search, Send, Users } from "lucide-react";
 import { toast } from "sonner";
@@ -53,7 +54,7 @@ const AUDIENCES: BroadcastAudience[] = [
 ];
 const MAX_MESSAGE = 600;
 
-export default function BroadcastPage() {
+export default function BroadcastPage({ embedded = false }: { embedded?: boolean } = {}) {
   const qc = useQueryClient();
   const send = useSendBroadcast();
   const gymName = useAuthStore((s) => s.gym?.name) ?? "tu gym";
@@ -91,6 +92,7 @@ export default function BroadcastPage() {
   }
 
   function validate(): string | null {
+    if (preview.isLoading || preview.isError || !data) return "Confirma los destinatarios antes de enviar. Reintenta la consulta si falló.";
     if (!message.trim()) return t.broadcast.empty;
     if (message.length > MAX_MESSAGE) return t.broadcast.tooLong;
     if (audienceCount === 0) return t.broadcast.noAudience;
@@ -133,11 +135,11 @@ export default function BroadcastPage() {
   };
 
   const canSend =
-    !!message.trim() && audienceCount > 0 && !overCap && !monthlyReached && !send.isPending;
+    !preview.isLoading && !preview.isError && !!data && !!message.trim() && audienceCount > 0 && !overCap && !monthlyReached && !send.isPending;
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <div className="space-y-1">
+    <PageContainer embedded={embedded} contentWidth="form" className="space-y-6">
+      {!embedded && (<div className="space-y-1">
         <h1
           className="text-3xl font-bold text-foreground"
           style={{ letterSpacing: "-0.02em" }}
@@ -145,7 +147,7 @@ export default function BroadcastPage() {
           {t.broadcast.title}
         </h1>
         <p className="text-sm text-muted-foreground">{t.broadcast.subtitle}</p>
-      </div>
+      </div>)}
 
       <div className="space-y-4">
         {error && (
@@ -171,11 +173,12 @@ export default function BroadcastPage() {
                 </SelectContent>
               </Select>
 
+              {preview.isError && <div role="alert"><Button type="button" variant="outline" onClick={() => void preview.refetch()}>Reintentar destinatarios</Button></div>}
               <div className="flex items-center justify-between gap-2 pt-1">
                 <p className="text-xs text-muted-foreground">
                   {preview.isLoading
                     ? t.broadcast.loadingPreview
-                    : t.broadcast.recipientsCount(audienceCount)}
+                    : preview.isError ? "No pudimos consultar los destinatarios." : t.broadcast.recipientsCount(audienceCount)}
                 </p>
                 <div className="flex items-center gap-2">
                   {custom && (
@@ -188,7 +191,7 @@ export default function BroadcastPage() {
                       {t.broadcast.backToGroup}
                     </Button>
                   )}
-                  <Button
+                  <Button requiresWrite
                     variant="outline"
                     size="sm"
                     className="h-7"
@@ -225,7 +228,7 @@ export default function BroadcastPage() {
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-1">
+              <p className="text-sm font-medium text-muted-foreground mb-1">
                 {t.broadcast.previewLabel}
               </p>
               <div className="rounded-md border bg-muted/30 px-3 py-2 text-sm whitespace-pre-wrap">
@@ -235,7 +238,9 @@ export default function BroadcastPage() {
 
             <div className="flex items-center justify-between gap-3 pt-2">
               <p className="text-xs text-muted-foreground">
-                {isPlus
+                {preview.isLoading || preview.isError || !data
+                  ? "No se pudo confirmar el cupo de envíos."
+                  : isPlus
                   ? null
                   : monthlyReached
                     ? t.broadcast.monthlyReached(monthlyLimit)
@@ -271,7 +276,7 @@ export default function BroadcastPage() {
             <AlertDialogCancel disabled={send.isPending}>
               {t.broadcast.confirm.cancel}
             </AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogAction requiresWrite
               onClick={(e) => {
                 e.preventDefault();
                 doSend();
@@ -284,7 +289,7 @@ export default function BroadcastPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </PageContainer>
   );
 }
 
@@ -359,7 +364,7 @@ function RecipientPickerDialog({
               <div className="p-3 text-sm text-muted-foreground">
                 {t.broadcast.loadingPreview}
               </div>
-            ) : (results.data?.items ?? []).length === 0 ? (
+            ) : results.isError ? (<div role="alert" className="p-3 text-sm"><p>No pudimos buscar socios.</p><Button variant="outline" onClick={() => void results.refetch()}>Reintentar búsqueda</Button></div>) : (results.data?.items ?? []).length === 0 ? (
               <div className="p-3 text-sm text-muted-foreground">
                 {t.broadcast.pickerNoResults}
               </div>

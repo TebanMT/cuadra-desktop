@@ -7,8 +7,11 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import RegisterPurchasePage from "@/pages/products/RegisterPurchasePage";
 
-vi.mock("@/stores/useAuthStore", () => ({ useAuthStore: (select: (s: unknown) => unknown) => select({ user: { role: "owner", user_id: "search-user" }, gym: { gym_id: "search-gym" } }) }));
-vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: () => null }));
+vi.mock("@/stores/useAuthStore", () => ({ useAuthStore: Object.assign((select: (s: unknown) => unknown) => select({ user: { role: "owner", user_id: "search-user" }, gym: { gym_id: "search-gym" }, readOnly: false }), { getState: () => ({ readOnly: false }) }) }));
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({ CashDrawerField: () => null });
+});
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 const catalog = [{ id: "water", name: "Agua mineral" }, { id: "bar", name: "Barra de avena" }, { id: "protein", name: "PROTEÍNA sabor PIÑA" }];
 const requests: URL[] = [];
@@ -54,7 +57,7 @@ describe("Buscador de la compra con API y espera reales", () => {
     await user.click(await screen.findByRole("button", { name: "Agua mineral" }));
     await user.type(screen.getByLabelText("Costo de Agua mineral"), "10");
     await user.click(screen.getByRole("button", { name: "Guardar compra" }));
-    await screen.findByText("Compra terminada");
+    await screen.findByText("Compra terminada", {}, { timeout: 3000 });
     expect(submissions).toEqual([expect.objectContaining({ items: [{ product_id: "water", quantity: 1, unit_cost: 10 }] })]);
   });
 

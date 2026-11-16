@@ -40,7 +40,7 @@ describe("Synchronization status copy", () => {
   it("shows a short disconnection without hiding the pending changes or diagnosis", () => {
     show("offline_short", 3);
     expect(screen.getByText("Sin conexión")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Estado de sincronización" }));
+    fireEvent.click(screen.getByRole("button", { name: "Estado de sincronización: Sin conexión" }));
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(screen.getByText("test-only diagnostic").closest("details")).not.toHaveAttribute("open");
     expect(screen.getByText(/Puedes seguir trabajando/)).toBeInTheDocument();

@@ -1,8 +1,12 @@
+import { ChargeSettingsStatus } from "@/components/billing/ChargeSettingsStatus";
+import { chargeSettingsReady, CHARGE_SETTINGS_REQUIRED } from "@/lib/chargeSettingsReadiness";
+import { useCanWrite, READ_ONLY_MESSAGE } from "@/lib/writeAccess";
+import { permissionHint, usePermission } from "@/lib/permissions";
 import { validateDateFields } from "@/lib/date-input";
 import { DateInput } from "@/components/ui/date-input";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Image as ImageIcon, X as XIcon, Upload, Camera, ChevronRight, UserPlus, Tag } from "lucide-react";
+import { Loader2, Image as ImageIcon, X as XIcon, Upload, Camera, ChevronRight, UserPlus, Tag, Plus } from "lucide-react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +32,7 @@ import { previewExpiry, todayIso } from "@/lib/dates";
 import { getAvatarPalette, getInitials } from "@/lib/avatar";
 import { members as t } from "@/strings/members";
 import { MemberPhoto, useMemberPhotoSrc } from "./MemberPhoto";
+import { VigenciaBadge } from "./VigenciaBadge";
 import { CameraCaptureModal } from "@/components/shared/CameraCaptureModal";
 import type { Promotion } from "@/hooks/usePromotions";
 import { formatPromotionValue, promotions as pt } from "@/strings/promotions";
@@ -191,6 +196,7 @@ function calcTotal(
 }
 
 export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCancel, serverError }: Props) {
+  const canWrite = useCanWrite();
   const [values, setValues] = useState<MemberFormValues>({ ...emptyValues, ...initial });
   // Promo opcional al primer pago. Sólo se activa cuando charge_first_payment
   // está prendido. Para companion_memberships abrimos selector en cascada.
@@ -230,15 +236,21 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
   // puede tener fee=0 aunque el gym ya cobre la cuota; en ese caso
   // usamos el monto default del gym como fallback.
   const chargeSettingsQuery = useGymChargeSettings();
+  const feesReady = chargeSettingsReady(chargeSettingsQuery.data);
+  const needsFees = mode === "create" && values.charge_first_payment;
   const gymCharges = useMemo(
     () => ({
       chargesEnrollment: !!chargeSettingsQuery.data?.charges_enrollment,
       chargesMaintenance: !!chargeSettingsQuery.data?.charges_maintenance,
       defaultEnrollmentAmount: chargeSettingsQuery.data?.enrollment_amount ?? 0,
       defaultMaintenanceAmount: chargeSettingsQuery.data?.maintenance_amount ?? 0,
+      defaultFrequency: chargeSettingsQuery.data?.maintenance_frequency || undefined,
     }),
     [chargeSettingsQuery.data],
   );
+  // Without "discounts", reception can't skip a fee that is due nor date a
+  // first payment before today (the backend answers 403).
+  const canDiscount = usePermission("discounts");
 
   useEffect(() => {
     if (!navigator.mediaDevices?.enumerateDevices) {
@@ -319,10 +331,24 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
   }, [mode, activeTypes, values.membership_type_id]);
 
   const selectedPlan = activeTypes.find((p) => p.id === values.membership_type_id);
+  // Due fees for a new member: enrollment whenever the gym charges it with
+  // an amount; maintenance also needs a frequency (plan or gym default).
+  const enrollmentDue = !!selectedPlan && gymCharges.chargesEnrollment &&
+    effectiveFee(selectedPlan.enrollment_fee, gymCharges.defaultEnrollmentAmount) > 0;
+  const maintenanceDue = !!selectedPlan && gymCharges.chargesMaintenance &&
+    effectiveFee(selectedPlan.maintenance_fee, gymCharges.defaultMaintenanceAmount) > 0 &&
+    !!(selectedPlan.maintenance_frequency || gymCharges.defaultFrequency);
+  const lockEnrollment = !canDiscount && enrollmentDue;
+  const lockMaintenance = !canDiscount && maintenanceDue;
+  const chargeEnrollment = values.charge_enrollment || lockEnrollment;
+  const chargeMaintenance = values.charge_maintenance || lockMaintenance;
+  // A first payment dated before today needs "discounts".
+  const lockBackdate = mode === "create" && values.charge_first_payment && !canDiscount;
+  const minStartDate = lockBackdate ? todayIso() : undefined;
   const subtotal = calcTotal(
     selectedPlan,
-    values.charge_enrollment,
-    values.charge_maintenance,
+    chargeEnrollment,
+    chargeMaintenance,
     gymCharges.defaultEnrollmentAmount,
     gymCharges.defaultMaintenanceAmount,
   );
@@ -330,7 +356,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
   // de efectos (extra_days, companion) no descuentan; free_enrollment
   // descuenta el fee de inscripción si el operador está cobrando esa
   // cuota; percent/fixed son lo obvio.
-  const enrollmentForPromo = selectedPlan && values.charge_enrollment
+  const enrollmentForPromo = selectedPlan && chargeEnrollment
     ? effectiveFee(selectedPlan.enrollment_fee, gymCharges.defaultEnrollmentAmount)
     : 0;
   const promoDiscount = useMemo(() => {
@@ -343,13 +369,13 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
         if (promo.value == null) return 0;
         return Math.min(subtotal, promo.value);
       case "free_enrollment":
-        if (!values.charge_enrollment || enrollmentForPromo <= 0) return 0;
+        if (!chargeEnrollment || enrollmentForPromo <= 0) return 0;
         return Math.min(subtotal, enrollmentForPromo);
       case "extra_days":
       case "companion_memberships":
         return 0;
     }
-  }, [promo, values.charge_first_payment, values.charge_enrollment, subtotal, enrollmentForPromo]);
+  }, [promo, values.charge_first_payment, chargeEnrollment, subtotal, enrollmentForPromo]);
   const total = Math.max(0, subtotal - promoDiscount);
   const expiryStr = useMemo(() => {
     if (!selectedPlan || !values.start_date) return null;
@@ -409,6 +435,8 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canWrite || submitting) return;
+    if (needsFees && !feesReady) { setError(CHARGE_SETTINGS_REQUIRED); return; }
     setError(null);
 
     const schema = mode === "create" ? createSchema : editSchema;
@@ -424,6 +452,11 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
       return;
     }
 
+    if (minStartDate && values.start_date < minStartDate) {
+      setError(`Con cobro inicial, el inicio es hoy o después. Para registrarlo con fecha atrasada: ${permissionHint("discounts")}`);
+      return;
+    }
+
     if (promo && promo.kind === "companion_memberships") {
       const want = promo.companion_count ?? 0;
       if (companionIDs.length !== want) {
@@ -433,7 +466,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
     }
 
     onSubmit({
-      values,
+      values: { ...values, charge_enrollment: chargeEnrollment, charge_maintenance: chargeMaintenance },
       totalCharge: total,
       enrollmentAmount: effectiveFee(selectedPlan?.enrollment_fee, gymCharges.defaultEnrollmentAmount),
       maintenanceAmount: effectiveFee(selectedPlan?.maintenance_fee, gymCharges.defaultMaintenanceAmount),
@@ -455,7 +488,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
 
       <section className="space-y-4">
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <h3 className="font-display text-base text-foreground">
             {t.form.sections.basics}
           </h3>
           {/* Hint para no-técnicos: los asteriscos junto a "Nombre" y
@@ -513,33 +546,33 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
           )}
         </div>
 
-        <div className="flex flex-wrap gap-3">
+        <details className="border-t pt-3"><summary className="cursor-pointer py-2 text-sm font-medium">Agregar datos opcionales</summary><div className="flex flex-wrap gap-3 py-2">
           {!showEmail && (
-            <Button type="button" variant="link" size="sm" onClick={() => setShowEmail(true)} className="h-auto p-0">
-              {t.form.addEmail}
+            <Button type="button" variant="link" size="sm" onClick={() => setShowEmail(true)} className="h-auto gap-1.5 p-0 min-h-11">
+              <Plus aria-hidden className="h-4 w-4" />{t.form.addEmail}
             </Button>
           )}
           {!showBirthdate && (
-            <Button type="button" variant="link" size="sm" onClick={() => setShowBirthdate(true)} className="h-auto p-0">
-              {t.form.addBirthdate}
+            <Button type="button" variant="link" size="sm" onClick={() => setShowBirthdate(true)} className="h-auto gap-1.5 p-0 min-h-11">
+              <Plus aria-hidden className="h-4 w-4" />{t.form.addBirthdate}
             </Button>
           )}
           {!showPhoto && (
-            <Button type="button" variant="link" size="sm" onClick={() => setShowPhoto(true)} className="h-auto p-0">
-              {t.form.addPhoto}
+            <Button type="button" variant="link" size="sm" onClick={() => setShowPhoto(true)} className="h-auto gap-1.5 p-0 min-h-11">
+              <Plus aria-hidden className="h-4 w-4" />{t.form.addPhoto}
             </Button>
           )}
           {!showNotes && (
-            <Button type="button" variant="link" size="sm" onClick={() => setShowNotes(true)} className="h-auto p-0">
-              {t.form.addNotes}
+            <Button type="button" variant="link" size="sm" onClick={() => setShowNotes(true)} className="h-auto gap-1.5 p-0 min-h-11">
+              <Plus aria-hidden className="h-4 w-4" />{t.form.addNotes}
             </Button>
           )}
           {!showGender && (
-            <Button type="button" variant="link" size="sm" onClick={() => setShowGender(true)} className="h-auto p-0">
-              {t.form.addGender}
+            <Button type="button" variant="link" size="sm" onClick={() => setShowGender(true)} className="h-auto gap-1.5 p-0 min-h-11">
+              <Plus aria-hidden className="h-4 w-4" />{t.form.addGender}
             </Button>
           )}
-        </div>
+        </div></details>
 
         {showEmail && (
           <div className="space-y-2">
@@ -665,7 +698,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                 setShowGender(false);
               }}
             />
-            <RadioGroup
+            <RadioGroup aria-label="Género"
               value={values.gender}
               onValueChange={(v) => update("gender", v as GenderFormValue)}
               className="flex flex-wrap gap-4"
@@ -690,7 +723,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
 
       {mode === "create" && (
         <section className="space-y-4">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+          <h3 className="font-display text-base text-foreground">
             {t.form.sections.membership}
           </h3>
 
@@ -718,8 +751,12 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
             <DateInput
               id="m-start"
               value={values.start_date}
+              min={minStartDate}
               onValueChange={(e) => update("start_date", e)}
             />
+            {lockBackdate && (
+              <p className="text-xs text-muted-foreground">Con cobro inicial, el inicio es hoy o después. Para registrarlo con fecha atrasada: {permissionHint("discounts")}</p>
+            )}
             {expiryStr && (
               <p className="text-sm text-muted-foreground">{t.form.expiryPreview(expiryStr)}</p>
             )}
@@ -742,7 +779,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                     operador los puede deseleccionar para reflejar
                     promos ("primer mes sin inscripción"). */}
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  <p className="text-sm font-medium text-muted-foreground">
                     {t.form.chargeBreakdown}
                   </p>
                   <div className="space-y-2 rounded-md border bg-muted/30 p-3">
@@ -765,7 +802,8 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                       <label className="flex items-center justify-between gap-3 cursor-pointer text-sm">
                         <span className="flex items-center gap-2">
                           <Checkbox
-                            checked={values.charge_enrollment}
+                            checked={chargeEnrollment}
+                            disabled={lockEnrollment}
                             onCheckedChange={(v) => update("charge_enrollment", !!v)}
                           />
                           <span>{t.form.chargeEnrollment}</span>
@@ -773,7 +811,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                         <span
                           className={
                             "tabular-nums font-medium " +
-                            (values.charge_enrollment ? "" : "text-muted-foreground line-through")
+                            (chargeEnrollment ? "" : "text-muted-foreground line-through")
                           }
                         >
                           {formatMoney(effectiveFee(selectedPlan.enrollment_fee, gymCharges.defaultEnrollmentAmount))}
@@ -790,7 +828,8 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                       <label className="flex items-center justify-between gap-3 cursor-pointer text-sm">
                         <span className="flex items-center gap-2">
                           <Checkbox
-                            checked={values.charge_maintenance}
+                            checked={chargeMaintenance}
+                            disabled={lockMaintenance}
                             onCheckedChange={(v) => update("charge_maintenance", !!v)}
                           />
                           <span>{t.form.chargeMaintenance}</span>
@@ -798,7 +837,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                         <span
                           className={
                             "tabular-nums font-medium " +
-                            (values.charge_maintenance ? "" : "text-muted-foreground line-through")
+                            (chargeMaintenance ? "" : "text-muted-foreground line-through")
                           }
                         >
                           {formatMoney(effectiveFee(selectedPlan.maintenance_fee, gymCharges.defaultMaintenanceAmount))}
@@ -806,15 +845,25 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                       </label>
                     )}
 
+                    {(lockEnrollment || lockMaintenance) && (
+                      <p className="text-xs text-muted-foreground">
+                        {lockEnrollment && lockMaintenance
+                          ? "Para no cobrar la inscripción o el mantenimiento: "
+                          : lockEnrollment
+                            ? "Para no cobrar la inscripción: "
+                            : "Para no cobrar el mantenimiento: "}
+                        {permissionHint("discounts")}
+                      </p>
+                    )}
                     {promoDiscount > 0 && (
-                      <div className="flex items-center justify-between text-sm text-success">
+                      <div className="flex items-center justify-between text-sm text-success-text">
                         <span>− Promoción ({promo?.name})</span>
                         <span className="tabular-nums">−{formatMoney(promoDiscount)}</span>
                       </div>
                     )}
                     <div className="border-t pt-2 flex items-center justify-between text-sm font-semibold">
                       <span>{t.form.chargeTotal}</span>
-                      <span className="tabular-nums">{formatMoney(total)}</span>
+                      <span className="tabular-nums">{feesReady ? formatMoney(total) : "Por confirmar"}</span>
                     </div>
                   </div>
                 </div>
@@ -828,7 +877,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="w-full h-9"
+                      className="w-full h-11"
                       onClick={() => setPromoPickerOpen(true)}
                     >
                       <Tag className="h-4 w-4 mr-2" />
@@ -841,22 +890,22 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                           <div className="flex items-center gap-2 flex-wrap">
                             <Tag className="h-4 w-4 text-primary" />
                             <span className="font-medium text-sm">{promo.name}</span>
-                            <Badge variant="secondary" className="text-[10px]">
+                            <Badge variant="secondary" className="text-xs">
                               {formatPromotionValue(promo.kind, promo.value, promo.companion_count)}
                             </Badge>
                           </div>
                           {promoDiscount > 0 && (
-                            <div className="text-xs text-success mt-1">
+                            <div className="text-xs text-success-text mt-1">
                               {pt.picker.discountPreview(formatMoney(promoDiscount))}
                             </div>
                           )}
                           {promo.kind === "extra_days" && promo.value != null && (
-                            <div className="text-xs text-success mt-1">
+                            <div className="text-xs text-success-text mt-1">
                               {pt.picker.extraDaysPreview(promo.value)}
                             </div>
                           )}
                           {promo.kind === "companion_memberships" && (
-                            <div className="text-xs text-success mt-1">
+                            <div className="text-xs text-success-text mt-1">
                               {pt.picker.companionPreview(promo.companion_count ?? 0)} ·{" "}
                               {companionIDs.length === (promo.companion_count ?? 0)
                                 ? `${companionIDs.length} ya elegidos`
@@ -911,7 +960,7 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
                   onConfirm={(ids) => setCompanionIDs(ids)}
                 />
 
-                <RadioGroup
+                <RadioGroup aria-label="Método de pago"
                   value={values.payment_method}
                   onValueChange={(v) => update("payment_method", v as MemberFormValues["payment_method"])}
                   className="flex flex-wrap gap-4"
@@ -935,14 +984,24 @@ export function MemberForm({ mode, initial, memberId, submitting, onSubmit, onCa
         </section>
       )}
 
-      <div className="flex flex-col gap-3 sm:flex-row justify-end pt-2">
+      <div className="border-t pt-4 space-y-4">
+        {mode === "create" && <div className="space-y-1 text-sm" aria-label="Resumen de inscripción">
+          <p className="font-semibold">{values.full_name.trim() || "Nuevo socio"}</p>
+          <p>{values.charge_first_payment ? `Cobro inicial: ${feesReady ? formatMoney(total) : "por confirmar"} · ${t.form.methods[values.payment_method as keyof typeof t.form.methods] ?? "Elige el método de pago"}` : "Inscripción sin cobro inicial"}</p>
+          {expiryStr && <p className="text-muted-foreground">{t.form.expiryPreview(expiryStr)}</p>}
+        </div>}
+        {needsFees && <ChargeSettingsStatus query={chargeSettingsQuery} />}
+        {!canWrite && <p role="status" className="text-sm text-muted-foreground">{READ_ONLY_MESSAGE}</p>}
+        <div className="flex flex-col gap-3 sm:flex-row justify-end">
         <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           {t.form.cancel}
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button requiresWrite type="submit" disabled={!canWrite || submitting || (needsFees && !feesReady)}>
           {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {mode === "create" ? t.form.submitNew : t.form.submitEdit}
+          {mode === "create" ? (values.charge_first_payment ? feesReady ? `Inscribir y cobrar ${formatMoney(total)}` : "Inscribir y cobrar" : "Inscribir sin cobro") : t.form.submitEdit}
         </Button>
+      </div>
+
       </div>
 
       <CameraCaptureModal
@@ -977,7 +1036,7 @@ function OptionalFieldHeader({ label, htmlFor, onRemove }: OptionalFieldHeaderPr
         variant="link"
         size="sm"
         onClick={onRemove}
-        className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground"
+        className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground min-h-11"
       >
         − {t.form.removeOptional}
       </Button>
@@ -1022,25 +1081,6 @@ function PhotoPreview({ value, memberId }: { value: string; memberId: string | u
     );
   }
   return placeholder;
-}
-
-type StatusVariant = "success" | "warning" | "destructive" | "secondary" | "outline";
-
-function matchStatusInfo(item: MemberListItem): { label: string; variant: StatusVariant } {
-  const s = t.form.matches.status;
-  switch (item.access_status) {
-    case "allowed_active":
-      return { label: s.active, variant: "success" };
-    case "allowed_expiring_soon":
-      return { label: s.expiringSoon, variant: "warning" };
-    case "denied_expired":
-      return { label: s.expired, variant: "destructive" };
-    case "denied_inactive":
-      return { label: s.inactive, variant: "secondary" };
-    case "denied_no_membership":
-    default:
-      return { label: s.noPlan, variant: "outline" };
-  }
 }
 
 // MemberMatches — lista inline de socios existentes que matchean el
@@ -1125,7 +1165,6 @@ function MemberMatches({ query, onDismiss }: { query: string; onDismiss(): void 
 function MatchRow({ item, onOpen }: { item: MemberListItem; onOpen(): void }) {
   const m = item.member;
   const palette = getAvatarPalette(m.full_name);
-  const info = matchStatusInfo(item);
   return (
     <li>
       <button
@@ -1138,7 +1177,8 @@ function MatchRow({ item, onOpen }: { item: MemberListItem; onOpen(): void }) {
         )}
       >
         <Avatar className="h-10 w-10 shrink-0">
-          <MemberPhoto memberId={m.id} />
+          {/* Sin photo_url no hay nada que pedir al sidecar (sería un 404). */}
+          {m.photo_url && <MemberPhoto memberId={m.id} />}
           <AvatarFallback
             className="text-xs font-semibold"
             style={{ backgroundColor: palette.bg, color: palette.text }}
@@ -1148,11 +1188,12 @@ function MatchRow({ item, onOpen }: { item: MemberListItem; onOpen(): void }) {
         </Avatar>
         <div className="min-w-0 flex-1">
           <p className="font-medium truncate">{m.full_name}</p>
-          <p className="text-xs text-muted-foreground truncate">
-            {m.phone || "—"}
+          {/* Teléfono y folio distinguen homónimos antes de abrir la ficha. */}
+          <p className="text-xs text-muted-foreground truncate tabular">
+            {[/\d/.test(m.phone ?? "") ? m.phone : null, m.folio].filter(Boolean).join(" · ")}
           </p>
         </div>
-        <Badge variant={info.variant}>{info.label}</Badge>
+        <VigenciaBadge accessStatus={item.access_status} expiryDate={item.current_membership?.expiry_date} />
         <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
       </button>
     </li>

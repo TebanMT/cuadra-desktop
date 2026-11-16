@@ -10,15 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLogin } from "@/hooks/useAuth";
 import { ApiError, api } from "@/lib/api";
 import { auth } from "@/strings/auth";
-import { useAuthStore } from "@/stores/useAuthStore";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { TrialEndedDialog } from "@/components/auth/TrialEndedDialog";
 
 // LoginEmail is the fallback email+password sign-in for desktop after the
 // auth-refactor v0.7. The primary flow is the PIN grid at /auth/login; this
@@ -28,7 +20,6 @@ import {
 export default function LoginEmail() {
   const navigate = useNavigate();
   const login = useLogin();
-  const setReadOnly = useAuthStore((s) => s.setReadOnly);
 
   // Welcome.tsx pasa `?email=` cuando detecta que el laptop ya está
   // pareado — pre-llenamos el campo así el operador solo tipea la
@@ -107,8 +98,7 @@ export default function LoginEmail() {
     }
   }
 
-  function continueAfterTrial(readOnly: boolean) {
-    setReadOnly(readOnly);
+  function continueAfterTrial() {
     setTrialModal(false);
     navigate("/", { replace: true });
   }
@@ -210,22 +200,7 @@ export default function LoginEmail() {
         </p>
       </form>
 
-      <Dialog open={trialModal} onOpenChange={setTrialModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{auth.login.trialExpired.title}</DialogTitle>
-            <DialogDescription>{auth.login.trialExpired.body}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => continueAfterTrial(true)}>
-              {auth.login.trialExpired.later}
-            </Button>
-            <Button onClick={() => continueAfterTrial(false)}>
-              {auth.login.trialExpired.activate}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <TrialEndedDialog open={trialModal} onContinue={continueAfterTrial} />
     </AuthShell>
   );
 }

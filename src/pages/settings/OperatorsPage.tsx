@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { useState } from "react";
 import {
   Loader2,
@@ -42,31 +43,30 @@ import { OperatorEditModal } from "@/components/settings/OperatorEditModal";
 import { OperatorResetPasswordModal } from "@/components/settings/OperatorResetPasswordModal";
 import { OperatorRotatePinModal } from "@/components/settings/OperatorRotatePinModal";
 import {
-  useOperators,
+  operatorLimitError,
+  useOperatorCapacity,
   useToggleOperatorActive,
   type Operator,
 } from "@/hooks/useOperators";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { canAccessFeature } from "@/lib/features";
 import { ApiError } from "@/lib/api";
 import { fmtDate } from "@/lib/dates";
 import { settings as t } from "@/strings/settings";
+import { PERMISSIONS } from "@/lib/permissions";
 import { Link } from "react-router-dom";
+import { SettingsBackLink } from "@/components/settings/SettingsBackLink";
 
-// Caps en FE. El BE es la fuente de verdad (CreateOperator usa
-// MaxOperatorsStandard=2 → dueño + 1 op para Standard; MaxOperatorsPerGym=11
-// → dueño + 10 op para Plus/Trial). Mantener acá los mismos números le
-// ahorra al dueño el 402 cuando ya llegó al cap.
-const HARD_LIMIT_PLUS = 10;
-const HARD_LIMIT_STANDARD = 1;
+// Aviso suave antes del cupo Plus (el cupo vive en useOperatorCapacity).
 const SOFT_WARN = 5;
+const LIMIT_NOTE_ID = "operators-limit-note";
 
 export default function OperatorsPage() {
-  const list = useOperators(true);
+  // El servidor cuenta sólo a los operadores activos (CountOperatorsByGym);
+  // el dueño y los desactivados no ocupan lugar. useOperatorCapacity cuenta
+  // igual para que el cupo coincida con la lista y con lo que el servidor
+  // acepta, aquí y en el alta.
+  const { list, capacity } = useOperatorCapacity();
   const me = useAuthStore((s) => s.user);
-  const plan = useAuthStore((s) => s.gym);
-  const isPlus = canAccessFeature(plan, "extra_operators");
-  const hardLimit = isPlus ? HARD_LIMIT_PLUS : HARD_LIMIT_STANDARD;
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<Operator | null>(null);
   const [resetting, setResetting] = useState<Operator | null>(null);
@@ -74,11 +74,17 @@ export default function OperatorsPage() {
   const [confirmToggle, setConfirmToggle] = useState<Operator | null>(null);
 
   const items = list.data?.items ?? [];
-  const operators = items.filter((o) => o.role === "operator");
-  const activeCount = operators.filter((o) => o.active).length;
+  const capacityKnown = capacity != null;
+  const isPlus = capacity?.isPlus ?? false;
+  const hardLimit = capacity?.limit ?? 0;
+  const usedCount = capacity?.used ?? 0;
+  const inactiveCount = capacity?.inactive ?? 0;
+  const atLimit = capacity?.full ?? false;
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl mx-auto">
+    <PageContainer className="space-y-6">
+      <div className="space-y-1">
+      <SettingsBackLink />
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div className="space-y-1">
           <h1
@@ -88,34 +94,36 @@ export default function OperatorsPage() {
             {t.operators.title}
           </h1>
           <p className="text-sm text-muted-foreground">
-            {t.operators.subtitle(hardLimit, activeCount)}
+            {capacityKnown ? t.operators.capacity(hardLimit, usedCount, inactiveCount) : "Consulta el equipo y los accesos disponibles."}
           </p>
         </div>
-        <Button
+        <Button requiresWrite
           size="lg"
           onClick={() => setCreateOpen(true)}
-          disabled={activeCount >= hardLimit}
-          className="h-10 rounded-md font-semibold shadow-sm"
+          disabled={!capacityKnown || atLimit}
+          aria-describedby={atLimit ? LIMIT_NOTE_ID : undefined}
+          className="rounded-md font-semibold"
         >
-          <Plus className="h-4 w-4 mr-2" />
+          <Plus aria-hidden="true" className="h-4 w-4" />
           {t.operators.create}
         </Button>
       </div>
+      </div>
       <div className="space-y-4">
 
-      {activeCount >= hardLimit && (
+      {atLimit && (
         <Alert variant="warning">
-          <AlertDescription>
+          <AlertDescription id={LIMIT_NOTE_ID}>
             {isPlus ? (
               t.operators.hardLimit
             ) : (
               <>
-                Tu plan Standard incluye 1 operador. Para sumar más,{" "}
+                {t.operators.standardLimit} Para revisar el acceso,{" "}
                 <Link
-                  to="/settings/subscription"
+                  to="/help"
                   className="font-semibold underline underline-offset-2"
                 >
-                  mejora a Plus
+                  consulta a soporte
                 </Link>
                 .
               </>
@@ -125,21 +133,27 @@ export default function OperatorsPage() {
       )}
       {/* SOFT_WARN sólo aplica al cap Plus — en Standard el cap es 1 y el
           warning sería ruido (siempre se dispara antes de la creación). */}
-      {isPlus && activeCount >= SOFT_WARN && activeCount < hardLimit && (
+      {isPlus && usedCount >= SOFT_WARN && usedCount < hardLimit && (
         <Alert>
           <AlertDescription>{t.operators.softWarning}</AlertDescription>
         </Alert>
       )}
 
       {list.isLoading && (
-        <div className="flex items-center justify-center py-20">
-          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        <div role="status" className="flex items-center justify-center gap-3 py-20 text-muted-foreground">
+          <Loader2 aria-hidden="true" className="h-6 w-6 animate-spin" />
+          Consultando operadores…
         </div>
       )}
 
       {list.error && (
         <Alert variant="destructive">
-          <AlertDescription>{t.operators.loadError}</AlertDescription>
+          <AlertDescription className="space-y-3">
+            <p>{capacityKnown ? "No pudimos actualizar los operadores. Mostramos la última información disponible." : t.operators.loadError}</p>
+            <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>
+              {list.isFetching ? "Reintentando…" : "Reintentar operadores"}
+            </Button>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -164,11 +178,16 @@ export default function OperatorsPage() {
                 {items.map((op) => {
                   const isSelf = op.id === me?.user_id;
                   return (
-                    <TableRow key={op.id} className={!op.active ? "opacity-60" : undefined}>
+                    <TableRow key={op.id}>
                       <TableCell className="font-medium">{op.full_name}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{op.email}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{op.email || t.operators.noEmail}</TableCell>
                       <TableCell className="hidden md:table-cell text-sm">
                         {t.operators.role[op.role]}
+                        {op.role === "operator" && op.permissions && (
+                          <div className="text-xs text-muted-foreground">
+                            {`${op.permissions.length} de ${PERMISSIONS.length} permisos`}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-1">
@@ -196,7 +215,7 @@ export default function OperatorsPage() {
                         {op.role === "operator" ? (
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button requiresWrite variant="ghost" size="icon" aria-label={`Acciones de ${op.full_name}`}>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -224,7 +243,10 @@ export default function OperatorsPage() {
                                   }
                                   setConfirmToggle(op);
                                 }}
-                                disabled={isSelf}
+                                // Activar a alguien con el cupo lleno lo rechazaría el
+                                // servidor: se dice antes, en el mismo menú.
+                                disabled={isSelf || (!op.active && atLimit)}
+                                title={!op.active && atLimit ? t.operators.activateAtLimit : undefined}
                               >
                                 <Power className="h-4 w-4 mr-2" />
                                 {op.active
@@ -267,7 +289,7 @@ export default function OperatorsPage() {
         open={!!confirmToggle}
         onOpenChange={(o) => !o && setConfirmToggle(null)}
       />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -293,7 +315,9 @@ function ToggleConfirm({
       );
       onOpenChange(false);
     } catch (err) {
-      toast.error(err instanceof ApiError ? err.message : t.operators.errors.generic);
+      // Con el cupo lleno, la explicación de Tinta en vez del mensaje del servidor.
+      if (operatorLimitError(err)) toast.error(t.operators.activateAtLimit);
+      else toast.error(err instanceof ApiError ? err.message : t.operators.errors.generic);
     }
   }
 
@@ -314,7 +338,7 @@ function ToggleConfirm({
           <AlertDialogCancel disabled={toggle.isPending}>
             {t.operators.deactivate.cancel}
           </AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogAction requiresWrite
             onClick={(e) => {
               e.preventDefault();
               doToggle();

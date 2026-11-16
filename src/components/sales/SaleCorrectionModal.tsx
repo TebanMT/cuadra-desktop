@@ -63,6 +63,8 @@ export function SaleCorrectionModal({
   const [reason, setReason] = useState("");
   const [resolution, setResolution] = useState<SaleCorrectionMoneyResolution | "">("");
   const [refundMethod, setRefundMethod] = useState<SaleCorrectionRefundMethod | "">("");
+  const [cashReady, setCashReady] = useState(false);
+  const [collectionReady, setCollectionReady] = useState(false);
   const [cashDrawerId, setCashDrawerId] = useState<string>();
   const [increaseResolution, setIncreaseResolution] = useState<SaleCorrectionIncreaseResolution | "">("");
   const [collectionMethod, setCollectionMethod] = useState<SaleCorrectionRefundMethod | "">("");
@@ -213,6 +215,7 @@ export function SaleCorrectionModal({
     event.preventDefault();
     setError(null);
     setVersionConflict(false);
+    if (isOwner && ((needsMoneyDecision && resolution === "refund_excess" && refundMethod === "cash" && !cashReady) || (needsIncreaseDecision && increaseResolution === "collect_now" && collectionMethod === "cash" && !collectionReady))) return setError("Confirma la caja antes de guardar la corrección.");
     if (!sale || !preview.changed) {
       setError(t.page.correction.errors.unchanged);
       return;
@@ -309,9 +312,7 @@ export function SaleCorrectionModal({
           return;
         }
         setError(
-          (details?.exception as string | undefined) ||
-            (details?.message as string | undefined) ||
-            caught.message ||
+          caught.message ||
             t.page.correction.errors.generic
         );
         return;
@@ -321,7 +322,7 @@ export function SaleCorrectionModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !correction.isPending && onOpenChange(next)}>
+    <Dialog busy={correction.isPending} open={open} onOpenChange={(next) => !correction.isPending && onOpenChange(next)}>
       <DialogContent
         className="max-w-3xl max-h-[90vh] overflow-y-auto"
         onInteractOutside={(event) => event.preventDefault()}
@@ -392,7 +393,7 @@ export function SaleCorrectionModal({
                           <p className="text-xs tabular text-muted-foreground">
                             {fmtMoney(line.unitPrice)} c/u
                           </p>
-                          {line.saleItemID && <select aria-label={`Producto correcto para ${line.productName}`} value={line.productID} onChange={(event) => selectReplacement(line.draftKey, event.target.value)} className="mt-2 h-8 max-w-[220px] rounded-md border bg-background px-2 text-xs"><option value={line.originalProductID}>{line.productID === line.originalProductID ? line.productName : "Producto capturado originalmente"}</option>{(products.data ?? []).filter((product) => product.id !== line.originalProductID).map((product) => <option key={product.id} value={product.id}>{product.name} · existencias {product.stock}</option>)}</select>}
+                          {line.saleItemID && <select aria-label={`Producto correcto para ${line.productName}`} value={line.productID} onChange={(event) => selectReplacement(line.draftKey, event.target.value)} className="mt-2 h-11 max-w-[220px] rounded-md border bg-background px-2 text-xs"><option value={line.originalProductID}>{line.productID === line.originalProductID ? line.productName : "Producto capturado originalmente"}</option>{(products.data ?? []).filter((product) => product.id !== line.originalProductID).map((product) => <option key={product.id} value={product.id}>{product.name} · existencias {product.stock}</option>)}</select>}
                         </td>
                         <td className="px-3 py-3 text-center font-medium tabular">{line.originalQuantity}</td>
                         <td className="px-3 py-3">
@@ -401,7 +402,7 @@ export function SaleCorrectionModal({
                               type="button"
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-11 w-11"
                               aria-label={t.page.correction.decreaseLine(line.productName)}
                               onClick={() => setQuantity(line.draftKey, line.correctedQuantity - 1)}
                               disabled={line.correctedQuantity <= 0}
@@ -417,13 +418,13 @@ export function SaleCorrectionModal({
                                 setQuantity(line.draftKey, Number(event.target.value))
                               }
                               aria-label={`${line.productName}, cantidad correcta`}
-                              className="h-8 w-20 text-center tabular"
+                              className="h-11 w-20 text-center tabular"
                             />
                             <Button
                               type="button"
                               variant="outline"
                               size="icon"
-                              className="h-8 w-8"
+                              className="h-11 w-11"
                               aria-label={t.page.correction.increaseLine(line.productName)}
                               onClick={() => setQuantity(line.draftKey, line.correctedQuantity + 1)}
                             >
@@ -433,7 +434,7 @@ export function SaleCorrectionModal({
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              className="h-11 w-11 text-muted-foreground hover:text-destructive"
                               aria-label={t.page.correction.removeLine(line.productName)}
                               onClick={() => removeLine(line.draftKey)}
                             >
@@ -465,7 +466,7 @@ export function SaleCorrectionModal({
             </div>
 
             <div className="flex flex-col gap-2 rounded-md border border-dashed p-3 sm:flex-row sm:items-end">
-              <div className="flex-1 space-y-1"><Label htmlFor="sale-correction-add-product">Agregar producto que faltó</Label><select id="sale-correction-add-product" className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={productToAdd} onChange={(event) => setProductToAdd(event.target.value)}><option value="">Selecciona un producto</option>{(products.data ?? []).filter((product) => !correctedLines.some((line) => line.productID === product.id && line.correctedQuantity > 0)).map((product) => <option key={product.id} value={product.id}>{product.name} · {fmtMoney(product.price)} · existencias {product.stock}</option>)}</select></div><Button type="button" variant="outline" onClick={addProduct} disabled={!productToAdd || products.isLoading}><Plus className="h-4 w-4 mr-1" />Agregar</Button>
+              <div className="flex-1 space-y-1"><Label htmlFor="sale-correction-add-product">Agregar producto que faltó</Label><select id="sale-correction-add-product" className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={productToAdd} onChange={(event) => setProductToAdd(event.target.value)}><option value="">Selecciona un producto</option>{(products.data ?? []).filter((product) => !correctedLines.some((line) => line.productID === product.id && line.correctedQuantity > 0)).map((product) => <option key={product.id} value={product.id}>{product.name} · {fmtMoney(product.price)} · existencias {product.stock}</option>)}</select></div><Button type="button" variant="outline" onClick={addProduct} disabled={!productToAdd || products.isLoading}><Plus className="h-4 w-4 mr-1" />Agregar</Button>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3">
@@ -490,7 +491,7 @@ export function SaleCorrectionModal({
 
             {needsIncreaseDecision && !isOwner && <Alert variant="warning"><AlertDescription>{sale.member_id ? `Puedes dejar ${fmtMoney(preview.additionalDue)} pendientes al socio. Para registrar el cobro, pide al dueño que lo confirme.` : "Esta venta no tiene socio y el aumento requiere que el dueño confirme si ya se cobró o se cobra ahora."}</AlertDescription></Alert>}
 
-            {isOwner && increaseResolution === "collect_now" && needsIncreaseDecision && <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="sale-correction-collection-method">Método del cobro adicional</Label><select id="sale-correction-collection-method" className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={collectionMethod} onChange={(event) => { setCollectionMethod(event.target.value as SaleCorrectionRefundMethod); if (event.target.value !== "cash") setCollectionCashDrawerId(undefined); }}><option value="">Selecciona</option><option value="cash">Efectivo</option><option value="transfer">Transferencia</option><option value="card">Tarjeta</option></select></div><div className="space-y-2"><Label htmlFor="sale-correction-collection-date">Fecha real del cobro</Label><DateInput id="sale-correction-collection-date" context="recent" max={todayIso()} value={collectionDate} onValueChange={(event) => setCollectionDate(event)} /></div>{collectionMethod === "cash" && <CashDrawerField value={collectionCashDrawerId} onChange={setCollectionCashDrawerId} id="sale-correction-collection-drawer" />}</div>}
+            {isOwner && increaseResolution === "collect_now" && needsIncreaseDecision && <div className="grid gap-3 sm:grid-cols-2"><div className="space-y-2"><Label htmlFor="sale-correction-collection-method">Método del cobro adicional</Label><select id="sale-correction-collection-method" className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={collectionMethod} onChange={(event) => { setCollectionMethod(event.target.value as SaleCorrectionRefundMethod); if (event.target.value !== "cash") setCollectionCashDrawerId(undefined); }}><option value="">Selecciona</option><option value="cash">Efectivo</option><option value="transfer">Transferencia</option><option value="card">Tarjeta</option></select></div><div className="space-y-2"><Label htmlFor="sale-correction-collection-date">Fecha real del cobro</Label><DateInput id="sale-correction-collection-date" context="recent" max={todayIso()} value={collectionDate} onValueChange={(event) => setCollectionDate(event)} /></div>{collectionMethod === "cash" && <CashDrawerField onReadyChange={setCollectionReady} value={collectionCashDrawerId} onChange={setCollectionCashDrawerId} id="sale-correction-collection-drawer" />}</div>}
 
             {needsMoneyDecision && isOwner && (
               <fieldset className="space-y-3">
@@ -571,7 +572,7 @@ export function SaleCorrectionModal({
             )}
 
             {isOwner && needsMoneyDecision && resolution === "refund_excess" && refundMethod === "cash" && (
-              <CashDrawerField
+              <CashDrawerField onReadyChange={setCashReady}
                 value={cashDrawerId}
                 onChange={setCashDrawerId}
                 id="sale-correction-refund-cash-drawer"
@@ -602,7 +603,7 @@ export function SaleCorrectionModal({
               >
                 {t.page.correction.cancel}
               </Button>
-              <Button type="submit" disabled={correction.isPending || !preview.changed}>
+              <Button requiresWrite type="submit" disabled={correction.isPending || !preview.changed || (isOwner && ((needsMoneyDecision && resolution === "refund_excess" && refundMethod === "cash" && !cashReady) || (needsIncreaseDecision && increaseResolution === "collect_now" && collectionMethod === "cash" && !collectionReady)))}>
                 {correction.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {correction.isPending
                   ? t.page.correction.submitting
@@ -627,10 +628,10 @@ function PreviewNumber({
 }) {
   return (
     <div className="rounded-lg border border-border bg-card px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
       <p
         className={cn(
-          "mt-1 text-xl font-bold tabular",
+          "mt-1 font-display tabular text-xl",
           tone === "warning" ? "text-warning" : "text-foreground"
         )}
       >

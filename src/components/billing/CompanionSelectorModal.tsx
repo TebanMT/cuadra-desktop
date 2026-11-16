@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { useMembersList, type MemberListItem } from "@/hooks/useMembers";
 import { promotions as t } from "@/strings/promotions";
 import { useDebounce } from "@/hooks/useDebounce";
+import { MemberHitSummary } from "@/components/checkin/MemberSearchInput";
 
 interface CompanionSelectorModalProps {
   open: boolean;
@@ -83,7 +84,7 @@ export function CompanionSelectorModal({
             const m = selected[idx];
             if (!m) {
               return (
-                <Badge key={idx} variant="outline" className="opacity-50">
+                <Badge key={idx} variant="outline" className="border-dashed font-normal text-muted-foreground">
                   {t.companion.slotPlaceholder(idx)}
                 </Badge>
               );
@@ -117,12 +118,13 @@ export function CompanionSelectorModal({
 
         <div className="max-h-64 overflow-y-auto rounded-md border divide-y">
           {list.isLoading ? (
-            <div className="flex justify-center p-4">
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <div className="flex items-center justify-center gap-2 p-4 text-sm text-muted-foreground" role="status">
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              Buscando socios…
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-sm text-muted-foreground p-3 text-center">
-              Sin resultados
+              {dq ? `Ningún socio coincide con «${dq}».` : "Escribe un nombre, teléfono o número de socio."}
             </p>
           ) : (
             filtered.map((m) => (
@@ -131,13 +133,23 @@ export function CompanionSelectorModal({
                 type="button"
                 onClick={() => add(m)}
                 disabled={need === 0}
-                className="w-full text-left p-2.5 hover:bg-muted/50 flex items-center justify-between gap-3 disabled:opacity-40"
+                aria-label={`Elegir a ${m.member.full_name}`}
+                className="flex min-h-14 w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-muted/60 focus-visible:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-40"
               >
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{m.member.full_name}</div>
-                  <div className="text-xs text-muted-foreground">{m.member.phone}</div>
-                </div>
-                <Badge variant="outline">Elegir</Badge>
+                {/* Mismo resumen que la búsqueda y el cobro: número para homónimos
+                    y vigencia, que casi siempre es «Sin membresía» o «Vencido». */}
+                <MemberHitSummary
+                  member={{
+                    member_id: m.member.id,
+                    full_name: m.member.full_name,
+                    phone: m.member.phone,
+                    member_number: m.member.member_number,
+                    folio: m.member.folio,
+                    photo_url: m.member.photo_url,
+                    access_status: m.access_status,
+                    current_membership: m.current_membership ?? null,
+                  }}
+                />
               </button>
             ))
           )}

@@ -1,29 +1,25 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { memberView, type MemberView } from "@/lib/memberNavigation";
 import { MemberBalances } from "@/components/members/MemberBalances";
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  CircleDollarSign,
   DollarSign,
   FileSpreadsheet,
   Loader2,
   MessageSquare,
-  MoreVertical,
   Phone,
   Plus,
   Search,
-  Users,
-  UserX,
   Wallet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { MemberPhotoLightbox } from "@/components/members/MemberPhotoLightbox";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   useMembersList,
@@ -37,10 +33,9 @@ import { useAttentionRequired } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { daysFromToday, fmtDayMonth } from "@/lib/dates";
+import { whatsappUrl } from "@/lib/whatsapp";
+import { VigenciaBadge } from "@/components/members/VigenciaBadge";
 import { members as t } from "@/strings/members";
-import { cn } from "@/lib/utils";
-import { StatCard } from "@/components/shared/StatCard";
 import {
   DataTable,
   DataTableBody,
@@ -51,8 +46,8 @@ import {
   EmptyState,
   FilterPill,
   PageHeader,
-  SectionCard,
 } from "@/components/shared/PagePrimitives";
+import { HelpHint } from "@/components/shared/HelpHint";
 
 type SortKey = "expiry_asc" | "expiry_desc" | "name_asc" | "name_desc" | "newest" | "oldest";
 
@@ -64,6 +59,32 @@ const SORT_MAP: Record<SortKey, { sort: MemberSort; dir: SortDir; label: keyof t
   newest: { sort: "created_at", dir: "desc", label: "newest" },
   oldest: { sort: "created_at", dir: "asc", label: "oldest" },
 };
+
+// Orden por defecto de cada vista mientras el operador no elija otro.
+// - Todos: directorio por nombre. Ordenar por vencimiento ponía primero a
+//   todos los socios sin membresía (el motor local ordena los vacíos al
+//   principio), una pared de «Sin membresía» sin nada que atender.
+// - Activos y Por vencer: el que vence antes, arriba (ahí no hay vacíos).
+// - Sin vigencia: el que venció hace menos, arriba; es el más fácil de
+//   recuperar. Los vacíos (sin membresía o sin primer pago) quedan al final.
+const DEFAULT_SORT: Record<MemberView, SortKey> = {
+  "": "name_asc",
+  active: "expiry_asc",
+  expiring_soon: "expiry_asc",
+  lapsed: "expiry_desc",
+  no_membership: "name_asc",
+  unpaid_enrollment: "name_asc",
+  expired: "expiry_desc",
+  inactive: "name_asc",
+  unrenewed: "name_asc",
+  balance: "name_asc",
+};
+
+function sortLabel(key: SortKey, view: MemberView): string {
+  if ((view === "expired" || view === "lapsed") && key === "expiry_desc") return t.page.sort.expiredRecentFirst;
+  if ((view === "expired" || view === "lapsed") && key === "expiry_asc") return t.page.sort.expiredOldestFirst;
+  return t.page.sort[SORT_MAP[key].label];
+}
 
 const PAGE_SIZE_KEY = "members:page-size";
 const DEFAULT_PAGE_SIZE = 25;
@@ -82,62 +103,11 @@ function persistPageSize(size: number) {
 
 function fmtMoney(n: number | undefined): string {
   if (n === undefined || n === null) return "—";
-  return `$${Number(n).toLocaleString("es-MX", { maximumFractionDigits: 0 })}`;
+  return `$${Number(n).toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-// El color del avatar ya no depende del estado de membresía. Es hash
-// del nombre — color de identidad, no de status. El estado se comunica
-// por el Badge (pill) a la derecha del nombre.
-// Lógica vive en `lib/avatar.ts::getAvatarPalette()`.
-
-interface StatusInfo {
-  label: string;
-  variant: "success" | "warning" | "destructive" | "secondary" | "outline";
-  detail: React.ReactNode;
-}
-
-function statusInfo(item: MemberListItem): StatusInfo {
-  const ms = item.current_membership;
-  // daysFromToday tolera undefined → null; sólo úsalo cuando hay expiry.
-  const days = ms?.expiry_date ? daysFromToday(ms.expiry_date) : null;
-  switch (item.access_status) {
-    case "allowed_active":
-      return {
-        label: "Activo",
-        variant: "success",
-        detail: ms?.expiry_date ? `Renueva ${fmtDayMonth(ms.expiry_date)}` : "—",
-      };
-    case "allowed_expiring_soon": {
-      const n = days ?? 0;
-      return {
-        label: "Por vencer",
-        variant: "warning",
-        detail: n === 0 ? "Vence hoy" : n === 1 ? "Vence mañana" : `Vence en ${n} días`,
-      };
-    }
-    case "denied_expired": {
-      const n = Math.abs(days ?? 0);
-      return {
-        label: "Vencido",
-        variant: "destructive",
-        detail: n === 0 ? "Vence hoy" : n === 1 ? "1 día vencido" : `${n} días vencido`,
-      };
-    }
-    case "denied_unpaid_enrollment":
-      // Socio inscrito sin primer pago — la membresía existe en
-      // pending_payment. Mismo bucket visual que vencidos (acción:
-      // cobrar) pero con copy distinta para que el operador entienda.
-      return {
-        label: "Sin primer pago",
-        variant: "destructive",
-        detail: "Cobrar para activar",
-      };
-    case "denied_no_membership":
-      return { label: "Sin plan", variant: "outline", detail: "Aún no se ha cobrado" };
-    case "denied_inactive":
-      return { label: "Inactivo", variant: "secondary", detail: "Dado de baja" };
-  }
-}
+// La foto identifica a la persona; el estado vive en la columna «Vigencia»,
+// con la misma insignia que la búsqueda, la ficha y el cobro.
 
 export default function MembersPage() {
   const [params, setParams] = useSearchParams();
@@ -153,12 +123,16 @@ export default function MembersPage() {
     setParams(current => { const next = new URLSearchParams(current); if (status) next.set("status", status); else next.delete("status"); return next; });
   }
   const [planFilter, setPlanFilter] = useState<string>("");
-  const [sortKey, setSortKey] = useState<SortKey>("expiry_asc");
+  // null = el orden por defecto de la vista actual (DEFAULT_SORT). Una
+  // elección explícita se respeta al cambiar de filtro.
+  const [chosenSort, setChosenSort] = useState<SortKey | null>(null);
+  const sortKey = chosenSort ?? DEFAULT_SORT[statusFilter];
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(readPageSize());
 
   const navigate = useNavigate();
   const role = useAuthStore((s) => s.user?.role);
+  const readOnly = useAuthStore(s => s.readOnly);
   const isOwner = role === "owner";
 
   useEffect(() => {
@@ -213,18 +187,19 @@ export default function MembersPage() {
   // Estimated revenue at risk = sum of overdue + expiring_soon current_membership prices
   // (we don't have it from API, fallback to count-based)
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <PageContainer className="space-y-6">
       <PageHeader
         title="Socios"
-        subtitle="Base de datos de socios del gym"
         actions={
           <>
+            <HelpHint topic="buscar-socio" task="buscar un socio y revisar su vigencia" />
             {isOwner && (
               <Button
                 size="lg"
                 variant="outline"
+                disabled={readOnly}
                 onClick={() => navigate("/members/import")}
-                className="h-10 rounded-md font-semibold"
+                className="h-11 rounded-md font-semibold"
               >
                 <FileSpreadsheet className="h-4 w-4 mr-2" />
                 {t.import.cta.importFromExcel}
@@ -232,8 +207,8 @@ export default function MembersPage() {
             )}
             <Button
               size="lg"
-              onClick={() => navigate("/members/new")}
-              className="h-10 rounded-md font-semibold shadow-sm"
+              disabled={readOnly} onClick={() => navigate("/members/new")}
+              className="h-11 rounded-md font-semibold shadow-sm"
             >
               <Plus className="h-4 w-4 mr-2" />
               Nuevo socio
@@ -242,74 +217,6 @@ export default function MembersPage() {
         }
       />
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Total socios"
-          value={counts.data?.total ?? "—"}
-          icon={Users}
-          tone="neutral"
-          hint="todos los registrados"
-        />
-        <StatCard
-          title="Activos"
-          value={counts.data?.active ?? "—"}
-          icon={Users}
-          tone="success"
-          hint="con membresía vigente"
-        />
-        <StatCard
-          title="Por vencer"
-          value={counts.data?.expiring_soon ?? "—"}
-          icon={CircleDollarSign}
-          tone={counts.data && counts.data.expiring_soon > 0 ? "warning" : "neutral"}
-          hint="próximos 7 días"
-        />
-        <StatCard
-          title="Vencidos"
-          value={counts.data?.expired ?? "—"}
-          icon={UserX}
-          tone={counts.data && counts.data.expired > 0 ? "danger" : "neutral"}
-          hint="membresía vencida"
-        />
-      </div>
-
-      {/* Filters / search */}
-      <div className="flex flex-wrap gap-3">
-        <FilterPill
-          label="Todos"
-          count={counts.data?.total}
-          active={statusFilter === ""}
-          onClick={() => setStatusFilter("")}
-        />
-        <FilterPill
-          label="Activos"
-          count={counts.data?.active}
-          active={statusFilter === "active"}
-          onClick={() => setStatusFilter("active")}
-        />
-        <FilterPill
-          label="Por vencer"
-          count={counts.data?.expiring_soon}
-          active={statusFilter === "expiring_soon"}
-          onClick={() => setStatusFilter("expiring_soon")}
-        />
-        <FilterPill
-          label="Vencidos"
-          count={counts.data?.expired}
-          active={statusFilter === "expired"}
-          onClick={() => setStatusFilter("expired")}
-        />
-        <FilterPill
-          label="Inactivos"
-          count={counts.data?.inactive}
-          active={statusFilter === "inactive"}
-          onClick={() => setStatusFilter("inactive")}
-        />
-        <FilterPill label="Sin renovar · 60 días" active={statusFilter === "unrenewed"} onClick={() => setStatusFilter("unrenewed")} />
-        <FilterPill label="Con saldo" count={attention.data?.pending_balance.length} active={balances} onClick={() => setStatusFilter("balance")} />
-      </div>
-
       <div className="flex flex-wrap gap-3">
         <div className="flex-1 min-w-[280px] max-w-md relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -317,13 +224,13 @@ export default function MembersPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={balances ? "Buscar por nombre o teléfono…" : "Buscar por nombre, folio o teléfono…"}
-            className="pl-9 h-10"
+            className="pl-9 h-11"
             aria-label="Buscar socio"
           />
         </div>
 
         {!balances && <Select value={planFilter || "_all"} onValueChange={(v) => setPlanFilter(v === "_all" ? "" : v)}>
-          <SelectTrigger className="h-10 w-[180px]">
+          <SelectTrigger aria-label="Filtrar por plan" className="h-11 w-[180px]">
             <SelectValue placeholder="Todos los planes" />
           </SelectTrigger>
           <SelectContent>
@@ -336,32 +243,102 @@ export default function MembersPage() {
           </SelectContent>
         </Select>}
 
-        {!balances && <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-          <SelectTrigger className="h-10 w-[200px]">
+        {!balances && <Select value={sortKey} onValueChange={(v) => setChosenSort(v as SortKey)}>
+          <SelectTrigger aria-label="Ordenar socios" className="h-11 w-[220px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             {(Object.keys(SORT_MAP) as SortKey[]).map((key) => (
               <SelectItem key={key} value={key}>
-                {t.page.sort[SORT_MAP[key].label]}
+                {sortLabel(key, statusFilter)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>}
       </div>
 
+      <div className="flex flex-wrap gap-3">
+        <FilterPill
+          label={t.page.states.all}
+          count={counts.data?.total}
+          active={statusFilter === ""}
+          onClick={() => setStatusFilter("")}
+        />
+        <FilterPill
+          label={t.page.states.active}
+          count={counts.data?.active}
+          active={statusFilter === "active"}
+          onClick={() => setStatusFilter("active")}
+        />
+        <FilterPill
+          label={t.page.states.expiringSoon}
+          count={counts.data?.expiring_soon}
+          active={statusFilter === "expiring_soon"}
+          onClick={() => setStatusFilter("expiring_soon")}
+        />
+        <FilterPill
+          label={t.page.states.lapsed}
+          count={counts.data?.lapsed}
+          active={statusFilter === "lapsed"}
+          onClick={() => setStatusFilter("lapsed")}
+        />
+        <FilterPill
+          label={t.page.states.noMembership}
+          count={counts.data?.no_membership}
+          active={statusFilter === "no_membership"}
+          onClick={() => setStatusFilter("no_membership")}
+        />
+        <details className="group" open={statusFilter === "unpaid_enrollment" || statusFilter === "expired" || statusFilter === "inactive" || statusFilter === "unrenewed" || balances || undefined}>
+          <summary className="cursor-pointer rounded-md px-3 py-3 text-sm font-medium">{t.page.states.more}</summary>
+          <div className="flex flex-wrap gap-2 py-2">
+        <FilterPill
+          label={t.page.states.unpaidEnrollment}
+          count={counts.data?.unpaid_enrollment}
+          active={statusFilter === "unpaid_enrollment"}
+          onClick={() => setStatusFilter("unpaid_enrollment")}
+        />
+        <FilterPill
+          label={t.page.states.expired}
+          count={counts.data?.expired}
+          active={statusFilter === "expired"}
+          onClick={() => setStatusFilter("expired")}
+        />
+        <FilterPill
+          label={t.page.states.inactive}
+          count={counts.data?.inactive}
+          active={statusFilter === "inactive"}
+          onClick={() => setStatusFilter("inactive")}
+        />
+        <FilterPill label={t.page.states.unrenewed} active={statusFilter === "unrenewed"} onClick={() => setStatusFilter("unrenewed")} />
+        <FilterPill label={t.page.states.balance} count={attention.data?.pending_balance.length} active={balances} onClick={() => setStatusFilter("balance")} />
+          </div>
+        </details>
+      </div>
+
+      {/* Cada vista sin vigencia dice qué agrupa y qué se hace con ella,
+          para que el conteo no se lea como otra cosa. */}
+      {statusFilter === "expired" && (
+        <p className="-mt-3 text-sm text-muted-foreground">
+          {t.page.states.expiredHint}
+          {sortKey === "expiry_desc" && <> {t.page.states.expiredHintRecentFirst}</>}
+        </p>
+      )}
+      {statusFilter === "lapsed" && <p className="-mt-3 text-sm text-muted-foreground">{t.page.states.lapsedHint}</p>}
+      {statusFilter === "no_membership" && <p className="-mt-3 text-sm text-muted-foreground">{t.page.states.noMembershipHint}</p>}
+      {statusFilter === "unpaid_enrollment" && <p className="-mt-3 text-sm text-muted-foreground">{t.page.states.unpaidEnrollmentHint}</p>}
+
       {!balances && list.error && (
         <Alert variant="destructive">
-          <AlertDescription>{t.errors.loadList}</AlertDescription>
+          <AlertDescription>{t.errors.loadList} <Button variant="link" onClick={() => void list.refetch()}>Reintentar</Button></AlertDescription>
         </Alert>
       )}
 
-      {balances ? <MemberBalances search={debouncedSearch} /> : <SectionCard flush>
+      {balances ? <MemberBalances search={debouncedSearch} /> : <section className="border-y">
         {list.isLoading && items.length === 0 ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <span role="status" className="flex items-center gap-2"><Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-muted-foreground" />Cargando socios…</span>
           </div>
-        ) : items.length === 0 ? (
+        ) : list.error ? null : items.length === 0 ? (
           <EmptyState
             icon={hasFilters ? <Search className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
             title={hasFilters ? "Sin resultados" : "Aún no hay socios"}
@@ -372,7 +349,7 @@ export default function MembersPage() {
             }
             action={
               !hasFilters && (
-                <Button onClick={() => navigate("/members/new")} className="rounded-md">
+                <Button disabled={readOnly} onClick={() => navigate("/members/new")} className="rounded-md">
                   <Plus className="h-4 w-4 mr-2" />
                   Nuevo socio
                 </Button>
@@ -382,11 +359,9 @@ export default function MembersPage() {
         ) : (
           <DataTable>
             <DataTableHead>
-              <DataTableTh className="w-12" />
               <DataTableTh>Socio</DataTableTh>
               <DataTableTh>Plan</DataTableTh>
-              <DataTableTh>Vencimiento</DataTableTh>
-              <DataTableTh>Estado</DataTableTh>
+              <DataTableTh>Vigencia</DataTableTh>
               <DataTableTh className="w-32 text-right pr-5">Acciones</DataTableTh>
             </DataTableHead>
             <DataTableBody>
@@ -395,6 +370,7 @@ export default function MembersPage() {
                   key={it.member.id}
                   item={it}
                   onClick={() => navigate(`/members/${it.member.id}`)}
+                  onPay={() => navigate(`/members/${it.member.id}?action=pay`)}
                   planMap={planMap}
                   debt={debtByMember.get(it.member.id) ?? 0}
                 />
@@ -402,14 +378,15 @@ export default function MembersPage() {
             </DataTableBody>
           </DataTable>
         )}
-      </SectionCard>}
+      </section>}
 
       {/* Pagination */}
       {!balances && items.length > 0 && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span>Por página</span>
             <Select value={String(pageSize)} onValueChange={(v) => changePageSize(parseInt(v, 10))}>
-              <SelectTrigger className="h-8 w-[80px]">
+              <SelectTrigger aria-label="Socios por página" className="h-11 w-[80px]">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -431,7 +408,7 @@ export default function MembersPage() {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1 || list.isFetching}
               aria-label="Anterior"
-              className="h-8 w-8 p-0"
+              className="h-11 w-11 p-0"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -444,7 +421,7 @@ export default function MembersPage() {
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages || list.isFetching}
               aria-label="Siguiente"
-              className="h-8 w-8 p-0"
+              className="h-11 w-11 p-0"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
@@ -452,46 +429,36 @@ export default function MembersPage() {
         </div>
       )}
 
-    </div>
+    </PageContainer>
   );
 }
 
 interface MemberRowProps {
   item: MemberListItem;
   onClick(): void;
+  onPay(): void;
   planMap: Record<string, string>;
   debt: number;
 }
 
-function MemberRow({ item, onClick, debt }: MemberRowProps) {
+function MemberRow({ item, onClick, onPay, debt }: MemberRowProps) {
   const m = item.member;
   const ms = item.current_membership;
-  const status = statusInfo(item);
   const money = useMoneyVisibility();
-  const showPay =
-    item.access_status === "denied_expired" ||
-    item.access_status === "denied_unpaid_enrollment" ||
-    item.access_status === "allowed_expiring_soon";
+  const readOnly = useAuthStore(state => state.readOnly);
+  const showPay = m.status === "active" && ["denied_expired", "denied_unpaid_enrollment", "allowed_expiring_soon", "denied_no_membership"].includes(item.access_status);
+  const activate = item.access_status === "denied_no_membership";
+  // Sin dígitos suficientes, wa.me abre un chat vacío: no ofrecemos el enlace.
+  const whatsapp = whatsappUrl(m.phone);
 
   return (
     <DataTableRow onClick={onClick} className="group">
-      {/* Avatar — clic abre lightbox con la foto en grande sin navegar
-          al detalle (stopPropagation evita el row-click). El color del
-          fallback sigue siendo por hash del nombre, NO por estado. */}
-      <DataTableCell className="w-12 pl-5 pr-0">
-        <MemberPhotoLightbox
-          memberId={m.id}
-          fullName={m.full_name}
-          avatarClassName="h-10 w-10"
-          fallbackClassName="text-xs"
-          stopPropagation
-        />
-      </DataTableCell>
-
-      {/* Member */}
       <DataTableCell>
+        <div className="flex items-center gap-3">
+          <MemberPhotoLightbox memberId={m.id} fullName={m.full_name} hasPhoto={!!m.photo_url} avatarClassName="h-11 w-11" fallbackClassName="text-xs" stopPropagation />
+          <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-semibold text-foreground">{m.full_name}</span>
+          <Link to={`/members/${m.id}`} onClick={event => event.stopPropagation()} className="font-semibold text-foreground hover:underline">{m.full_name}</Link>
           <span className="font-mono text-xs text-muted-foreground tabular">
             #{m.folio}
           </span>
@@ -505,12 +472,14 @@ function MemberRow({ item, onClick, debt }: MemberRowProps) {
             </span>
           )}
         </div>
-        {m.phone && (
+        {/\d/.test(m.phone ?? "") && (
           <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-            <Phone className="h-3 w-3" />
+            <Phone className="h-3 w-3" aria-hidden />
             <span className="tabular">{m.phone}</span>
           </div>
         )}
+          </div>
+        </div>
       </DataTableCell>
 
       {/* Plan */}
@@ -518,7 +487,7 @@ function MemberRow({ item, onClick, debt }: MemberRowProps) {
         {ms ? (
           <span className="text-sm text-foreground">{ms.type_name}</span>
         ) : (
-          <span className="text-xs text-muted-foreground">Sin plan</span>
+          <span className="text-muted-foreground" aria-label="Sin plan asignado">—</span>
         )}
         {ms && (
           <div className="text-xs text-muted-foreground mt-0.5 tabular">
@@ -527,56 +496,43 @@ function MemberRow({ item, onClick, debt }: MemberRowProps) {
         )}
       </DataTableCell>
 
-      {/* Expiry */}
       <DataTableCell>
-        <div className="text-sm text-foreground tabular">
-          {ms ? fmtDayMonth(ms.expiry_date) : "—"}
-        </div>
-        <div className="text-xs text-muted-foreground mt-0.5">{status.detail}</div>
-      </DataTableCell>
-
-      {/* Status */}
-      <DataTableCell>
-        <Badge variant={status.variant}>{status.label}</Badge>
+        <VigenciaBadge accessStatus={item.access_status} expiryDate={ms?.expiry_date} />
       </DataTableCell>
 
       {/* Actions */}
       <DataTableCell className="text-right pr-3">
+        {/* Acciones siempre visibles (sin hover), de 44px, con el nombre del
+            socio en su nombre accesible: hay una por fila. */}
         <div
-          className="inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          className="inline-flex items-center gap-1"
           onClick={(e) => e.stopPropagation()}
         >
-          {m.phone && (
+          {whatsapp && (
             <a
-              href={`https://wa.me/${m.phone.replace(/[^0-9]/g, "")}`}
+              href={whatsapp}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-success/10 hover:text-success transition-colors"
-              title="WhatsApp"
+              className="inline-flex items-center justify-center h-11 w-11 rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              title="Abrir WhatsApp"
+              aria-label={t.page.rowActions.whatsappFor(m.full_name)}
             >
-              <MessageSquare className="h-4 w-4" />
+              <MessageSquare className="h-4 w-4" aria-hidden />
             </a>
           )}
           {showPay && (
-            <button
-              type="button"
-              onClick={onClick}
-              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary transition-colors"
-              title="Cobrar"
-              aria-label="Cobrar"
+            <Button
+              requiresWrite
+              variant="ghost"
+              className="text-primary hover:text-primary"
+              onClick={onPay}
+              disabled={readOnly}
+              aria-label={activate ? t.page.rowActions.activateFor(m.full_name) : t.page.rowActions.payFor(m.full_name)}
             >
-              <DollarSign className="h-4 w-4" />
-            </button>
+              <DollarSign aria-hidden />
+              {activate ? t.page.rowActions.activate : t.page.rowActions.pay}
+            </Button>
           )}
-          <button
-            type="button"
-            onClick={onClick}
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
-            title="Ver detalle"
-            aria-label="Ver detalle"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
         </div>
       </DataTableCell>
     </DataTableRow>

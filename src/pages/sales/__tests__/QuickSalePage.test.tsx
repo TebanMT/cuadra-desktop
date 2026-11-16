@@ -26,6 +26,12 @@ beforeEach(() => {
  sell.mockReset().mockResolvedValue({ sale_id: "s1", payment_id: "p1", folio: "PRD-1", paid: 20, total: 20, balance_pending: 0 });
 });
 describe("Venta en curso", () => {
+ it("«Quitar» mide 44px y «Ventas del día» abre las ventas de hoy con regreso a la venta", () => {
+  render(app()); fireEvent.click(screen.getByRole("button", { name: "Agregar Agua botella" }));
+  expect(screen.getByRole("button", { name: "Quitar Agua botella" })).toHaveClass("h-11", "w-11");
+  const link = screen.getByRole("link", { name: "Ventas del día" });
+  expect(link).toHaveAttribute("href", "/billing?concept=product&period=today");
+ });
  it.each(["proteína", "PROTEÍNA", "proteina", "piña", "PINA"])("encuentra y agrega el mismo producto buscando %s", term => {
   state.products[0].name = "PROTEÍNA PIÑA";
   render(app()); const search = screen.getByRole("textbox", { name: "Buscar producto" });

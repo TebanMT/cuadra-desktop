@@ -1,6 +1,7 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { MemberLastEntry } from "@/components/members/MemberLastEntry";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
@@ -16,6 +17,7 @@ import {
   KeyRound,
   DollarSign,
   Lock,
+  CalendarClock,
   Wallet,
   Fingerprint,
   Copy,
@@ -39,6 +41,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { MemberPhotoLightbox } from "@/components/members/MemberPhotoLightbox";
+import { VigenciaBadge } from "@/components/members/VigenciaBadge";
+import { vigenciaFrom } from "@/lib/vigencia";
 import { useMember, useDeleteFingerprint } from "@/hooks/useMembers";
 import { useHotkeys } from "@/hooks/useHotkeys";
 import { useBiometricStatus } from "@/hooks/useBiometric";
@@ -51,7 +55,7 @@ import {
   useMemberCheckins,
   type CheckinEvent,
 } from "@/hooks/useCheckin";
-import { eventToFeedback, feedbackTone } from "@/components/checkin/CheckinFeedback";
+import { eventToFeedback, feedbackDetail, feedbackTone } from "@/components/checkin/CheckinFeedback";
 import { fmtDate, daysFromToday } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 import { members as t } from "@/strings/members";
@@ -59,11 +63,14 @@ import { billing as bt } from "@/strings/billing";
 import { checkin as ct } from "@/strings/checkin";
 import { MemberEditDialog } from "@/components/members/MemberEditDialog";
 import { MemberStatusModal } from "@/components/members/MemberStatusModal";
+import { usePermission } from "@/lib/permissions";
 import { LockExpiryModal } from "@/components/members/LockExpiryModal";
 import { AssignMemberNumberModal } from "@/components/members/AssignMemberNumberModal";
 import { RegisterFingerprintModal } from "@/components/members/RegisterFingerprintModal";
 import { PaymentModal } from "@/components/billing/PaymentModal";
 import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
+import { ReceiptViewer } from "@/components/billing/ReceiptViewer";
+import type { RegisterMembershipPaymentResponse } from "@/hooks/useBilling";
 import { PaymentHistory } from "@/components/billing/PaymentHistory";
 
 // MemberDetailPage — versión ruta de lo que antes era MemberDetailSheet.
@@ -77,11 +84,21 @@ import { PaymentHistory } from "@/components/billing/PaymentHistory";
 // dialogs porque son acciones cortas con contexto del socio actual.
 export default function MemberDetailPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { id: memberId = null } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const detail = useMember(memberId);
   const money = useMoneyVisibility();
   const role = useAuthStore((s) => s.user?.role);
+  const readOnly = useAuthStore(s => s.readOnly);
+  // Deactivating a member needs "member_status"; reactivating is always allowed.
+  const canDeactivate = usePermission("member_status");
+  const [lastReceipt, setLastReceipt] = useState<RegisterMembershipPaymentResponse | null>(null);
+  const [receiptId, setReceiptId] = useState<string | null>(null);
+  useEffect(() => {
+    setLastReceipt(location.state?.paymentReceipt ?? null);
+    setReceiptId(null);
+  }, [memberId, location.state]);
   const history = usePaymentHistory(memberId, {});
 
   const [editOpen, setEditOpen] = useState(false);
@@ -129,83 +146,118 @@ export default function MemberDetailPage() {
   // el detalle. Cuando se abre, consumimos el param para que un refresh
   // no re-dispare el modal y para que el URL quede limpio.
   useEffect(() => {
-    if (searchParams.get("action") === "pay" && detail.data && !payOpen) {
+    if (!readOnly && member?.status === "active" && searchParams.get("action") === "pay" && detail.data && !payOpen) {
+      payRef.current?.focus();
       setPayOpen(true);
       const next = new URLSearchParams(searchParams);
       next.delete("action");
       setSearchParams(next, { replace: true });
     }
-  }, [searchParams, detail.data, payOpen, setSearchParams]);
+  }, [searchParams, detail.data, payOpen, setSearchParams, readOnly, member?.status]);
+
+  useEffect(() => {
+    const receipt = searchParams.get("receipt");
+    if (!receipt) return;
+    setReceiptId(receipt);
+    const next = new URLSearchParams(searchParams);
+    next.delete("receipt");
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   // ?action=settle — espejo de action=pay para las CTAs de deuda
   // (Atención requerida → "Abonar"). Espera a que el historial cargue
   // porque el modal necesita el payment padre con saldo.
   useEffect(() => {
-    if (searchParams.get("action") === "settle" && oldestPendingPayment && !settleOpen) {
+    if (!readOnly && searchParams.get("action") === "settle" && oldestPendingPayment && !settleOpen) {
+      settleRef.current?.focus();
       setSettleOpen(true);
       const next = new URLSearchParams(searchParams);
       next.delete("action");
       setSearchParams(next, { replace: true });
     }
-  }, [searchParams, oldestPendingPayment, settleOpen, setSearchParams]);
+  }, [searchParams, oldestPendingPayment, settleOpen, setSearchParams, readOnly, member?.status]);
 
   // Dispara un check-in manual del socio actual y muestra un toast con el
   // resultado. La feedback usa el mismo mapping que la pantalla de Check-in
-  // para que el copy se mantenga uniforme entre superficies.
+  // para que el copy se mantenga uniforme entre superficies. Sigue activo en
+  // solo lectura: registrar entradas es lo que la prueba terminada permite.
   const handleCheckin = useCallback(async () => {
     if (!member || checkinManual.isPending) return;
     try {
       const ev = await checkinManual.mutateAsync({ member_id: member.id });
       const fb = eventToFeedback(ev);
-      const detail = (() => {
-        const days = ev.days_until_expiry ?? 0;
-        switch (fb.kind) {
-          case "success_active":
-            return ct.feedback.successActive(days);
-          case "success_expiring_soon":
-            return ct.feedback.successExpiringSoon(Math.max(0, days));
-          case "denied_expired":
-            return ct.feedback.deniedExpired(Math.abs(days));
-          case "denied_inactive":
-            return ct.feedback.deniedInactive;
-          case "denied_no_membership":
-            return ct.feedback.deniedNoMembership;
-          default:
-            return ct.feedback.deniedNotFound;
-        }
-      })();
+      const detail = feedbackDetail(fb);
       const tone = feedbackTone(fb.kind);
       const title = `${member.full_name}`;
       if (tone === "success") toast.success(title, { description: detail });
       else if (tone === "warning") toast.warning(title, { description: detail });
       else toast.error(title, { description: detail });
     } catch (err) {
-      const msg = checkinErrorMessage(err, ct.feedback.deniedNotFound);
+      const msg = checkinErrorMessage(err, "No pudimos registrar la entrada. Revisa la conexión con recepción e intenta de nuevo.");
       toast.error(member.full_name, { description: msg });
     }
   }, [member, checkinManual]);
 
+  // Botones que reciben el foco cuando un atajo o una URL abre su
+  // diálogo: DialogContent devuelve el foco al elemento enfocado al abrir,
+  // así que al cerrar el operador vuelve al control que corresponde y no
+  // a <body> (donde los atajos seguirían vivos sin contexto).
+  const checkinRef = useRef<HTMLButtonElement>(null);
+  const payRef = useRef<HTMLButtonElement>(null);
+  const editRef = useRef<HTMLButtonElement>(null);
+  const settleRef = useRef<HTMLButtonElement>(null);
+  const checkinHintId = useId();
+
+  // C prepara la entrada (enfoca el botón y muestra la pista); Enter la
+  // confirma con el comportamiento nativo del botón. Una sola letra nunca
+  // escribe un registro de asistencia.
+  const [checkinArmed, setCheckinArmed] = useState(false);
+  useEffect(() => {
+    if (!checkinArmed) return;
+    const timer = window.setTimeout(() => setCheckinArmed(false), 6000);
+    return () => window.clearTimeout(timer);
+  }, [checkinArmed]);
+
+  // Esc vuelve a donde venías (búsqueda, Inicio, cobros…); si la ficha se
+  // abrió sin historial dentro de la app, a la lista de socios.
+  const goBack = useCallback(() => {
+    if (location.key !== "default") navigate(-1);
+    else navigate("/members");
+  }, [location.key, navigate]);
+
   // Hotkeys: las desactivamos mientras algún sub-modal está abierto
   // para no interceptar teclas dentro de los inputs del modal.
   const anyModalOpen =
-    editOpen || statusOpen || lockOpen || numberOpen || payOpen || settleOpen || fpOpen;
+    editOpen || statusOpen || lockOpen || numberOpen || payOpen || settleOpen || fpOpen || !!receiptId || confirmFpDeleteOpen;
 
   const hotkeyHandlers = useMemo(
     () => ({
       e: () => {
-        if (member) setEditOpen(true);
+        if (!member || readOnly) return;
+        editRef.current?.focus();
+        setEditOpen(true);
       },
       p: () => {
-        if (member) setPayOpen(true);
+        if (member?.status !== "active" || readOnly) return;
+        payRef.current?.focus();
+        setPayOpen(true);
       },
       c: () => {
-        handleCheckin();
+        const button = checkinRef.current;
+        if (!member || !button || button.disabled) return;
+        button.focus();
+        setCheckinArmed(true);
       },
       Escape: () => {
-        navigate("/members");
+        // Con la entrada preparada, el primer Esc sólo la cancela.
+        if (checkinArmed) {
+          setCheckinArmed(false);
+          return;
+        }
+        goBack();
       },
     }),
-    [member, navigate, handleCheckin]
+    [member, goBack, readOnly, checkinArmed]
   );
   useHotkeys(hotkeyHandlers, !anyModalOpen);
 
@@ -213,6 +265,14 @@ export default function MemberDetailPage() {
     membership && membership.expiry_date ? daysFromToday(membership.expiry_date) : null;
   const isPending = membership?.status === "pending_payment";
   const isOwner = role === "owner";
+  // La vigencia sale de access_status (la decisión del backend), nunca de
+  // membership.status: una membresía puede seguir «active» con la fecha
+  // vencida. Define también la jerarquía: un solo botón relleno.
+  const accessStatus = detail.data?.access_status;
+  const vigencia = vigenciaFrom({ accessStatus, expiryDate: membership?.expiry_date });
+  const isActiveMember = member?.status === "active";
+  const checkinPrimary = isActiveMember && vigencia.canEnter;
+  const payPrimary = isActiveMember && !vigencia.canEnter;
 
   if (detail.isLoading && !member) {
     return (
@@ -224,28 +284,28 @@ export default function MemberDetailPage() {
 
   if (detail.error || !member) {
     return (
-      <div className="p-6 max-w-3xl mx-auto space-y-4">
-        <Button variant="outline" onClick={() => navigate("/members")}>
+      <PageContainer contentWidth="form" className="space-y-4">
+        <Button variant="outline" onClick={goBack}>
           <ArrowLeft className="h-4 w-4 mr-2" />
           Volver
         </Button>
         <Alert variant="destructive">
           <AlertDescription>{t.errors.loadDetail}</AlertDescription>
         </Alert>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
     <>
-      <div className="p-6 space-y-6 max-w-5xl mx-auto">
+      <PageContainer className="space-y-6">
         {/* Header: back + identidad + acciones principales */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-start gap-4 min-w-0">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate("/members")}
+              onClick={goBack}
               className="mt-1"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -254,14 +314,12 @@ export default function MemberDetailPage() {
             <MemberPhotoLightbox
               memberId={member.id}
               fullName={member.full_name}
+              hasPhoto={!!member.photo_url}
               avatarClassName="h-16 w-16"
               fallbackClassName="text-lg"
             />
             <div className="min-w-0 flex-1">
-              <h1
-                className="text-2xl font-bold text-foreground truncate"
-                style={{ letterSpacing: "-0.02em" }}
-              >
+              <h1 className="font-display text-2xl text-foreground truncate">
                 {member.full_name}
               </h1>
               <div className="text-sm text-muted-foreground space-y-0.5 mt-1">
@@ -283,28 +341,55 @@ export default function MemberDetailPage() {
                 <span aria-hidden>·</span>
                 <span>{t.detail.createdAt(fmtDate(member.created_at))}</span>
                 <span aria-hidden>·</span>
-                <NumberInline number={member.member_number} onChange={() => setNumberOpen(true)} />
+                <NumberInline number={member.member_number} readOnly={readOnly} onChange={() => { if (!readOnly) setNumberOpen(true); }} />
               </div>
             </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            <Button
-              variant="default"
-              onClick={handleCheckin}
-              disabled={checkinManual.isPending}
-            >
-              {checkinManual.isPending ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <LogIn className="h-4 w-4 mr-2" />
-              )}
-              {t.detail.actions.checkin}
-            </Button>
-            <Button variant="outline" onClick={() => setEditOpen(true)}>
+          <div className="flex gap-2 flex-wrap items-center">
+            <div className="relative">
+              <Button
+                ref={checkinRef}
+                variant={checkinPrimary ? "default" : "outline"}
+                size={checkinPrimary ? "lg" : "default"}
+                className={checkinPrimary ? undefined : "h-12"}
+                onClick={() => {
+                  setCheckinArmed(false);
+                  void handleCheckin();
+                }}
+                onBlur={() => setCheckinArmed(false)}
+                disabled={checkinManual.isPending}
+                aria-describedby={checkinArmed ? checkinHintId : undefined}
+              >
+                {checkinManual.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <LogIn className="h-4 w-4 mr-2" />
+                )}
+                {checkinPrimary ? t.detail.actions.checkin : t.detail.actions.verify}
+              </Button>
+              {/* Pista de la tecla C: visible junto al botón enfocado y
+                  anunciada por lectores de pantalla. */}
+              <span
+                id={checkinHintId}
+                role="status"
+                className={cn(
+                  checkinArmed
+                    ? "absolute left-0 top-full z-10 mt-1.5 whitespace-nowrap rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground"
+                    : "sr-only"
+                )}
+              >
+                {checkinArmed && (
+                  <>
+                    <Kbd>Enter</Kbd> {checkinPrimary ? t.detail.checkinHint.enter : t.detail.checkinHint.verify}
+                  </>
+                )}
+              </span>
+            </div>
+            <Button ref={editRef} variant="outline" className="h-12" disabled={readOnly} onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4 mr-2" />
               {t.detail.actions.edit}
             </Button>
-            <Button variant="outline" onClick={() => setStatusOpen(true)}>
+            {(member.status !== "active" || canDeactivate) && <Button variant={member.status === "active" ? "outline" : "default"} size={member.status === "active" ? "default" : "lg"} className={member.status === "active" ? "h-12" : undefined} disabled={readOnly} onClick={() => setStatusOpen(true)}>
               {member.status === "active" ? (
                 <>
                   <BadgeMinus className="h-4 w-4 mr-2" />
@@ -316,30 +401,40 @@ export default function MemberDetailPage() {
                   {t.detail.actions.markActive}
                 </>
               )}
-            </Button>
+            </Button>}
           </div>
         </div>
 
-        {/* Membresía */}
-        <div>
-          <div className="text-sm font-medium text-muted-foreground mb-2">
+        {member.status !== "active" && <p className="text-sm text-muted-foreground">{t.detail.inactiveNote}</p>}
+        {lastReceipt && <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-success/30 bg-success-soft p-4 text-success-text">
+          <p><strong>Cobro registrado · {fmtMoney(lastReceipt.paid)}</strong><br />Comprobante {lastReceipt.folio} · Vigencia hasta {fmtDate(lastReceipt.new_expiry)}</p>
+          <Button variant="outline" onClick={event => { event.currentTarget.focus(); setReceiptId(lastReceipt.payment_id); }}>Ver comprobante</Button>
+        </div>}
+        {/* Membresía: la insignia de vigencia contesta «¿puede pasar?»; la
+            línea de fecha da el dato exacto sin repetir el plazo. */}
+        <section aria-labelledby="membership-title">
+          <h2 id="membership-title" className="text-sm font-medium text-muted-foreground mb-2">
             {t.detail.membership.title}
-          </div>
+          </h2>
           {membership && isPending ? (
-            // Pending payment: el socio fue inscrito pero no ha pagado.
-            // Card warning con CTA prominente para cobrar (lo activa
-            // automáticamente, abono parcial cuenta).
-            <Card className="border-warning/40 bg-warning/5">
+            // Sin primer pago: el socio fue inscrito pero no ha pagado. El
+            // cobro lo activa (un abono parcial cuenta).
+            <Card>
               <CardContent className="pt-4 space-y-3">
-                <div className="flex items-baseline justify-between gap-2 flex-wrap">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="font-semibold text-base">{membership.type_name}</div>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-warning/15 text-warning">
-                    {t.detail.membership.pendingTitle}
-                  </span>
+                  <VigenciaBadge size="md" vigencia={vigencia} hideDetail />
                 </div>
                 <p className="text-sm text-muted-foreground">{t.detail.membership.pendingBody}</p>
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <Button size="sm" onClick={() => setPayOpen(true)}>
+                  <Button
+                    ref={payRef}
+                    requiresWrite
+                    variant={payPrimary ? "default" : "outline"}
+                    size={payPrimary ? "lg" : "default"}
+                    disabled={readOnly || member.status !== "active"}
+                    onClick={() => setPayOpen(true)}
+                  >
                     <DollarSign className="h-4 w-4 mr-1" />
                     {t.detail.membership.payFirst}
                   </Button>
@@ -349,71 +444,80 @@ export default function MemberDetailPage() {
           ) : membership ? (
             <Card>
               <CardContent className="pt-4 space-y-3">
-                <div className="flex items-baseline justify-between">
+                <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="font-semibold text-base">{membership.type_name}</div>
-                  <span
-                    className={cn(
-                      "text-xs px-2 py-0.5 rounded-full",
-                      expiryDays !== null && expiryDays > 7 && "bg-success/10 text-success",
-                      expiryDays !== null &&
-                        expiryDays >= 0 &&
-                        expiryDays <= 7 &&
-                        "bg-warning/10 text-warning",
-                      expiryDays !== null && expiryDays < 0 && "bg-destructive/10 text-destructive"
-                    )}
-                  >
-                    {membership.status === "active" ? t.detail.membership.vigente : membership.status}
-                  </span>
+                  <VigenciaBadge
+                    size="md"
+                    vigencia={vigencia}
+                    // «Vigente · hasta 3 dic» repetiría la fecha de abajo.
+                    hideDetail={accessStatus === "allowed_active"}
+                  />
                 </div>
-                <div className="text-sm text-muted-foreground">
-                  {t.detail.membership.due}:{" "}
-                  <span className="text-foreground font-medium">
-                    {membership.expiry_date ? fmtDate(membership.expiry_date) : "—"}
-                  </span>
-                  {expiryDays !== null && (
-                    <span className="ml-2">
-                      {expiryDays >= 0
-                        ? `(${t.detail.membership.expiring(expiryDays)})`
-                        : `(${t.detail.membership.expired(expiryDays)})`}
-                    </span>
-                  )}
-                </div>
+                {membership.expiry_date && (
+                  <p className="text-sm text-muted-foreground">
+                    {expiryDays !== null && expiryDays < 0 ? t.detail.membership.duePast : t.detail.membership.dueFuture}{" "}
+                    <span className="tabular font-medium text-foreground">{fmtDate(membership.expiry_date)}</span>
+                  </p>
+                )}
                 <div className="flex flex-wrap gap-2 pt-1">
-                  <Button size="sm" onClick={() => setPayOpen(true)}>
+                  <Button
+                    ref={payRef}
+                    requiresWrite
+                    variant={payPrimary ? "default" : "outline"}
+                    size={payPrimary ? "lg" : "default"}
+                    disabled={readOnly || member.status !== "active"}
+                    onClick={() => setPayOpen(true)}
+                  >
                     <DollarSign className="h-4 w-4 mr-1" />
                     {t.detail.membership.pay}
                   </Button>
                   <Button
-                    size="sm"
+                    requiresWrite
                     variant="outline"
+                    className={payPrimary ? "h-12" : undefined}
                     onClick={() => setLockOpen(true)}
-                    disabled={!isOwner}
-                    title={!isOwner ? t.lockExpiry.ownerOnly : undefined}
+                    disabled={readOnly || !isOwner}
+                    aria-describedby={!isOwner ? "lock-expiry-reason" : undefined}
                   >
-                    <Lock className="h-4 w-4 mr-1" />
+                    <CalendarClock className="h-4 w-4 mr-1" aria-hidden />
                     {t.detail.membership.lock}
                   </Button>
                 </div>
+                {!isOwner && (
+                  <p id="lock-expiry-reason" className="text-xs text-muted-foreground">
+                    {t.lockExpiry.ownerOnly}
+                  </p>
+                )}
               </CardContent>
             </Card>
           ) : (
             <Card>
-              <CardContent className="pt-4 text-sm text-muted-foreground">
-                {t.detail.membership.none}
+              <CardContent className="pt-4 space-y-3">
+                <VigenciaBadge size="md" vigencia={vigencia} />
+                {/* Activo: «Sin membresía» y el botón bastan. Inactivo: la
+                    insignia dice «Inactivo», así que falta decir lo del plan. */}
+                {member.status !== "active" && <p className="text-sm text-muted-foreground">{t.detail.membership.none}</p>}
+                {member.status === "active" && (
+                  <Button ref={payRef} requiresWrite size="lg" disabled={readOnly} onClick={() => setPayOpen(true)}>
+                    <DollarSign className="h-4 w-4 mr-1" />
+                    {t.detail.membership.activate}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           )}
-        </div>
+        </section>
 
         {/* Saldo pendiente — cualquier concepto (membresía o venta fiada). */}
         {totalPending > 0 && oldestPendingPayment && (
           <button
+            ref={settleRef}
             type="button"
-            onClick={() => setSettleOpen(true)}
-            className="w-full flex items-center justify-between gap-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning hover:bg-warning/15"
+            disabled={readOnly} onClick={() => setSettleOpen(true)}
+            className="w-full min-h-11 flex items-center justify-between gap-2 rounded-md border border-warning/45 bg-warning-soft px-3 py-2 text-sm text-warning-foreground hover:bg-warning/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="flex items-center gap-2 min-w-0">
-              <Wallet className="h-4 w-4 shrink-0" />
+              <Wallet className="h-4 w-4 shrink-0" aria-hidden />
               <span className="truncate">
                 {bt.detailFlag.pending(money.fmt(totalPending))}
                 {pendingByConcept.size > 1 && (
@@ -463,6 +567,7 @@ export default function MemberDetailPage() {
         {fingerprintAvailable && (
           <div className="border-t pt-4 flex flex-wrap gap-2">
             <Button
+              disabled={readOnly}
               variant="outline"
               onClick={() => {
                 if (member?.has_fingerprint) {
@@ -480,14 +585,14 @@ export default function MemberDetailPage() {
           </div>
         )}
 
-        {/* Atajos de teclado */}
-        <div className="text-xs text-muted-foreground border-t pt-3 grid grid-cols-2 md:grid-cols-4 gap-1">
-          <div>{t.detail.shortcuts.pay}</div>
-          <div>{t.detail.shortcuts.checkin}</div>
-          <div>{t.detail.shortcuts.edit}</div>
-          <div>{t.detail.shortcuts.close}</div>
-        </div>
-      </div>
+        {/* Atajos de teclado: sólo los que corresponden a acciones disponibles. */}
+        <ul aria-label={t.detail.shortcuts.title} className="text-xs text-muted-foreground border-t pt-3 flex flex-wrap gap-x-6 gap-y-2">
+          {!readOnly && member.status === "active" && <li><Kbd>P</Kbd> {t.detail.shortcuts.pay}</li>}
+          <li><Kbd>C</Kbd> {checkinPrimary ? t.detail.shortcuts.checkin : t.detail.shortcuts.verify}</li>
+          {!readOnly && <li><Kbd>E</Kbd> {t.detail.shortcuts.edit}</li>}
+          <li><Kbd>Esc</Kbd> {t.detail.shortcuts.back}</li>
+        </ul>
+      </PageContainer>
 
       <AlertDialog open={confirmFpDeleteOpen} onOpenChange={setConfirmFpDeleteOpen}>
         <AlertDialogContent>
@@ -500,7 +605,7 @@ export default function MemberDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogAction requiresWrite
               onClick={() => {
                 deleteFingerprint.mutate(undefined, {
                   onSuccess: () => setFpOpen(true),
@@ -548,11 +653,14 @@ export default function MemberDetailPage() {
         open={fpOpen}
         onOpenChange={setFpOpen}
       />
+      <ReceiptViewer folio={receiptId === lastReceipt?.payment_id ? lastReceipt.folio : history.data?.items.find(payment => payment.id === receiptId)?.reference} paymentId={receiptId} open={!!receiptId} onOpenChange={value => { if (!value) setReceiptId(null); }} />
       <PaymentModal
         member={member}
         currentMembership={membership}
+        accessStatus={detail.data?.access_status}
         open={payOpen}
         onOpenChange={setPayOpen}
+        onPaid={setLastReceipt}
       />
       {oldestPendingPayment && (
         <SettleBalanceModal
@@ -567,6 +675,14 @@ export default function MemberDetailPage() {
   );
 }
 
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded border border-border bg-muted px-1 font-sans text-xs font-medium text-foreground">
+      {children}
+    </kbd>
+  );
+}
+
 // NumberInline — el NÚMERO DE SOCIO (ADR-010) como una pieza más de metadata,
 // junto al folio / fecha de inscripción. Dos affordances inline para evitar
 // competir con las acciones principales del header:
@@ -574,7 +690,7 @@ export default function MemberDetailPage() {
 //   - Click en "Cambiar"               → abre el modal de regeneración.
 // Si el socio no tiene número (caso histórico pre-auto-assign), la píldora
 // degenera en un link "Asignar número de socio" que abre el mismo modal.
-function NumberInline({ number, onChange }: { number?: number; onChange(): void }) {
+function NumberInline({ number, onChange, readOnly }: { number?: number; onChange(): void; readOnly: boolean }) {
   async function copy() {
     if (number == null) return;
     try {
@@ -589,6 +705,8 @@ function NumberInline({ number, onChange }: { number?: number; onChange(): void 
       <button
         type="button"
         onClick={onChange}
+        disabled={readOnly}
+        title={readOnly ? "Solo lectura" : undefined}
         className="inline-flex items-center gap-1 rounded px-1 -mx-1 hover:bg-muted/60 focus:outline-none focus:ring-1 focus:ring-ring underline-offset-2 hover:underline"
       >
         <KeyRound className="h-3 w-3" />
@@ -612,7 +730,9 @@ function NumberInline({ number, onChange }: { number?: number; onChange(): void 
       <button
         type="button"
         onClick={onChange}
-        className="underline-offset-2 hover:underline hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring rounded"
+        disabled={readOnly}
+        title={readOnly ? "Solo lectura" : undefined}
+        className="disabled:opacity-50 disabled:cursor-not-allowed underline-offset-2 hover:underline hover:text-foreground focus:outline-none focus:ring-1 focus:ring-ring rounded"
       >
         {t.memberNumber.triggerChange}
       </button>

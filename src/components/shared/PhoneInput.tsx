@@ -44,6 +44,7 @@ interface Props {
   id?: string;
   disabled?: boolean;
   placeholder?: string;
+  "aria-labelledby"?: string;
 }
 
 // PhoneInput parte el celular en dos: el dial code (select) y el número
@@ -57,6 +58,7 @@ export function PhoneInput({
   id,
   disabled,
   placeholder,
+  "aria-labelledby": labelledBy,
 }: Props) {
   const known = COUNTRY_DIAL_CODES.some((c) => c.code === dialCode);
   const safeValue = known ? dialCode : DEFAULT_DIAL_CODE;
@@ -70,7 +72,7 @@ export function PhoneInput({
       >
         {/* El trigger muestra sólo "+52" (compacto). El dropdown
             despliega "+52 · México" para que el usuario pueda elegir. */}
-        <SelectTrigger className="w-[88px] shrink-0 tabular">
+        <SelectTrigger aria-label="Código de país" className="w-[88px] shrink-0 tabular">
           <span>+{safeValue}</span>
         </SelectTrigger>
         <SelectContent>
@@ -83,6 +85,8 @@ export function PhoneInput({
       </Select>
       <Input
         id={id}
+        aria-labelledby={labelledBy}
+        aria-label={!id && !labelledBy ? "Teléfono" : undefined}
         type="tel"
         inputMode="tel"
         autoComplete="tel-national"

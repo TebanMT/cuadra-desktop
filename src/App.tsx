@@ -47,9 +47,9 @@ function Bootstrapped() {
     setOnPlanRequired((payload) => {
       toast.error(payload.message, {
         action: {
-          label: "Mejorar plan",
+          label: "Consultar ayuda",
           onClick: () => {
-            window.location.assign("/settings/subscription");
+            window.location.assign("/help");
           },
         },
       });

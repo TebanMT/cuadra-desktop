@@ -10,7 +10,7 @@ vi.mock("@/lib/api", async () => {
   return {
     ...actual,
     api: {
-      get: vi.fn(),
+      get: vi.fn(async () => ({ items: [{ id: "main", name: "Principal", active: true, is_main: true }] })),
       post: vi.fn(async () => ({
         payment: {
           id: "pay-2",
@@ -53,7 +53,9 @@ describe("SettleBalanceModal", () => {
     const amount = screen.getByLabelText(/Cuánto vas a abonar/i) as HTMLInputElement;
     expect(parseFloat(amount.value)).toBe(200);
 
-    await user.click(screen.getByRole("button", { name: /Abonar/ }));
+    const submit = screen.getByRole("button", { name: /Abonar/ });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await user.click(submit);
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
   });
 
@@ -97,6 +99,7 @@ describe("SettleBalanceModal", () => {
     );
 
     const submit = screen.getByRole("button", { name: /Abonar/ });
+    await waitFor(() => expect(submit).toBeEnabled());
     await user.click(submit);
     await screen.findByText(/No pudimos registrar el abono/i);
     await user.click(submit);

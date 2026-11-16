@@ -60,7 +60,7 @@ export async function openKioskWindow(): Promise<OpenKioskWindowResult> {
   // bloqueado" hasta que tengamos un caso de uso real que lo justifique.
   const win = new WebviewWindow(KIOSK_WINDOW_LABEL, {
     url: "/kiosk",
-    title: "Tinta · Kiosko",
+    title: "Tinta · Kiosco",
     fullscreen: false,
     maximized: true,
     resizable: true,

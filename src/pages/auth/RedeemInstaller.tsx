@@ -44,7 +44,7 @@ export default function RedeemInstaller() {
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.status === 410) {
-          setError("Este código ya fue usado o caducó. Pide uno nuevo desde el dashboard.");
+          setError("Este código ya fue usado o caducó. Pide uno nuevo desde el panel web de Tinta.");
         } else if (e.status === 404) {
           setError("Código no reconocido. Verifica que lo copiaste completo.");
         } else if (e.status === 503) {
@@ -71,7 +71,7 @@ export default function RedeemInstaller() {
           Conecta esta computadora.
         </h1>
         <p className="text-muted-foreground">
-          Pega el código que te dio el dashboard.
+          Pega el código de instalación que generaste en el panel web de Tinta.
         </p>
       </div>
 

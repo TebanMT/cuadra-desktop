@@ -8,13 +8,16 @@ vi.mock("@/hooks/useExpenses", async (importOriginal) => {
   return { ...actual, usePayInventoryPurchase: () => ({ mutateAsync: payMutate, isPending: false }) };
 });
 vi.mock("@/hooks/useMoneyVisibility", () => ({ useMoneyVisibility: () => ({ fmt: (value: number) => `$${value.toFixed(2)}`, hidden: false }) }));
-vi.mock("@/components/cash/CashDrawerField", () => ({
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({
   CashDrawerField: ({ value, onChange }: { value?: string; onChange(value?: string): void }) => (
     <select aria-label="Cajón" value={value ?? ""} onChange={(event) => onChange(event.target.value || undefined)}>
       <option value="">Selecciona</option><option value="drawer-main">Caja principal</option>
     </select>
   ),
-}));
+});
+});
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 import { InventoryPurchasesPanel, PayInventoryPurchaseDialog } from "../ExpensesPage";

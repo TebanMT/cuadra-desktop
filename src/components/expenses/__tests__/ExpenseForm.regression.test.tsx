@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { ExpenseForm, type ExpenseFormValues } from "../ExpenseForm";
-vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: () => null }));
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({ CashDrawerField: () => null });
+});
 const initial: Partial<ExpenseFormValues> = { amount: "100", category: "servicios", payment_method: "transfer", paid_from: "gym_fund", expense_date: "2026-01-05", description: "Limpieza" };
 const submit = () => fireEvent.click(screen.getByRole("button", { name: /Registrar gasto|Guardar cambios/ }));
 describe("Captura cotidiana de gastos", () => {

@@ -3,6 +3,7 @@ import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "@/test/utils";
 import { PromotionsTab } from "../PromotionsTab";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 // Mock del api para devolver una promo vigente + capturar mutaciones.
 vi.mock("@/lib/api", async () => {
@@ -43,6 +44,18 @@ vi.mock("@/lib/api", async () => {
 describe("PromotionsTab", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useAuthStore.setState({ readOnly: false, user: { user_id: "u1", role: "owner" } as never });
+  });
+
+  it("a un operador sólo le muestra la lista, sin crear ni editar", async () => {
+    useAuthStore.setState({ user: { user_id: "u2", role: "operator", permissions: [] } as never });
+    renderWithProviders(<PromotionsTab />);
+    await waitFor(() => expect(screen.getByText("Verano 25")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: /nueva promoción/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Editar Verano 25" })).not.toBeInTheDocument();
+    // Sin botón para crear, el texto tampoco le pide crear.
+    expect(screen.queryByText(/^Crea /)).not.toBeInTheDocument();
+    expect(screen.getByText(/Solo el dueño las crea o cambia\./)).toBeInTheDocument();
   });
 
   it("lista las promociones vigentes", async () => {

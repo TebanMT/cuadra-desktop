@@ -1,10 +1,12 @@
+import { ChargeSettingsStatus } from "@/components/billing/ChargeSettingsStatus";
+import { chargeSettingsReady, CHARGE_SETTINGS_REQUIRED } from "@/lib/chargeSettingsReadiness";
 import { validateDateFields } from "@/lib/date-input";
 import { DateInput } from "@/components/ui/date-input";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Printer, MessageCircle, Tag, X } from "lucide-react";
+import { AlertTriangle, Loader2, Tag, X, Plus, Minus } from "lucide-react";
 import { addDays, max as dateMax } from "date-fns";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -36,22 +38,29 @@ import {
 } from "@/hooks/useBilling";
 import { useGymChargeSettings } from "@/hooks/useGymChargeSettings";
 import { useSyncStatus, levelOf } from "@/hooks/useSyncStatus";
-import type { Member, MembershipSummary } from "@/hooks/useMembers";
+import type { AccessStatus, Member, MembershipSummary } from "@/hooks/useMembers";
 import { ApiError } from "@/lib/api";
 import { addMonthsClamped, fmtDate, parseDate, todayIso } from "@/lib/dates";
-import { printPdf } from "@/lib/tauri-bridge";
-import { notifySendReceiptOutcome } from "@/lib/receiptToasts";
-import { api } from "@/lib/api";
 import { billing as t } from "@/strings/billing";
 import { members as mt } from "@/strings/members";
 import { CashDrawerField } from "@/components/cash/CashDrawerField";
+import { useAuthStore } from "@/stores/useAuthStore";
+import { usePermission } from "@/lib/permissions";
 import { keyForPayload } from "@/lib/idempotency";
+import { RestrictedNote } from "@/components/shared/RestrictedNote";
+import { VigenciaBadge } from "@/components/members/VigenciaBadge";
+import { vigenciaFrom } from "@/lib/vigencia";
+import { cn } from "@/lib/utils";
 
 interface Props {
   member: Pick<Member, "id" | "full_name" | "phone" | "enrollment_paid" | "last_maintenance_paid">;
   currentMembership: MembershipSummary | null | undefined;
+  /** Decisión de acceso del backend (detalle del socio). Sin ella, la
+   *  vigencia actual se infiere de la membresía. */
+  accessStatus?: AccessStatus;
   open: boolean;
   onOpenChange(open: boolean): void;
+  onPaid?(receipt: RegisterMembershipPaymentResponse): void;
 }
 
 // Días mínimos entre cobros de mantenimiento para cada frecuencia. Espeja
@@ -126,7 +135,13 @@ function previewNewExpiry(
   return fmtDate(addDays(from, durationDays));
 }
 
-export function PaymentModal({ member, currentMembership, open, onOpenChange }: Props) {
+export function PaymentModal({ member, currentMembership, accessStatus, open, onOpenChange, onPaid }: Props) {
+  const readOnly = useAuthStore(s => s.readOnly);
+  // Per-operator permissions: a discount or a backdated payment needs
+  // "discounts"; charging less than the total needs "credit".
+  const canDiscount = usePermission("discounts");
+  const canCredit = usePermission("credit");
+  const [cashReady, setCashReady] = useState(false);
   const types = useMembershipTypes();
   const register = useRegisterMembershipPayment();
   const sync = useSyncStatus(open);
@@ -135,6 +150,7 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
   // gyms.charge_settings — mismo hook que MemberForm para que la
   // experiencia sea consistente entre el flujo de alta y el de cobro.
   const chargeSettings = useGymChargeSettings();
+  const feesReady = chargeSettingsReady(chargeSettings.data);
   const gym = useMemo(
     () => ({
       chargesEnrollment: !!chargeSettings.data?.charges_enrollment,
@@ -174,12 +190,14 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [companionOpen, setCompanionOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<RegisterMembershipPaymentResponse | null>(null);
-  const [whatsappState, setWhatsappState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const completed = useRef(false);
+  const sending = useRef(false);
+  const opened = useRef(false);
   const paymentAttempt = useRef<{ fingerprint: string; key: string } | null>(null);
 
   useEffect(() => {
-    if (open) {
+    if (open && !opened.current) {
+      completed.current = false;
       setTypeId(currentMembership?.membership_type_id || "");
       setMethod("cash");
       setCashDrawerId(undefined);
@@ -197,10 +215,10 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
       setPickerOpen(false);
       setCompanionOpen(false);
       setError(null);
-      setSuccess(null);
-      setWhatsappState("idle");
+
       paymentAttempt.current = null;
     }
+    opened.current = open;
   }, [open, currentMembership?.membership_type_id]);
 
   const selectedType = useMemo(
@@ -240,11 +258,16 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
     paymentDate,
   );
 
+  // Without "discounts" a due fee can't be skipped (the backend answers
+  // 403); forcing a fee that isn't due is still fine.
+  const lockEnrollment = !canDiscount && autoEnrollment;
+  const lockMaintenance = !canDiscount && autoMaintenance;
+
   // Decisión final tras posible override del operador.
   const willChargeEnrollment =
-    enrollmentAmount > 0 && (chargeEnrollment ?? autoEnrollment);
+    enrollmentAmount > 0 && (lockEnrollment || (chargeEnrollment ?? autoEnrollment));
   const willChargeMaintenance =
-    maintenanceAmount > 0 && (chargeMaintenance ?? autoMaintenance);
+    maintenanceAmount > 0 && (lockMaintenance || (chargeMaintenance ?? autoMaintenance));
 
   // Warnings inline: sólo cuando el operador FORZÓ un cobro que el
   // sistema no recomendaba (override manual sobre auto-decisión false).
@@ -272,10 +295,10 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
   }, [selectedType, willChargeEnrollment, willChargeMaintenance, enrollmentAmount, maintenanceAmount]);
 
   const discountValue = useMemo(() => {
-    if (!discountOpen) return 0;
+    if (!discountOpen || !canDiscount) return 0;
     const v = parseFloat(discountAmount);
     return Number.isFinite(v) && v > 0 ? v : 0;
-  }, [discountOpen, discountAmount]);
+  }, [discountOpen, discountAmount, canDiscount]);
 
   // Promo preview client-side. Espeja Calculate() del BE (calculator.go).
   // El BE recalcula auth y rebota cualquier discrepancia (la promo puede
@@ -305,10 +328,10 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
   }, [breakdown, discountValue, promoDiscount]);
 
   const partialValue = useMemo(() => {
-    if (!partialOpen) return null;
+    if (!partialOpen || !canCredit) return null;
     const v = parseFloat(partialAmount);
     return Number.isFinite(v) && v > 0 ? v : null;
-  }, [partialOpen, partialAmount]);
+  }, [partialOpen, partialAmount, canCredit]);
 
   const amountToCharge = partialValue ?? total;
   const pendingBalance = partialValue !== null ? Math.max(0, total - partialValue) : 0;
@@ -326,23 +349,42 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
     [selectedType, paymentDate, currentMembership?.expiry_date]
   );
 
+  // Vigencia antes del cobro, con la misma insignia de búsqueda, lista y
+  // ficha; el pie muestra la nueva. Sin access_status se deriva de la
+  // membresía (pending_payment = sin primer pago), nunca de su status crudo.
+  const currentVigencia = useMemo(() => {
+    if (!currentMembership) return accessStatus ? vigenciaFrom({ accessStatus }) : null;
+    const status = accessStatus ?? (currentMembership.status === "pending_payment" ? "denied_unpaid_enrollment" : undefined);
+    return vigenciaFrom({ accessStatus: status, expiryDate: currentMembership.expiry_date ?? null });
+  }, [accessStatus, currentMembership]);
+
+  // Desglose sólo cuando el total tiene más de una pieza: con el puro plan,
+  // el importe ya vive en el pie y en el botón.
+  const hasBreakdown =
+    enrollmentAmount > 0 ||
+    (maintenanceAmount > 0 && !!maintenanceFrequency) ||
+    discountValue > 0 ||
+    promoDiscount > 0;
+
   const offline = levelOf(sync.data) !== "ok";
 
   function validate(): string | null {
+    if (!feesReady) return CHARGE_SETTINGS_REQUIRED;
+    if (method === "cash" && !cashReady) return "Espera a confirmar la caja o reintenta su consulta.";
     if (!selectedType) return t.payment.errors.amountInvalid;
     if (!method) return t.payment.errors.methodRequired;
     if (total <= 0) return t.payment.errors.amountInvalid;
-    if (discountOpen && promo) {
+    if (discountOpen && canDiscount && promo) {
       // Mismo gate que el BE: stacking manual+promo prohibido.
       return "No puedes combinar descuento manual con promoción.";
     }
-    if (discountOpen) {
+    if (discountOpen && canDiscount) {
       if (discountValue <= 0 || !breakdown || discountValue > breakdown.subtotal) {
         return t.payment.errors.discountInvalid;
       }
       if (!discountReason.trim()) return t.payment.errors.discountReasonRequired;
     }
-    if (partialOpen) {
+    if (partialOpen && canCredit) {
       if (partialValue === null || partialValue <= 0 || partialValue > total) {
         return t.payment.errors.partialInvalid;
       }
@@ -358,6 +400,7 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (sending.current || completed.current || readOnly) return;
     const v = validate();
     if (v) {
       setError(v);
@@ -381,7 +424,7 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
       charge_maintenance: willChargeMaintenance,
       ...(willChargeEnrollment ? { enrollment_amount: enrollmentAmount } : {}),
       ...(willChargeMaintenance ? { maintenance_amount: maintenanceAmount } : {}),
-      ...(discountOpen
+      ...(discountOpen && canDiscount
         ? { discount_amount: discountValue, discount_reason: discountReason.trim() }
         : {}),
       ...(partialOpen && partialValue !== null ? { partial_amount: partialValue } : {}),
@@ -401,9 +444,12 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
       idempotency_key: paymentAttempt.current.key,
     };
 
+    sending.current = true;
     try {
       const res = await register.mutateAsync(payload);
-      setSuccess(res);
+      completed.current = true;
+      onOpenChange(false);
+      onPaid?.(res);
       const expiryFmt = fmtDate(res.new_expiry);
       const amountFmt = fmtMoney(res.paid);
       if (res.pending_offline_sync || offline) {
@@ -413,99 +459,32 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
       }
     } catch (err) {
       if (err instanceof ApiError) {
-        const data = err.details as Record<string, unknown> | null;
-        setError((data?.exception as string | undefined) || t.payment.errors.generic);
+        setError(err.message || t.payment.errors.generic);
       } else {
         setError(t.payment.errors.generic);
       }
-    }
-  }
-
-  async function handlePrint() {
-    if (!success) return;
-    try {
-      const res = await api.blob(`/api/v1/payments/${success.payment_id}/receipt.pdf`);
-      const buf = new Uint8Array(await res.blob.arrayBuffer());
-      const mode = await printPdf(buf);
-      if (mode === "printed") {
-        toast.success(t.payment.afterAction.printOk);
-      } else {
-        toast.info(t.payment.afterAction.printOpened);
-      }
-    } catch {
-      toast.error(t.payment.afterAction.printError);
-    }
-  }
-
-  async function handleSendWhatsapp() {
-    if (!success) return;
-    setWhatsappState("sending");
-    try {
-      const res = await api.post<{ status: string; note?: string }>(
-        `/api/v1/payments/${success.payment_id}/send-receipt`,
-        { channel: "whatsapp" }
-      );
-      // skipped (sin teléfono) deja el botón re-intentable: el operador
-      // puede capturar el teléfono y volver a mandar sin cerrar el modal.
-      setWhatsappState(res.status === "skipped" ? "error" : "sent");
-      notifySendReceiptOutcome(res);
-    } catch {
-      setWhatsappState("error");
-      toast.error(t.payment.afterAction.whatsappError);
-    }
+    } finally { sending.current = false; }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+    <Dialog open={open} busy={register.isPending} onOpenChange={value => { if (!sending.current) onOpenChange(value); }}>
+      <DialogContent className="flex max-w-xl flex-col gap-0 overflow-hidden p-0">
+        <DialogHeader className="shrink-0 space-y-2 border-b px-6 py-5">
           <DialogTitle>{t.payment.title(member.full_name)}</DialogTitle>
+          {currentVigencia && (
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+              <span>Vigencia actual</span>
+              <VigenciaBadge vigencia={currentVigencia} size="sm" />
+            </div>
+          )}
+          <DialogDescription className="sr-only">Revisa el importe, el método de pago y la nueva vigencia antes de confirmar el cobro.</DialogDescription>
         </DialogHeader>
 
-        {success ? (
-          <div className="space-y-4">
-            <Alert>
-              <AlertDescription>
-                {fmtMoney(success.paid)} cobrados. Vence {fmtDate(success.new_expiry)}.
-                {success.balance_pending > 0 && (
-                  <> Saldo pendiente: {fmtMoney(success.balance_pending)}.</>
-                )}
-              </AlertDescription>
-            </Alert>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={handlePrint}>
-                <Printer className="h-4 w-4" />
-                {t.payment.afterAction.print}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleSendWhatsapp}
-                disabled={whatsappState === "sending" || !member.phone}
-              >
-                {whatsappState === "sending" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <MessageCircle className="h-4 w-4" />
-                )}
-                {whatsappState === "sending"
-                  ? t.payment.afterAction.whatsappSending
-                  : t.payment.afterAction.sendWhatsapp}
-              </Button>
-              <Button onClick={() => onOpenChange(false)} className="ml-auto">
-                {t.payment.afterAction.close}
-              </Button>
-            </div>
-          </div>
-        ) : (
-          <form onSubmitCapture={validateDateFields} onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <form onSubmitCapture={validateDateFields} onSubmit={handleSubmit} className="flex min-h-0 flex-col" noValidate>
+            <div className="min-h-0 space-y-4 overflow-y-auto px-6 py-4">
             {offline && (
               <Alert>
                 <AlertDescription>{t.payment.offline}</AlertDescription>
-              </Alert>
-            )}
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
 
@@ -513,7 +492,8 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
               <Label htmlFor="pm-type">{t.payment.membership}</Label>
               <Select value={typeId} onValueChange={setTypeId} disabled={types.isLoading}>
                 <SelectTrigger id="pm-type">
-                  <SelectValue placeholder="Selecciona…" />
+                  {/* El precio vive en las opciones; el importe a cobrar, en el pie. */}
+                  <SelectValue placeholder="Selecciona…">{selectedType?.name}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {types.data
@@ -527,115 +507,149 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
               </Select>
             </div>
 
-            {/* Toggles de cobros extra. Sólo aparecen cuando el gym
-                cobra ese concepto Y el plan/gym resolvió un monto > 0;
-                de lo contrario, no hay nada que toggle-ear. El operador
-                puede deseleccionar el default ("promo sin inscripción
-                este mes") o forzarlo. */}
-            {selectedType && (enrollmentAmount > 0 || maintenanceAmount > 0) && (
-              <div className="space-y-1.5 rounded-md border bg-muted/20 p-3">
-                {enrollmentAmount > 0 && (
-                  <label className="flex items-center justify-between gap-3 text-sm cursor-pointer">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <Checkbox
-                        checked={willChargeEnrollment}
-                        onCheckedChange={(v) => setChargeEnrollment(v === true)}
-                      />
-                      <span className={willChargeEnrollment ? "" : "text-muted-foreground line-through"}>
-                        {t.payment.breakdown.enrollment}
-                      </span>
-                      {member.enrollment_paid && (
-                        <span className="text-xs text-muted-foreground">(ya pagada)</span>
-                      )}
-                    </span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {fmtMoney(enrollmentAmount)}
-                    </span>
-                  </label>
-                )}
-                {maintenanceAmount > 0 && maintenanceFrequency && (
-                  <label className="flex items-center justify-between gap-3 text-sm cursor-pointer">
-                    <span className="flex items-center gap-2 min-w-0">
-                      <Checkbox
-                        checked={willChargeMaintenance}
-                        onCheckedChange={(v) => setChargeMaintenance(v === true)}
-                      />
-                      <span className={willChargeMaintenance ? "" : "text-muted-foreground line-through"}>
-                        {t.payment.breakdown.maintenance}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        ({FREQ_LABEL[maintenanceFrequency]})
-                      </span>
-                    </span>
-                    <span className="tabular-nums text-muted-foreground">
-                      {fmtMoney(maintenanceAmount)}
-                    </span>
-                  </label>
-                )}
-                {/* Warnings inline: educar al operador cuando fuerza un
-                    cobro que el sistema no recomendaba. Estilo "soft
-                    warning" (no destructive) — informa sin bloquear. */}
-                {(warnEnrollmentForced || warnMaintenanceForced) && (
-                  <div className="mt-2 space-y-1 rounded border border-warning/30 bg-warning/5 px-2.5 py-1.5 text-xs text-warning">
-                    {warnEnrollmentForced && (
-                      <p>{t.payment.warn.enrollmentAlreadyPaid}</p>
-                    )}
-                    {warnMaintenanceForced && nextMaintenanceDue && (
-                      <p>{t.payment.warn.maintenanceNotDue(nextMaintenanceDue)}</p>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {breakdown && (
-              <div className="rounded-md border bg-muted/40 p-3 space-y-1.5">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-sm">{t.payment.total}</span>
-                  <span className="text-2xl font-semibold tabular-nums">{fmtMoney(total)}</span>
-                </div>
-                <div className="text-xs text-muted-foreground space-y-0.5">
-                  <div className="flex justify-between">
-                    <span>{t.payment.breakdown.base}</span>
-                    <span className="tabular-nums">{fmtMoney(breakdown.base)}</span>
-                  </div>
-                  {breakdown.enrollment > 0 && (
-                    <div className="flex justify-between">
-                      <span>+ {t.payment.breakdown.enrollment}</span>
-                      <span className="tabular-nums">{fmtMoney(breakdown.enrollment)}</span>
-                    </div>
+            {/* Desglose: plan + cobros extra (con su casilla) + descuentos.
+                Los extras sólo aparecen cuando el gym cobra ese concepto Y
+                el plan/gym resolvió un monto > 0. El operador puede quitar
+                el default ("promo sin inscripción este mes") o forzarlo. Sin
+                fila de total: el total vive en el pie fijo. */}
+            {selectedType && hasBreakdown && (
+              <div className="space-y-2">
+                <p id="pm-breakdown-label" className="text-sm font-medium">Desglose</p>
+                <ul aria-labelledby="pm-breakdown-label" className="divide-y rounded-md border text-sm">
+                  <li className="flex min-h-11 items-center justify-between gap-3 px-3">
+                    <span className="min-w-0 truncate">{t.payment.membership} {selectedType.name}</span>
+                    <span className="tabular">{fmtMoney(selectedType.price)}</span>
+                  </li>
+                  {enrollmentAmount > 0 && (
+                    <li>
+                      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Checkbox
+                            checked={willChargeEnrollment}
+                            disabled={lockEnrollment}
+                            onCheckedChange={(v) => setChargeEnrollment(v === true)}
+                          />
+                          <span className={willChargeEnrollment ? "" : "text-muted-foreground line-through"}>
+                            {t.payment.breakdown.enrollment}
+                          </span>
+                          {member.enrollment_paid && (
+                            <span className="text-xs text-muted-foreground">(ya pagada)</span>
+                          )}
+                        </span>
+                        <span className={cn("tabular", !willChargeEnrollment && "text-muted-foreground line-through")}>
+                          {fmtMoney(enrollmentAmount)}
+                        </span>
+                      </label>
+                    </li>
                   )}
-                  {breakdown.maint > 0 && (
-                    <div className="flex justify-between">
-                      <span>+ {t.payment.breakdown.maintenance}</span>
-                      <span className="tabular-nums">{fmtMoney(breakdown.maint)}</span>
-                    </div>
+                  {maintenanceAmount > 0 && maintenanceFrequency && (
+                    <li>
+                      <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Checkbox
+                            checked={willChargeMaintenance}
+                            disabled={lockMaintenance}
+                            onCheckedChange={(v) => setChargeMaintenance(v === true)}
+                          />
+                          <span className={willChargeMaintenance ? "" : "text-muted-foreground line-through"}>
+                            {t.payment.breakdown.maintenance}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            ({FREQ_LABEL[maintenanceFrequency]})
+                          </span>
+                        </span>
+                        <span className={cn("tabular", !willChargeMaintenance && "text-muted-foreground line-through")}>
+                          {fmtMoney(maintenanceAmount)}
+                        </span>
+                      </label>
+                    </li>
                   )}
                   {discountValue > 0 && (
-                    <div className="flex justify-between text-success">
-                      <span>− {t.payment.breakdown.discount}</span>
-                      <span className="tabular-nums">−{fmtMoney(discountValue)}</span>
-                    </div>
+                    <li className="flex min-h-11 items-center justify-between gap-3 px-3 text-success-text">
+                      <span>{t.payment.breakdown.discount}</span>
+                      <span className="tabular">−{fmtMoney(discountValue)}</span>
+                    </li>
                   )}
-                  {promoDiscount > 0 && (
-                    <div className="flex justify-between text-success">
-                      <span>− Promoción</span>
-                      <span className="tabular-nums">−{fmtMoney(promoDiscount)}</span>
-                    </div>
+                  {promoDiscount > 0 && promo && (
+                    <li className="flex min-h-11 items-center justify-between gap-3 px-3 text-success-text">
+                      <span className="min-w-0 truncate">Promoción · {promo.name}</span>
+                      <span className="tabular">−{fmtMoney(promoDiscount)}</span>
+                    </li>
                   )}
-                </div>
+                </ul>
+                {(lockEnrollment || lockMaintenance) && (
+                  <RestrictedNote permission="discounts">
+                    {lockEnrollment && lockMaintenance
+                      ? "No puedes quitar la inscripción ni el mantenimiento."
+                      : lockEnrollment
+                        ? "No puedes quitar la inscripción."
+                        : "No puedes quitar el mantenimiento."}
+                  </RestrictedNote>
+                )}
+                {/* Avisos: educar al operador cuando fuerza un cobro que el
+                    sistema no recomendaba. Informa sin bloquear. */}
+                {(warnEnrollmentForced || warnMaintenanceForced) && (
+                  <div className="flex items-start gap-2 rounded-md bg-warning-soft px-3 py-2 text-xs text-warning-foreground">
+                    <AlertTriangle aria-hidden="true" className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <div className="space-y-1">
+                      {warnEnrollmentForced && (
+                        <p>{t.payment.warn.enrollmentAlreadyPaid}</p>
+                      )}
+                      {warnMaintenanceForced && nextMaintenanceDue && (
+                        <p>{t.payment.warn.maintenanceNotDue(nextMaintenanceDue)}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
+            <div className="space-y-2">
+              <Label id="pm-method-label">{t.payment.method}</Label>
+              <RadioGroup
+                aria-labelledby="pm-method-label"
+                value={method}
+                onValueChange={(v) => setMethod(v as PaymentMethod)}
+                className="flex flex-wrap gap-4"
+              >
+                <label className="flex min-h-11 items-center gap-2 cursor-pointer">
+                  <RadioGroupItem value="cash" id="pm-m-cash" />
+                  <span>{t.payment.methods.cash}</span>
+                </label>
+                <label className="flex min-h-11 items-center gap-2 cursor-pointer">
+                  <RadioGroupItem value="transfer" id="pm-m-tr" />
+                  <span>{t.payment.methods.transfer}</span>
+                </label>
+                <label className="flex min-h-11 items-center gap-2 cursor-pointer">
+                  <RadioGroupItem value="card" id="pm-m-card" />
+                  <span>{t.payment.methods.card}</span>
+                </label>
+              </RadioGroup>
+            </div>
+
+            {method === "cash" && (
+              <CashDrawerField onReadyChange={setCashReady}
+                value={cashDrawerId}
+                onChange={setCashDrawerId}
+                date={paymentDate}
+                id="membership-cash-drawer"
+              />
+            )}
+
+            <details className="rounded-md border p-3">
+              <summary className="min-h-11 cursor-pointer py-3 font-medium">Promoción, descuento o pago parcial</summary>
+              <div className="space-y-3 pt-2">
             {/* Promoción — sección entre subtotal y total (UC del prompt).
                 Sin promo: botón "Aplicar promoción" → abre Picker. Con
                 promo: card resumen con badge + botón Quitar. Para
                 companion_memberships, badge adicional con la cantidad de
                 socios elegidos + botón para re-elegir si los slots están
                 vacíos. */}
-            <div className="rounded-md border border-dashed bg-card p-3">
+            {/* Sin promoción no hay caja: el botón ya vive dentro del <details>
+                con borde y una segunda caja se leía como tarjeta anidada. */}
+            <div className={promo ? "rounded-md border bg-card p-3" : undefined}>
               {!promo ? (
-                <Button
+                <Button requiresWrite
                   type="button"
                   variant="outline"
                   size="sm"
@@ -654,22 +668,17 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
                       <div className="flex items-center gap-2 flex-wrap">
                         <Tag className="h-4 w-4 text-primary" />
                         <span className="font-medium text-sm">{promo.name}</span>
-                        <Badge variant="secondary" className="text-[10px]">
+                        <Badge variant="secondary" className="text-xs">
                           {formatPromotionValue(promo.kind, promo.value, promo.companion_count)}
                         </Badge>
                       </div>
-                      {promoDiscount > 0 && (
-                        <div className="text-xs text-success mt-1">
-                          {pt.picker.discountPreview(fmtMoney(promoDiscount))}
-                        </div>
-                      )}
                       {promo.kind === "extra_days" && promo.value != null && (
-                        <div className="text-xs text-success mt-1">
+                        <div className="text-xs text-success-text mt-1">
                           {pt.picker.extraDaysPreview(promo.value)}
                         </div>
                       )}
                       {promo.kind === "companion_memberships" && (
-                        <div className="text-xs text-success mt-1">
+                        <div className="text-xs text-success-text mt-1">
                           {pt.picker.companionPreview(promo.companion_count ?? 0)} ·
                           {" "}
                           {companionIDs.length === (promo.companion_count ?? 0)
@@ -687,8 +696,9 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
                         setCompanionIDs([]);
                       }}
                       title={pt.picker.remove}
+                      aria-label={pt.picker.remove}
                     >
-                      <X className="h-4 w-4" />
+                      <X aria-hidden="true" className="h-4 w-4" />
                     </Button>
                   </div>
                   {promo.kind === "companion_memberships" && (
@@ -726,15 +736,17 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
             />
 
             <div className="space-y-3">
-              <button
+              {canDiscount && <button
                 type="button"
-                className="text-sm text-primary hover:underline"
+                className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                aria-expanded={discountOpen}
                 onClick={() => setDiscountOpen((v) => !v)}
               >
+                {discountOpen ? <Minus aria-hidden className="h-4 w-4" /> : <Plus aria-hidden className="h-4 w-4" />}
                 {discountOpen ? t.payment.removeDiscount : t.payment.addDiscount}
-              </button>
-              {discountOpen && (
-                <div className="grid grid-cols-2 gap-2 pl-3 border-l-2 border-muted">
+              </button>}
+              {canDiscount && discountOpen && (
+                <div className="grid grid-cols-2 gap-2 border-l border-border pl-3">
                   <div className="space-y-1">
                     <Label htmlFor="pm-disc">{t.payment.discountLabel}</Label>
                     <Input
@@ -758,15 +770,23 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
                 </div>
               )}
 
-              <button
+              {canCredit && <button
                 type="button"
-                className="text-sm text-primary hover:underline block"
+                className="flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                aria-expanded={partialOpen}
                 onClick={() => setPartialOpen((v) => !v)}
               >
+                {partialOpen ? <Minus aria-hidden className="h-4 w-4" /> : <Plus aria-hidden className="h-4 w-4" />}
                 {partialOpen ? t.payment.removePartial : t.payment.addPartial}
-              </button>
-              {partialOpen && (
-                <div className="pl-3 border-l-2 border-muted space-y-1">
+              </button>}
+              {!canDiscount && (
+                <RestrictedNote permission="discounts">No puedes aplicar descuentos.</RestrictedNote>
+              )}
+              {!canCredit && (
+                <RestrictedNote permission="credit">No puedes cobrar a medias.</RestrictedNote>
+              )}
+              {canCredit && partialOpen && (
+                <div className="space-y-1 border-l border-border pl-3">
                   <Label htmlFor="pm-partial">{t.payment.partialLabel}</Label>
                   <Input
                     id="pm-partial"
@@ -777,46 +797,12 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
                     value={partialAmount}
                     onChange={(e) => setPartialAmount(e.target.value)}
                   />
-                  {pendingBalance > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      {t.payment.partialHint(fmtMoney(pendingBalance))}
-                    </p>
-                  )}
                 </div>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>{t.payment.method}</Label>
-              <RadioGroup
-                value={method}
-                onValueChange={(v) => setMethod(v as PaymentMethod)}
-                className="flex flex-wrap gap-4"
-              >
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <RadioGroupItem value="cash" id="pm-m-cash" />
-                  <span>{t.payment.methods.cash}</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <RadioGroupItem value="transfer" id="pm-m-tr" />
-                  <span>{t.payment.methods.transfer}</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <RadioGroupItem value="card" id="pm-m-card" />
-                  <span>{t.payment.methods.card}</span>
-                </label>
-              </RadioGroup>
-            </div>
-
-            {method === "cash" && (
-              <CashDrawerField
-                value={cashDrawerId}
-                onChange={setCashDrawerId}
-                date={paymentDate}
-                id="membership-cash-drawer"
-              />
-            )}
-
+              </div>
+            </details>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
                 <Label htmlFor="pm-date">{t.payment.date}</Label>
@@ -824,24 +810,44 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
                   id="pm-date"
                   context="recent"
                   value={paymentDate}
+                  disabled={!canDiscount}
                   onValueChange={(e) => setPaymentDate(e)}
                 />
+                {!canDiscount && (
+                  <RestrictedNote permission="discounts">Se cobra con fecha de hoy.</RestrictedNote>
+                )}
               </div>
               <div className="space-y-1">
                 <Label htmlFor="pm-notes">{t.payment.notes}</Label>
                 <Input
                   id="pm-notes"
                   value={notes}
-                  placeholder={t.payment.notesPlaceholder}
+                  placeholder="Comentario interno"
+                  aria-describedby="pm-notes-hint"
                   onChange={(e) => setNotes(e.target.value)}
                 />
+                <p id="pm-notes-hint" className="text-xs text-muted-foreground">No aparece en el comprobante.</p>
               </div>
             </div>
 
-            {newExpiry && (
-              <p className="text-sm text-muted-foreground">{t.payment.newExpiry(newExpiry)}</p>
+            </div>
+            <div className="shrink-0 space-y-3 border-t bg-background px-6 py-4">
+            <ChargeSettingsStatus query={chargeSettings} />
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
             )}
-
+              {/* Único lugar protagonista del importe (además del botón). */}
+              <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2" aria-live="polite">
+                <div>
+                  <p className="text-sm text-muted-foreground">{partialValue !== null ? "Abono de hoy" : t.payment.total} · {t.payment.methods[method]}</p>
+                  {feesReady && selectedType
+                    ? <p className="font-display text-3xl leading-tight tabular text-foreground">{fmtMoney(amountToCharge)}</p>
+                    : <p className="text-base font-medium text-muted-foreground">{!feesReady ? "Total por confirmar" : "Elige una membresía"}</p>}
+                </div>
+                <div className="text-right text-sm">{newExpiry && <p>{t.payment.newExpiry(newExpiry)}</p>}{pendingBalance > 0 && <p className="text-warning">Saldo pendiente: <span className="tabular">{fmtMoney(pendingBalance)}</span></p>}</div>
+              </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button
                 type="button"
@@ -851,13 +857,13 @@ export function PaymentModal({ member, currentMembership, open, onOpenChange }: 
               >
                 {t.payment.cancel}
               </Button>
-              <Button type="submit" disabled={register.isPending || !selectedType || total <= 0}>
+              <Button requiresWrite size="lg" type="submit" disabled={!feesReady || (method === "cash") && !cashReady || readOnly || register.isPending || !selectedType || total <= 0}>
                 {register.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-                {t.payment.submit(fmtMoney(amountToCharge))}
+                {feesReady && selectedType ? t.payment.submit(fmtMoney(amountToCharge)) : "Cobrar"}
               </Button>
             </div>
+            </div>
           </form>
-        )}
       </DialogContent>
     </Dialog>
   );

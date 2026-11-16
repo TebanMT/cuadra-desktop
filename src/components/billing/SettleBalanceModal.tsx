@@ -33,6 +33,7 @@ export function SettleBalanceModal({
   open,
   onOpenChange,
 }: Props) {
+  const [cashReady, setCashReady] = useState(false);
   const settle = useSettleBalance(paymentId);
   const [amount, setAmount] = useState<string>("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
@@ -53,6 +54,7 @@ export function SettleBalanceModal({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    if (method === "cash" && !cashReady) return setError("Confirma la caja antes de abonar.");
     const v = parseFloat(amount);
     if (!Number.isFinite(v) || v <= 0 || v > pendingBalance) {
       setError(t.settle.errors.amountInvalid);
@@ -86,7 +88,7 @@ export function SettleBalanceModal({
       console.error("[settle-balance] failed", err);
       if (err instanceof ApiError) {
         const data = err.details as Record<string, unknown> | null;
-        const apiMsg = (data?.exception as string | undefined) || err.message;
+        const apiMsg = err.message;
         // Mostrar el mensaje real del BE si lo trae; el fallback
         // genérico sólo cuando la respuesta no es interpretable.
         setError(apiMsg || t.settle.errors.generic);
@@ -97,7 +99,7 @@ export function SettleBalanceModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} busy={settle.isPending} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-sm">
         <DialogHeader>
           <DialogTitle>{t.settle.title(memberName)}</DialogTitle>
@@ -126,7 +128,7 @@ export function SettleBalanceModal({
           </div>
           <div className="space-y-2">
             <Label>{t.settle.methodLabel}</Label>
-            <RadioGroup
+            <RadioGroup aria-label="Método de pago"
               value={method}
               onValueChange={(v) => setMethod(v as PaymentMethod)}
               className="flex flex-wrap gap-4"
@@ -146,7 +148,7 @@ export function SettleBalanceModal({
             </RadioGroup>
           </div>
           {method === "cash" && (
-            <CashDrawerField
+            <CashDrawerField onReadyChange={setCashReady}
               value={cashDrawerId}
               onChange={setCashDrawerId}
               id="settlement-cash-drawer"
@@ -161,7 +163,7 @@ export function SettleBalanceModal({
             >
               {t.settle.cancel}
             </Button>
-            <Button type="submit" disabled={settle.isPending}>
+            <Button requiresWrite type="submit" disabled={(method === "cash") && !cashReady || settle.isPending}>
               {settle.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {t.settle.submit(fmtMoney(parseFloat(amount) || 0))}
             </Button>

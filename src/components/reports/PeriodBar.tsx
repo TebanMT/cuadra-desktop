@@ -34,37 +34,12 @@ export function PeriodBar({
 }) {
   return (
     <div className={cn("flex flex-wrap items-center gap-1", className)}>
-      {PRESETS.map((preset) => (
-        <button
-          key={preset.key}
-          type="button"
-          aria-pressed={value.period === preset.key}
-          className={cn(
-            "h-11 rounded-md px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            value.period === preset.key
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:bg-muted hover:text-foreground",
-          )}
-          onClick={() => onChange({ period: preset.key })}
-        >
-          {preset.label}
-        </button>
-      ))}
-      <Select
-        value={
-          ["week", "3_months", "year"].includes(value.period)
-            ? value.period
-            : ""
-        }
-        onValueChange={(period) => onChange({ period: period as ReportPeriod })}
-      >
-        <SelectTrigger
-          aria-label="Más períodos"
-          className="h-11 w-auto min-w-0 px-2"
-        >
-          <SelectValue placeholder="Más períodos" />
+      <Select value={value.period === "custom" ? "" : value.period} onValueChange={period => onChange({ period: period as ReportPeriod })}>
+        <SelectTrigger aria-label="Período del reporte" className="h-11 w-[180px]">
+          <SelectValue placeholder="Período personalizado" />
         </SelectTrigger>
         <SelectContent>
+          {PRESETS.map(preset => <SelectItem key={preset.key} value={preset.key}>{preset.label}</SelectItem>)}
           <SelectItem value="week">Últimos 7 días</SelectItem>
           <SelectItem value="3_months">Últimos 3 meses</SelectItem>
           <SelectItem value="year">Últimos 12 meses</SelectItem>

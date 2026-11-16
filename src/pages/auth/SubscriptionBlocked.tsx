@@ -1,7 +1,10 @@
+import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import { ExternalLink, Lock, MessageCircle } from "lucide-react";
 import { openExternalUrl } from "@/lib/openExternal";
+import { BILLING_URL } from "@/lib/billing";
 import { AuthShell } from "@/components/shared/AuthShell";
 import { Button } from "@/components/ui/button";
+import { useLogout } from "@/hooks/useAuth";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { fmtDate } from "@/lib/dates";
 
@@ -18,15 +21,9 @@ import { fmtDate } from "@/lib/dates";
 // paga en el dashboard, el cloud lo marca `active` de vuelta, el siguiente
 // sync lo refleja localmente, y la operación reanuda.
 
-const DASHBOARD_URL =
-  (import.meta.env.VITE_DASHBOARD_URL as string | undefined) ??
-  "https://entinta.app";
-
-const BILLING_URL = `${DASHBOARD_URL}/settings/subscription`;
-const SUPPORT_WHATSAPP_URL = "https://wa.me/524461057446";
 
 export default function SubscriptionBlocked() {
-  const clearAuth = useAuthStore((s) => s.clear);
+  const logout = useLogout();
   const gym = useAuthStore((s) => s.gym);
   const user = useAuthStore((s) => s.user);
 
@@ -61,14 +58,14 @@ export default function SubscriptionBlocked() {
             <>Este gym no tiene una suscripción activa.</>
           )}
           {" "}
-          Para seguir operando, activa tu plan desde el dashboard.
+          Para seguir operando, activa tu plan desde tu cuenta en línea.
         </p>
       </div>
 
       <div className="space-y-3">
         <Button size="lg" className="w-full" onClick={openBilling}>
           <ExternalLink className="h-4 w-4 mr-2" />
-          Activar plan en el dashboard
+          Activar plan en mi cuenta en línea
         </Button>
 
         <Button
@@ -91,7 +88,7 @@ export default function SubscriptionBlocked() {
         {user && (
           <button
             type="button"
-            onClick={() => clearAuth()}
+            disabled={logout.isPending} onClick={() => logout.mutate()}
             className="w-full text-center text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors mt-6"
           >
             Cerrar sesión

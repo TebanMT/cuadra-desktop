@@ -5,6 +5,7 @@ import { OwnerOnlyRoute, ProtectedRoute, PublicOnlyRoute } from "@/components/sh
 import { UpdaterShell } from "@/components/shared/UpdaterShell";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import Login from "@/pages/auth/Login";
+import ChangePasswordRequired from "@/pages/auth/ChangePasswordRequired";
 import LoginEmail from "@/pages/auth/LoginEmail";
 import Welcome from "@/pages/auth/Welcome";
 import RedeemInstaller from "@/pages/auth/RedeemInstaller";
@@ -20,6 +21,7 @@ import MemberDetailPage from "@/pages/members/MemberDetailPage";
 import MemberImportPage from "@/pages/members/MemberImportPage";
 import ProfilePage from "@/pages/profile/ProfilePage";
 import SettingsIndex from "@/pages/settings/SettingsIndex";
+import HelpPage from "@/pages/help/HelpPage";
 import AboutTintaPage from "@/pages/settings/AboutTintaPage";
 import SubscriptionPage from "@/pages/settings/SubscriptionPage";
 import MembershipTypesPage from "@/pages/settings/MembershipTypes";
@@ -63,6 +65,7 @@ export const router = createBrowserRouter([
   {
     element: <ProtectedRoute />,
     children: [
+      { path: "/auth/change-password", element: <ChangePasswordRequired /> },
       // UpdaterShell envuelve TODO el árbol post-login. Móntea el ciclo
       // de auto-update + el modal bloqueante de "schema upgrade required".
       // Tiene que estar dentro de ProtectedRoute porque el check inicial
@@ -102,6 +105,7 @@ export const router = createBrowserRouter([
           { path: "members/import", element: <MemberImportPage /> },
           { path: "members/:id", element: <MemberDetailPage /> },
           { path: "profile", element: <ProfilePage /> },
+          { path: "help", element: <HelpPage /> },
           { path: "billing", element: <CobrosPage /> },
           { path: "products", element: <ProductsPage /> },
           { path: "products/purchases/new", element: <RegisterPurchasePage /> },
@@ -139,9 +143,9 @@ export const router = createBrowserRouter([
               // plantillas + envío masivo a tabs internos de /settings/mensajes.
               // Mantenemos las URLs viejas vivas para preservar deep-links —
               // el componente de la página ahora redirige al tab equivalente.
-              { path: "settings/whatsapp", element: <WhatsAppSetupPage /> },
-              { path: "settings/templates", element: <TemplatesPage /> },
-              { path: "messaging/broadcast", element: <BroadcastPage /> },
+              { path: "settings/whatsapp", element: <Navigate to="/settings/mensajes?tab=whatsapp" replace /> },
+              { path: "settings/templates", element: <Navigate to="/settings/mensajes?tab=templates" replace /> },
+              { path: "messaging/broadcast", element: <Navigate to="/settings/mensajes?tab=broadcast" replace /> },
             ],
           },
         ],

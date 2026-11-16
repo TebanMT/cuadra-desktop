@@ -1,3 +1,4 @@
+import { useCanWrite, READ_ONLY_MESSAGE } from "@/lib/writeAccess";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -32,6 +33,7 @@ export function OverrideDialog({
   onOpenChange,
   onSuccess,
 }: Props) {
+  const canWrite = useCanWrite();
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const override = useOverrideCheckin();
@@ -45,6 +47,7 @@ export function OverrideDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!canWrite || override.isPending) return;
     if (reason.trim().length < 5) {
       setError(t.override.reasonRequired);
       return;
@@ -59,12 +62,12 @@ export function OverrideDialog({
       onSuccess(res);
       onOpenChange(false);
     } catch (err) {
-      setError(checkinErrorMessage(err, t.override.reasonRequired));
+      setError(checkinErrorMessage(err, t.feedback.operationalError));
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog busy={override.isPending} open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{t.override.title(memberName)}</DialogTitle>
@@ -72,6 +75,7 @@ export function OverrideDialog({
         </DialogHeader>
 
         <form onSubmit={submit} className="space-y-4">
+          {!canWrite && <Alert variant="warning"><AlertDescription>{READ_ONLY_MESSAGE}</AlertDescription></Alert>}
           {error && (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -82,6 +86,7 @@ export function OverrideDialog({
             <Label htmlFor="override-reason">{t.override.reasonLabel}</Label>
             <Textarea
               id="override-reason"
+              disabled={!canWrite || override.isPending}
               autoFocus
               rows={3}
               value={reason}
@@ -99,7 +104,7 @@ export function OverrideDialog({
             >
               {t.override.cancel}
             </Button>
-            <Button type="submit" disabled={override.isPending}>
+            <Button requiresWrite type="submit" disabled={override.isPending}>
               {override.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {t.override.submit}
             </Button>

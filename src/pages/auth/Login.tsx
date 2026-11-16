@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Loader2, ShieldAlert, UserCircle2 } from "lucide-react";
 import { AuthShell } from "@/components/shared/AuthShell";
@@ -13,10 +13,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { NumberPad } from "@/components/checkin/NumberPad";
+import { TrialEndedDialog } from "@/components/auth/TrialEndedDialog";
 import { useLoginPIN, useOperatorsForLogin, type OperatorForLogin } from "@/hooks/useAuth";
 import { ApiError, api } from "@/lib/api";
 import { auth } from "@/strings/auth";
-import { useAuthStore } from "@/stores/useAuthStore";
 import { cn } from "@/lib/utils";
 
 // Login renders the operators grid as the primary reception-screen
@@ -30,9 +30,9 @@ import { cn } from "@/lib/utils";
 // their PIN from the profile.
 export default function Login() {
   const navigate = useNavigate();
+  const operatorTrigger = useRef<HTMLButtonElement | null>(null);
   const operators = useOperatorsForLogin();
   const loginPIN = useLoginPIN();
-  const setReadOnly = useAuthStore((s) => s.setReadOnly);
   const [selected, setSelected] = useState<OperatorForLogin | null>(null);
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -132,8 +132,7 @@ export default function Login() {
     }
   }
 
-  function continueAfterTrial(readOnly: boolean) {
-    setReadOnly(readOnly);
+  function continueAfterTrial() {
     setTrialModal(false);
     navigate("/", { replace: true });
   }
@@ -145,7 +144,7 @@ export default function Login() {
   // sidecar está pareado. Si no lo está, el useEffect de arriba ya
   // disparó el navigate hacia /welcome y este return es transitorio.
   if (!pairingChecked) {
-    return <AuthShell> </AuthShell>;
+    return <AuthShell><p role="status" className="text-center text-muted-foreground">Preparando el acceso…</p></AuthShell>;
   }
 
   return (
@@ -164,14 +163,15 @@ export default function Login() {
       )}
 
       {operators.isLoading && (
-        <div className="flex justify-center py-10">
+        <div role="status" className="flex items-center justify-center gap-2 py-10">
+          <span>Cargando operadores…</span>
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       )}
 
       {operators.isError && (
         <Alert variant="destructive" className="mb-4">
-          <AlertDescription>{auth.pinLogin.errors.loadFailed}</AlertDescription>
+          <AlertDescription>{auth.pinLogin.errors.loadFailed}<Button variant="link" onClick={() => void operators.refetch()}>Reintentar</Button></AlertDescription>
         </Alert>
       )}
 
@@ -193,7 +193,7 @@ export default function Login() {
                 <button
                   key={op.user_id}
                   type="button"
-                  onClick={() => openOperator(op)}
+                  onClick={(event) => { operatorTrigger.current = event.currentTarget; openOperator(op); }}
                   className={cn(
                     "group flex flex-col items-center gap-2 rounded-xl border-2 border-border bg-card",
                     "px-3 py-5 transition-colors hover:border-primary hover:bg-primary/5",
@@ -229,7 +229,10 @@ export default function Login() {
       )}
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && closeModal()}>
-        <DialogContent>
+        <DialogContent onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          operatorTrigger.current?.focus();
+        }}>
           <DialogHeader>
             <DialogTitle>
               {selected ? auth.pinLogin.pinFor(selected.full_name) : ""}
@@ -248,6 +251,7 @@ export default function Login() {
             disabled={loginPIN.isPending}
             size="lg"
             ariaLabel="PIN"
+              masked
           />
           <div className="text-center">
             <button
@@ -261,22 +265,7 @@ export default function Login() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={trialModal} onOpenChange={setTrialModal}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{auth.login.trialExpired.title}</DialogTitle>
-            <DialogDescription>{auth.login.trialExpired.body}</DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col sm:flex-row gap-2 justify-end">
-            <Button variant="outline" onClick={() => continueAfterTrial(true)}>
-              {auth.login.trialExpired.later}
-            </Button>
-            <Button onClick={() => continueAfterTrial(false)}>
-              {auth.login.trialExpired.activate}
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <TrialEndedDialog open={trialModal} onContinue={continueAfterTrial} />
     </AuthShell>
   );
 }

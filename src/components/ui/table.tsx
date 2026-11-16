@@ -48,7 +48,7 @@ export const TableHead = React.forwardRef<
   <th
     ref={ref}
     className={cn(
-      "h-11 px-3 text-left align-middle text-xs font-medium uppercase tracking-wide text-muted-foreground",
+      "h-11 px-3 text-left align-middle text-xs font-medium text-muted-foreground",
       className
     )}
     {...props}

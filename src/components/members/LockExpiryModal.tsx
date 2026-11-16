@@ -89,8 +89,7 @@ export function LockExpiryModal({ membershipId, memberName, currentExpiry, open,
       onOpenChange(false);
     } catch (err) {
       if (err instanceof ApiError) {
-        const data = err.details as Record<string, unknown> | null;
-        setError((data?.exception as string | undefined) || t.form.errors.generic);
+        setError(err.message || t.form.errors.generic);
       } else {
         setError(t.form.errors.generic);
       }
@@ -131,7 +130,7 @@ export function LockExpiryModal({ membershipId, memberName, currentExpiry, open,
                       inputMode="numeric"
                       value={days}
                       onChange={(e) => setDays(e.target.value.replace(/[^\d-]/g, ""))}
-                      className="w-24 h-9"
+                      className="w-24 h-11"
                     />
                     <span className="text-sm text-muted-foreground">{t.lockExpiry.daysSuffix}</span>
                     <span className="text-sm font-medium">{newExpiryPreview ?? "—"}</span>
@@ -157,10 +156,15 @@ export function LockExpiryModal({ membershipId, memberName, currentExpiry, open,
                 )}
               </div>
 
-              <label className="flex items-center gap-2 cursor-pointer">
-                <RadioGroupItem value="reset" id="le-reset" />
-                <span>{t.lockExpiry.modes.reset}</span>
-              </label>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <RadioGroupItem value="reset" id="le-reset" />
+                  <span>{t.lockExpiry.modes.reset}</span>
+                </label>
+                {mode === "reset" && (
+                  <p className="pl-7 text-sm text-muted-foreground">{t.lockExpiry.resetHint}</p>
+                )}
+              </div>
             </RadioGroup>
           </div>
 
@@ -179,7 +183,7 @@ export function LockExpiryModal({ membershipId, memberName, currentExpiry, open,
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={lock.isPending}>
               {t.lockExpiry.cancel}
             </Button>
-            <Button type="submit" disabled={lock.isPending}>
+            <Button requiresWrite type="submit" disabled={lock.isPending}>
               {lock.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {t.lockExpiry.submit}
             </Button>

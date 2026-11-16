@@ -56,7 +56,8 @@ describe("PeriodBar — fechas exactas con calendario de rango", () => {
   it("los presets siguen aplicando directo, sin calendario", () => {
     const onChange = vi.fn();
     render(<Harness onChange={onChange} />);
-    fireEvent.click(screen.getByRole("button", { name: "Mes pasado" }));
+    fireEvent.keyDown(screen.getByRole("combobox", { name: "Período del reporte" }), { key: "ArrowDown" });
+    fireEvent.click(screen.getByRole("option", { name: "Mes pasado" }));
     expect(onChange).toHaveBeenCalledWith({ period: "last_month" });
   });
 });

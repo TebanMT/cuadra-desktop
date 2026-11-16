@@ -228,10 +228,21 @@ interface CorrectSaleWireResponse {
   };
 }
 
+// Resultado de búsqueda de socios. Además de nombre y teléfono conserva lo
+// que contesta «¿está vigente?» y distingue homónimos: número de socio,
+// foto, estado del socio, membresía actual y la decisión de acceso del
+// backend. Los campos extra son opcionales porque hay borradores de venta
+// guardados con la forma anterior.
 export interface MemberSearchResult {
   member_id: string;
   full_name: string;
   phone: string;
+  member_number?: number;
+  folio?: string;
+  photo_url?: string;
+  status?: import("./useMembers").MemberStatus;
+  access_status?: import("./useMembers").AccessStatus;
+  current_membership?: import("./useMembers").MembershipSummary | null;
 }
 
 const SALE_KEYS = {
@@ -364,9 +375,10 @@ export function useMemberSearch(query: string) {
     queryFn: async () => {
       // El sidecar/backend solo expone GET /api/v1/members (con `q` como
       // filtro). Aplanamos el list-item ({ member, current_membership,
-      // access_status }) al shape mínimo que necesita el dropdown.
+      // access_status }) conservando vigencia, número y foto: sin ellos el
+      // resultado no dice si el socio puede pasar ni distingue homónimos.
       const res = await api.get<{
-        items: Array<{ member: { id: string; full_name: string; phone: string } }>;
+        items: import("./useMembers").MemberListItem[];
       }>("/api/v1/members", {
         query: { q: query, page: 1, page_size: 10 },
       });
@@ -374,6 +386,12 @@ export function useMemberSearch(query: string) {
         member_id: it.member.id,
         full_name: it.member.full_name,
         phone: it.member.phone,
+        member_number: it.member.member_number,
+        folio: it.member.folio,
+        photo_url: it.member.photo_url,
+        status: it.member.status,
+        access_status: it.access_status,
+        current_membership: it.current_membership ?? null,
       }));
     },
     enabled: query.trim().length >= 2,

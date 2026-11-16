@@ -5,11 +5,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+// Un solo formato de dinero en toda la app: siempre con centavos ($20.00),
+// igual que fmtMoney. Antes convivían «$20» y «$20.00».
 export function formatMoney(value: number) {
   return new Intl.NumberFormat("es-MX", {
     style: "currency",
     currency: "MXN",
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(value);
 }

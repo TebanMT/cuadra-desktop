@@ -1,3 +1,6 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { SettingsBackLink } from "@/components/settings/SettingsBackLink";
+import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import { openExternalUrl } from "@/lib/openExternal";
 import { toast } from "sonner";
 import {
@@ -31,8 +34,9 @@ import {
 import { fmtMoney } from "@/hooks/useBilling";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { fmtDate } from "@/lib/dates";
+import { auth } from "@/strings/auth";
 
-const SUPPORT_WHATSAPP_URL = "https://wa.me/524461057446";
+
 
 // El flujo de activación / cambio de plan vive end-to-end en el dashboard
 // cloud (entinta.app). Razones:
@@ -161,15 +165,23 @@ export default function SubscriptionPage() {
   const periodEndsIso = sub.data?.period_ends_at ?? gym?.subscription_ends_at ?? null;
   const nextChargeIso = isTrial ? trialEndsIso : periodEndsIso;
   const trialDaysLeft = isTrial ? daysUntil(trialEndsIso) : null;
+  // Prueba cerrada por el cloud (UC-002): días de gracia hasta
+  // subscription_ends_at y después solo lectura. Nunca "Vencido" en rojo.
+  const trialClosed = isTrial && status === "cancelled";
+  const graceEndsMs = periodEndsIso ? new Date(periodEndsIso).getTime() : NaN;
+  const inTrialGrace = trialClosed && Number.isFinite(graceEndsMs) && graceEndsMs > Date.now();
 
   const history: SubscriptionEvent[] = sub.data?.history ?? [];
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <PageHeader
-        title="Suscripción"
-        subtitle="Tu plan, próximos cobros y recibos."
-      />
+    <PageContainer className="space-y-6">
+      <div className="space-y-1">
+        <SettingsBackLink />
+        <PageHeader
+          title="Suscripción"
+          subtitle="Tu plan, próximos cobros y recibos."
+        />
+      </div>
 
       {sub.isLoading && (
         <div className="flex items-center justify-center py-10">
@@ -197,8 +209,8 @@ export default function SubscriptionPage() {
         />
         <StatCard
           title="Estado"
-          value={statusLabel(status)}
-          tone={isPastDue ? "warning" : status === "cancelled" ? "danger" : "success"}
+          value={trialClosed ? (inTrialGrace ? "Días de gracia" : "Solo lectura") : statusLabel(status)}
+          tone={isPastDue || trialClosed ? "warning" : status === "cancelled" ? "danger" : "success"}
           icon={ShieldCheck}
         />
         <StatCard
@@ -206,17 +218,21 @@ export default function SubscriptionPage() {
           value={fmtDate(nextChargeIso)}
           tone="neutral"
           icon={CalendarDays}
-          hint={isTrial && nextChargeIso ? "Activa antes para no perder cobros" : undefined}
+          hint={isTrial && !trialClosed && nextChargeIso ? "Activa antes para no perder cobros" : undefined}
         />
       </div>
 
       {isTrial && (
         <Alert>
           <Sparkles className="h-4 w-4" />
-          <AlertTitle>Estás en periodo de prueba</AlertTitle>
+          <AlertTitle>{trialClosed ? auth.login.trialExpired.title : "Estás en periodo de prueba"}</AlertTitle>
           <AlertDescription className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <span>
-              Activa tu plan para seguir usando Tinta cuando termine la prueba.
+              {trialClosed
+                ? inTrialGrace
+                  ? auth.login.trialExpired.grace(fmtDate(periodEndsIso))
+                  : auth.login.trialExpired.readOnly
+                : "Activa tu plan para seguir usando Tinta cuando termine la prueba."}
             </span>
             <Button
               size="sm"
@@ -259,7 +275,7 @@ export default function SubscriptionPage() {
           <EmptyState
             icon={<CreditCard className="h-5 w-5" />}
             title="Sin movimientos todavía."
-            hint="Cuando actives tu plan los cobros aparecerán aquí. Para detalle completo (recibos, métodos guardados) abre tu dashboard."
+            hint="Aún no hay cobros en este historial. Consulta los recibos y métodos de pago guardados en tu cuenta web."
           />
         ) : (
           <DataTable>
@@ -316,6 +332,6 @@ export default function SubscriptionPage() {
           </Button>
         </div>
       </SectionCard>
-    </div>
+    </PageContainer>
   );
 }

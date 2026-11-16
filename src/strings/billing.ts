@@ -19,10 +19,10 @@ export const billing = {
       maintenanceNotDue: (date: string) =>
         `El siguiente cobro de mantenimiento toca hasta el ${date}. Sólo adelántalo si es un caso especial.`,
     },
-    addDiscount: "+ Aplicar descuento",
-    removeDiscount: "− Quitar descuento",
-    addPartial: "+ Pago parcial (diferido)",
-    removePartial: "− Cobro completo",
+    addDiscount: "Aplicar descuento",
+    removeDiscount: "Quitar descuento",
+    addPartial: "Pago parcial (diferido)",
+    removePartial: "Cobro completo",
     discountLabel: "Monto del descuento",
     discountReasonLabel: "Razón del descuento",
     discountReasonPlaceholder: "Ej. promoción referido, fidelidad…",
@@ -171,6 +171,8 @@ export const billing = {
     columns: {
       time: "Hora",
       date: "Fecha",
+      subject: "Cobro",
+      actions: "Acciones",
       member: "Socio",
       concept: "Concepto",
       amount: "Monto",
@@ -179,8 +181,28 @@ export const billing = {
     },
     empty: {
       title: "Sin cobros en este periodo.",
+      todayTitle: "Sin cobros hoy.",
       hint: "Cuando cobres, aparecerán aquí en tiempo real.",
+      salesHint: "Las ventas de productos se registran en Venta rápida.",
+      goToSales: "Ir a Venta rápida",
     },
+    // Sin «Ver totales de dinero» el backend sólo lista hoy y sin totales.
+    todayOnly: {
+      subtitle: "Cobros de hoy.",
+      note: "Ves solo los cobros de hoy, sin totales.",
+    },
+    backToSales: "Volver a Venta rápida",
+    // Acciones por fila: icono con nombre accesible que dice de qué cobro se trata.
+    rowActions: {
+      correct: "Corregir",
+      refund: "Devolver",
+      receipt: "Ver comprobante",
+      correctLabel: (subject: string) => `Corregir cobro de ${subject}`,
+      refundLabel: (subject: string) => `Devolver cobro de ${subject}`,
+      receiptLabel: (subject: string) => `Ver comprobante de ${subject}`,
+    },
+    recordedBy: (name: string) => `Registró ${name}`,
+    recognizedAs: (amount: string) => `${amount} cuenta como ingreso`,
     error: "No pudimos cargar los cobros.",
     pagination: {
       prev: "Anterior",

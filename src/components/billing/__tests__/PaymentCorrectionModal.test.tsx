@@ -12,7 +12,10 @@ vi.mock("@/hooks/useBilling", async (importOriginal) => {
   };
 });
 
-vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: () => null }));
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({ CashDrawerField: () => null });
+});
 vi.mock("sonner", () => ({ toast: { success: vi.fn() } }));
 
 import { PaymentCorrectionModal } from "../PaymentCorrectionModal";

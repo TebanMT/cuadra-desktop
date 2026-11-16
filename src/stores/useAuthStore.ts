@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { Permission } from "@/lib/permissions";
 
 export type Role = "owner" | "operator";
 
@@ -13,6 +14,10 @@ export interface AuthUser {
   // "Crear PIN" vs "Cambiar PIN" toggle on the profile page. Defaults
   // to false on older responses that haven't been redeployed yet.
   has_pin: boolean;
+  must_change_password?: boolean;
+  // Effective per-operator permissions (the owner gets all). Missing on
+  // sessions saved before permissions existed; see hasPermission().
+  permissions?: Permission[];
 }
 
 export type SubscriptionStatus = "active" | "past_due" | "cancelled";
@@ -32,6 +37,9 @@ interface AuthState {
   user: AuthUser | null;
   gym: AuthGym | null;
   hydrated: boolean;
+  // Recepción en solo lectura: la prueba terminó sin pago (UC-002). Se
+  // calcula del gym cada vez que cambia (isTrialReadOnly); setReadOnly sólo
+  // existe para pruebas. No se persiste: al recargar se recalcula del gym.
   readOnly: boolean;
   setSession(user: AuthUser, gym: AuthGym): void;
   setGym(gym: AuthGym): void;
@@ -51,8 +59,8 @@ export const useAuthStore = create<AuthState>()(
       gym: null,
       hydrated: false,
       readOnly: false,
-      setSession: (user, gym) => set({ user, gym }),
-      setGym: (gym) => set({ gym }),
+      setSession: (user, gym) => set({ user, gym, readOnly: isTrialReadOnly(gym) }),
+      setGym: (gym) => set({ gym, readOnly: isTrialReadOnly(gym) }),
       setReadOnly: (value) => set({ readOnly: value }),
       clear: () => set({ user: null, gym: null, readOnly: false }),
       markHydrated: () => set({ hydrated: true }),
@@ -61,11 +69,25 @@ export const useAuthStore = create<AuthState>()(
       name: "tinta.session",
       storage: createJSONStorage(() => localStorage),
       partialize: (s) => ({ user: s.user, gym: s.gym }),
+      // Una sesión vieja pudo guardar readOnly=true desde el antiguo botón
+      // "Recordármelo después"; ahora sólo manda el estado del gym.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<AuthState>;
+        const gym = saved.gym ?? current.gym;
+        return { ...current, ...saved, readOnly: isTrialReadOnly(gym) };
+      },
     }
   )
 );
 
 export const isAuthenticated = () => useAuthStore.getState().user !== null;
+
+// cancelled y la gracia (subscription_ends_at) ya pasó.
+function cancelledAfterGrace(gym: AuthGym): boolean {
+  if (gym.subscription_status !== "cancelled") return false;
+  if (!gym.subscription_ends_at) return true;
+  return new Date(gym.subscription_ends_at).getTime() <= Date.now();
+}
 
 /**
  * isSubscriptionBlocked refleja la decisión de IsAccessHardBlocked del
@@ -76,10 +98,20 @@ export const isAuthenticated = () => useAuthStore.getState().user !== null;
  * Reglas:
  *   - status != cancelled       → no bloqueado (trial activo, past_due, paid)
  *   - status = cancelled        → bloqueado SALVO grace period vigente
+ *   - prueba (trial) cancelada  → nunca bloqueo total: solo lectura
  */
 export function isSubscriptionBlocked(gym: AuthGym | null | undefined): boolean {
-  if (!gym) return false;
-  if (gym.subscription_status !== "cancelled") return false;
-  if (!gym.subscription_ends_at) return true;
-  return new Date(gym.subscription_ends_at).getTime() <= Date.now();
+  if (!gym || gym.subscription_plan === "trial") return false;
+  return cancelledAfterGrace(gym);
+}
+
+/**
+ * isTrialReadOnly espeja Gym.IsTrialReadOnly (gym.go, UC-002): la prueba
+ * terminó sin pago, el cloud ya lo confirmó por sync (status cancelled) y
+ * pasaron los días de gracia. Recepción en solo lectura: se puede consultar
+ * y registrar entradas; cobrar, dar de alta y editar esperan al plan.
+ */
+export function isTrialReadOnly(gym: AuthGym | null | undefined): boolean {
+  if (!gym || gym.subscription_plan !== "trial") return false;
+  return cancelledAfterGrace(gym);
 }

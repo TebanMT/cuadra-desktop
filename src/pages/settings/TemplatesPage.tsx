@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { useEffect, useState } from "react";
 import { Loader2, Lock, Pencil, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
@@ -74,7 +75,7 @@ const TEMPLATES_HIDDEN_KEYS = new Set<string>([
   "operator_temp_password",
 ]);
 
-export default function TemplatesPage() {
+export default function TemplatesPage({ embedded = false }: { embedded?: boolean } = {}) {
   const list = useTemplates();
   const gymName = useAuthStore((s) => s.gym?.name) ?? "Gym Bros";
   // El TEXTO sólo se edita cuando el gym manda desde su propio número (ver
@@ -90,8 +91,8 @@ export default function TemplatesPage() {
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto">
-      <div className="space-y-1">
+    <PageContainer embedded={embedded} className="space-y-6">
+      {!embedded && (<div className="space-y-1">
         <h1
           className="text-3xl font-bold text-foreground"
           style={{ letterSpacing: "-0.02em" }}
@@ -99,7 +100,7 @@ export default function TemplatesPage() {
           {t.templates.title}
         </h1>
         <p className="text-sm text-muted-foreground">{t.templates.subtitle}</p>
-      </div>
+      </div>)}
 
       {list.isLoading && (
         <div className="flex items-center justify-center py-20">
@@ -135,7 +136,7 @@ export default function TemplatesPage() {
           sample={sample}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -170,6 +171,7 @@ function TemplateRow({
   // confiar en is_default — así, después de Restaurar (que hace PATCH con
   // el default body), el badge desaparece aunque el override row siga ahí.
   const customized = tpl.body.trim() !== tpl.default_body.trim();
+  const effectiveBody = canEditText ? tpl.body : tpl.default_body;
 
   // El switch on/off vive inline en la card (no en el modal): es lo único
   // modificable sin número propio. Manda el body actual; el BE lo fuerza al
@@ -198,7 +200,7 @@ function TemplateRow({
             {update.isPending && (
               <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
             )}
-            <Switch
+            <Switch requiresWrite
               id={`tpl-on-${tpl.key}`}
               checked={tpl.enabled}
               onCheckedChange={toggle}
@@ -210,11 +212,11 @@ function TemplateRow({
           </div>
         </div>
         <p className="rounded-md border bg-muted/30 px-3 py-2 text-sm whitespace-pre-wrap">
-          {renderPreview(tpl.body || "—").replace(/\{gym_name\}/g, sample["{gym_name}"])}
+          {renderPreview(effectiveBody || "—").replace(/\{gym_name\}/g, sample["{gym_name}"])}
         </p>
         <div className="flex justify-end">
           {canEditText ? (
-            <Button variant="outline" size="sm" onClick={onEdit}>
+            <Button requiresWrite variant="outline" size="sm" onClick={onEdit}>
               <Pencil className="h-4 w-4" />
               {t.templates.edit}
             </Button>
@@ -329,25 +331,21 @@ function TemplateEditModal({
                 </Alert>
               )}
               <div className="flex items-center justify-between">
-                <Label htmlFor="tpl-body">{canEditText ? t.templates.modal.bodyLabel : "Texto de referencia"}</Label>
+                {canEditText ? <Label htmlFor="tpl-body">{t.templates.modal.bodyLabel}</Label> : <p className="text-sm font-medium">Texto de referencia</p>}
                 <div className="flex items-center gap-2">
-                  <Switch id="tpl-enabled" checked={enabled} onCheckedChange={setEnabled} />
+                  <Switch requiresWrite id="tpl-enabled" checked={enabled} onCheckedChange={setEnabled} />
                   <Label htmlFor="tpl-enabled" className="text-xs cursor-pointer">
                     {t.templates.modal.enabledLabel}
                   </Label>
                 </div>
               </div>
-              <Textarea
+              {canEditText ? <Textarea
                 id="tpl-body"
                 rows={7}
                 value={effectiveBody}
                 onChange={(e) => setBody(e.target.value)}
-                readOnly={!canEditText}
-                className={
-                  "font-mono text-sm" +
-                  (!canEditText ? " opacity-70 cursor-not-allowed bg-muted/40" : "")
-                }
-              />
+                className="text-sm"
+              /> : <p id="tpl-body" className="whitespace-pre-wrap text-sm leading-relaxed">{effectiveBody}</p>}
               {!canEditText && (
                 <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
                   <Lock className="h-3.5 w-3.5 shrink-0 mt-0.5" />
@@ -359,7 +357,7 @@ function TemplateEditModal({
                   {canEditText ? t.templates.modal.previewLabel : "Ejemplo del mensaje"}
                 </p>
                 <p className="text-sm whitespace-pre-wrap">{previewBody()}</p>
-                <p className="text-[10px] text-muted-foreground mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   {canEditText ? t.templates.modal.previewHint : "El texto fijo de WhatsApp puede diferir de este ejemplo."}
                 </p>
               </div>
@@ -393,7 +391,7 @@ function TemplateEditModal({
                   >
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={update.isPending}>
+                  <Button requiresWrite type="submit" disabled={update.isPending}>
                     {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                     {update.isPending ? t.templates.modal.submitting : t.templates.modal.submit}
                   </Button>
@@ -402,7 +400,7 @@ function TemplateEditModal({
             </div>
 
             <div className="rounded-md border bg-muted/30 px-3 py-3 self-start">
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              <p className="text-sm font-medium text-muted-foreground mb-2">
                 {t.templates.modal.variablesLabel}
               </p>
               <ul className="space-y-1 text-sm font-mono">
@@ -431,7 +429,7 @@ function TemplateEditModal({
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={reset.isPending}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
+            <AlertDialogAction requiresWrite
               onClick={(e) => {
                 e.preventDefault();
                 doReset();

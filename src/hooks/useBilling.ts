@@ -251,11 +251,12 @@ export interface GymPaymentsResponse {
   // total_paid es NETO del set filtrado completo (las devoluciones restan) y
   // se calcula server-side sobre TODA la ventana, no la página visible.
   // refund_total es la magnitud devuelta; los por-método son netos.
-  total_paid: number;
-  refund_total: number;
-  cash_total: number;
-  transfer_total: number;
-  card_total: number;
+  // Absent (not zero) for an operator without "view_totals".
+  total_paid?: number;
+  refund_total?: number;
+  cash_total?: number;
+  transfer_total?: number;
+  card_total?: number;
 }
 
 export interface SendReceiptInput {

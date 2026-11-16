@@ -15,6 +15,7 @@ import {
 } from "@/hooks/useSubscription";
 import { useSyncStatus, useTriggerSync } from "@/hooks/useSyncStatus";
 import { cn } from "@/lib/utils";
+import { fmtDate } from "@/lib/dates";
 
 const TONE: Record<SubscriptionBannerLevel, { bg: string; text: string; icon: typeof AlertTriangle }> = {
   ok: { bg: "", text: "", icon: AlertTriangle },
@@ -42,6 +43,18 @@ const TONE: Record<SubscriptionBannerLevel, { bg: string; text: string; icon: ty
     text: "text-muted-foreground",
     icon: WifiOff,
   },
+  // Prueba cerrada por el cloud, con días de gracia: ámbar con fecha de corte.
+  trial_grace: {
+    bg: "bg-warning-soft border-warning/40",
+    text: "text-warning-foreground",
+    icon: Hourglass,
+  },
+  // Solo lectura: ámbar, no rojo. La recepción sigue registrando entradas.
+  trial_read_only: {
+    bg: "bg-warning-soft border-warning/40",
+    text: "text-warning-foreground",
+    icon: CreditCard,
+  },
   past_due: {
     bg: "bg-destructive/10 border-destructive/50",
     text: "text-destructive",
@@ -54,7 +67,44 @@ const TONE: Record<SubscriptionBannerLevel, { bg: string; text: string; icon: ty
   },
 };
 
-function copyFor(level: SubscriptionBannerLevel, daysLeft: number | null): string {
+// The operator cannot pay or change the plan: tell them who can, never
+// "actualiza tu método de pago" as if they were the owner.
+function operatorCopyFor(
+  level: SubscriptionBannerLevel,
+  daysLeft: number | null,
+  graceEndsAt: string | null
+): string {
+  const ask = "Avísale al dueño para que active el plan";
+  switch (level) {
+    case "trial_info":
+      if (daysLeft === null) return "Tinta está en versión de prueba.";
+      return `Versión de prueba · ${daysLeft === 1 ? "queda" : "quedan"} ${daysLeft} ${daysLeft === 1 ? "día" : "días"}.`;
+    case "trial_soon":
+      if (daysLeft === null) return `La prueba está por terminar. ${ask}.`;
+      if (daysLeft <= 1) return `La prueba termina hoy. ${ask}.`;
+      return `Quedan ${daysLeft} días de prueba. ${ask}.`;
+    case "trial_over":
+      return `La prueba terminó. ${ask}; en unos días la recepción quedará en solo lectura.`;
+    case "trial_grace":
+      return `La prueba terminó. ${ask} antes del ${fmtDate(graceEndsAt)}; después la recepción queda en solo lectura.`;
+    case "trial_read_only":
+      return `Prueba terminada · Solo lectura: puedes consultar y registrar entradas. ${ask}.`;
+    case "trial_unconfirmed":
+      return "No pudimos confirmar el plan. Conéctate a internet para sincronizar.";
+    case "past_due":
+      return "No se pudo cobrar la mensualidad de Tinta. Avísale al dueño para que revise su método de pago.";
+    case "cancelled":
+      return "La suscripción de Tinta fue cancelada. Avísale al dueño para reactivar el plan.";
+    default:
+      return "";
+  }
+}
+
+function copyFor(
+  level: SubscriptionBannerLevel,
+  daysLeft: number | null,
+  graceEndsAt: string | null
+): string {
   switch (level) {
     case "trial_info":
       if (daysLeft === null) return "Estás en la versión de prueba.";
@@ -66,7 +116,11 @@ function copyFor(level: SubscriptionBannerLevel, daysLeft: number | null): strin
       if (daysLeft <= 1) return "Tu período de prueba termina hoy.";
       return `Te quedan ${daysLeft} días de prueba. Activa tu plan para no perder acceso.`;
     case "trial_over":
-      return "Tu período de prueba terminó. Activa tu plan para seguir con todo.";
+      return "Tu prueba terminó. Activa tu plan; en unos días la recepción quedará en solo lectura.";
+    case "trial_grace":
+      return `Tu prueba terminó. Activa tu plan antes del ${fmtDate(graceEndsAt)}; después la recepción queda en solo lectura.`;
+    case "trial_read_only":
+      return "Prueba terminada · Solo lectura: puedes consultar y registrar entradas. Activa tu plan para cobrar y hacer cambios.";
     case "trial_unconfirmed":
       return "No pudimos confirmar tu plan. Conéctate a internet para sincronizar.";
     case "past_due":
@@ -83,8 +137,8 @@ function copyFor(level: SubscriptionBannerLevel, daysLeft: number | null): strin
  * subscriptions in good standing; otherwise renders un aviso accionable.
  *
  * NUNCA bloquea ni limita funcionalidad — eso lo decide el cloud
- * (isSubscriptionBlocked). Este banner es puro aviso, alineado con el honor
- * system: visibilidad, no candado.
+ * (isSubscriptionBlocked / isTrialReadOnly). Este banner es puro aviso:
+ * visibilidad, no candado.
  *
  * Fuentes de datos (ambas locales, funcionan offline):
  *  - gym cacheado en useAuthStore (plan/status/trial_ends_at, refrescado por
@@ -95,6 +149,7 @@ function copyFor(level: SubscriptionBannerLevel, daysLeft: number | null): strin
  */
 export function SubscriptionBanner() {
   const gym = useAuthStore((s) => s.gym);
+  const isOwner = useAuthStore((s) => s.user?.role === "owner");
   const { data: sync } = useSyncStatus();
   const trigger = useTriggerSync();
   const syncing = trigger.isPending || sync?.sync_in_progress === true;
@@ -117,7 +172,7 @@ export function SubscriptionBanner() {
     level === "trial_info" || level === "trial_soon"
       ? calendarDaysUntil(gym.trial_ends_at)
       : null;
-  const copy = copyFor(level, daysLeft);
+  const copy = (isOwner ? copyFor : operatorCopyFor)(level, daysLeft, gym.subscription_ends_at);
   const tone = TONE[level];
   const Icon = tone.icon;
 
@@ -130,9 +185,11 @@ export function SubscriptionBanner() {
         tone.text
       )}
     >
+      {/* Wraps instead of truncating: the part that says what to do is at
+          the end of the sentence. */}
       <div className="flex items-center gap-2 min-w-0">
-        <Icon className="h-4 w-4 shrink-0" />
-        <span className="truncate">{copy}</span>
+        <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+        <span className="min-w-0">{copy}</span>
       </div>
       {level === "trial_unconfirmed" ? (
         // La acción que de verdad resuelve la duda: sincronizar. Si ya pagó en
@@ -143,17 +200,18 @@ export function SubscriptionBanner() {
           aria-busy={syncing}
           className="flex items-center gap-1 text-sm font-semibold underline underline-offset-2 hover:no-underline whitespace-nowrap disabled:opacity-50"
         >
-          <RefreshCw className={cn("h-3.5 w-3.5 motion-reduce:animate-none", syncing && "animate-spin")} />
+          <RefreshCw aria-hidden="true" className={cn("h-3.5 w-3.5 motion-reduce:animate-none", syncing && "animate-spin")} />
           {syncing ? "Sincronizando…" : "Sincronizar"}
         </button>
-      ) : (
+      ) : isOwner ? (
+        // «Ver plan» opens an owner-only route: the operator would be bounced.
         <Link
           to="/settings/subscription"
           className="text-sm font-semibold underline underline-offset-2 hover:no-underline whitespace-nowrap"
         >
           Ver plan
         </Link>
-      )}
+      ) : null}
     </div>
   );
 }

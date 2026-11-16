@@ -48,7 +48,7 @@ export function stuckEditRoute(it: QueueStuckItem): string | null {
   return route ? route(it.entity_id) : null;
 }
 
-export function SyncIndicator() {
+export function SyncIndicator({ compact = false }: { compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const { data, refetch } = useSyncStatus();
   const trigger = useTriggerSync();
@@ -63,7 +63,7 @@ export function SyncIndicator() {
   // llevas DÍAS sin sincronizar (visibilidad, no pánico); el rojo queda
   // reservado para problemas reales (rechazos del servidor, app vieja).
   const LEVEL_UI = {
-    ok: { icon: hasPending ? RefreshCw : CheckCircle2, color: hasPending ? "text-muted-foreground" : "text-success", label: hasPending ? shell.sync.pending : shell.sync.online },
+    ok: { icon: hasPending ? RefreshCw : CheckCircle2, color: hasPending ? "text-muted-foreground" : "text-success-text", label: hasPending ? shell.sync.pending : shell.sync.online },
     syncing: { icon: RefreshCw, color: "text-muted-foreground", label: shell.sync.syncing },
     offline: { icon: CloudOff, color: "text-muted-foreground", label: shell.sync.offline },
     offlineLong: { icon: AlertTriangle, color: "text-warning", label: shell.sync.offlineLong },
@@ -72,24 +72,36 @@ export function SyncIndicator() {
     stale: { icon: AlertCircle, color: "text-destructive", label: shell.sync.stale },
   } as const;
   const { icon: Icon, color: colorClass, label } = LEVEL_UI[level];
+  const shortLabel = {
+    ok: hasPending ? "Pendientes" : "Sincronizado",
+    syncing: "En curso",
+    offline: "Sin conexión",
+    offlineLong: "Sin conexión",
+    auth: "Revisar sesión",
+    syncError: "Revisar",
+    stale: "Actualizar",
+  }[level];
 
   return (
     <div className="flex items-center gap-1">
       <button
         onClick={() => { setOpen(true); void refetch?.(); }}
         className={cn(
-          "flex items-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-accent transition-colors",
+          "flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm hover:bg-accent transition-colors",
+          compact && "flex-col gap-0.5 px-2 py-1 text-xs xl:flex-row xl:gap-2 xl:px-3 xl:text-sm",
           colorClass
         )}
-        aria-label="Estado de sincronización"
+        aria-label={`Estado de sincronización: ${label}`}
+        title={label}
       >
         <Icon className={cn("h-4 w-4", level === "syncing" && "animate-spin")} />
-        <span className="hidden md:inline">{label}</span>
+        <span className={compact ? "hidden xl:inline" : "hidden md:inline"}>{label}</span>
+        {compact && <span className="xl:hidden">{shortLabel}</span>}
       </button>
       <button
         onClick={() => trigger.mutate()}
         disabled={syncing}
-        className="flex items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
+        className="flex h-11 w-11 items-center justify-center rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
         aria-label={syncing ? shell.sync.syncing : shell.sync.triggerNow}
         aria-busy={syncing}
         title={syncing ? shell.sync.syncing : shell.sync.triggerNow}

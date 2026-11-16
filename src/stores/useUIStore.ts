@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 
 interface UIState {
   sidebarCollapsed: boolean;
@@ -7,9 +8,9 @@ interface UIState {
   setTheme(theme: "light" | "dark"): void;
 }
 
-export const useUIStore = create<UIState>((set) => ({
+export const useUIStore = create<UIState>()(persist((set) => ({
   sidebarCollapsed: false,
   theme: "light",
   toggleSidebar: () => set((s) => ({ sidebarCollapsed: !s.sidebarCollapsed })),
   setTheme: (theme) => set({ theme }),
-}));
+}), { name: "tinta.navigation", partialize: (state) => ({ sidebarCollapsed: state.sidebarCollapsed }) }));

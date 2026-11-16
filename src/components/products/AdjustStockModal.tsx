@@ -26,10 +26,10 @@ export function AdjustStockModal({ product, open, onOpenChange }: { product: Pro
     catch (err) { setError(err instanceof Error ? err.message : "No se pudo guardar el ajuste."); }
   }
   return <Dialog open={open && !!product} onOpenChange={value => { if (!adjust.isPending) onOpenChange(value); }}><DialogContent><DialogHeader><DialogTitle>Ajustar existencias</DialogTitle><DialogDescription>{product?.name} · {product?.stock} registradas</DialogDescription></DialogHeader><form onSubmit={submit} className="space-y-4">
-    <label className="block text-sm">Qué necesitas corregir<select className="h-10 w-full rounded-md border bg-background px-3" value={type} onChange={e => { setType(e.target.value as typeof type); setQuantity(""); }}><option value="count">Corregir conteo</option><option value="damage">Registrar pérdida o daño</option></select></label>
+    <label className="block text-sm">Qué necesitas corregir<select className="h-11 w-full rounded-md border bg-background px-3" value={type} onChange={e => { setType(e.target.value as typeof type); setQuantity(""); }}><option value="count">Corregir conteo</option><option value="damage">Registrar pérdida o daño</option></select></label>
     <label className="block text-sm">{type === "count" ? "Cuántas unidades tienes realmente" : "Cuántas unidades se perdieron"}<Input type="number" min={type === "count" ? 0 : 1} step="1" value={quantity} onChange={e => setQuantity(e.target.value)} autoFocus /></label>
     <label className="block text-sm">Motivo<Input value={reason} maxLength={200} onChange={e => setReason(e.target.value)} placeholder="Ej. diferencia al contar" /></label>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-    <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={adjust.isPending} onClick={() => onOpenChange(false)}>Cancelar</Button><Button disabled={adjust.isPending} type="submit">Guardar ajuste</Button></div>
+    <div className="flex justify-end gap-2"><Button type="button" variant="outline" disabled={adjust.isPending} onClick={() => onOpenChange(false)}>Cancelar</Button><Button requiresWrite disabled={adjust.isPending} type="submit">Guardar ajuste</Button></div>
   </form></DialogContent></Dialog>;
 }

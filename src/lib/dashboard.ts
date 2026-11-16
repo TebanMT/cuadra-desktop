@@ -61,21 +61,23 @@ export function memberReviewItems(
     {
       id: "expiry",
       count: data.expiring_week.value,
-      label: "Membresías por vencer",
+      label: "Por vencer",
+      detail: "Membresías que vencen esta semana",
       to: "/members?status=expiring_soon",
     },
     {
       id: "balance",
       count: data.attention_summary.pending_balance,
-      label: "Socios con saldo pendiente",
+      label: "Con saldo",
+      detail: "Socios con saldo pendiente",
       amount: balance,
       to: "/members?status=balance",
     },
     {
       id: "unrenewed",
       count: data.recoverable.value,
-      label: "Socios sin renovar",
-      detail: "Últimos 60 días",
+      label: "Sin renovar · 60 días",
+      detail: "Vencieron en los últimos 60 días y no han renovado",
       to: "/members?status=unrenewed",
     },
     ...(showProducts
@@ -83,7 +85,8 @@ export function memberReviewItems(
           {
             id: "stock",
             count: data.attention_summary.low_stock,
-            label: "Productos con pocas existencias",
+            label: "Por surtir",
+            detail: "Productos con pocas existencias o agotados",
             to: "/products?low_stock=1",
           },
         ]

@@ -6,11 +6,12 @@ export const checkin = {
     searching: "Buscando…",
     typeAtLeast: "Escribe al menos 2 letras.",
     operator: (name: string) => `Operador: ${name}`,
-    openKiosk: "Modo kiosko",
-    goToKiosk: "Ir al kiosko",
+    openKiosk: "Modo kiosco",
+    goToKiosk: "Ir al kiosco",
     todayCount: (n: number) => `Entradas hoy: ${n}`,
     recent: "Últimas entradas",
     recentEmpty: "Aún no hay entradas hoy.",
+    recentFailed: "No se pudieron cargar las últimas entradas. Las nuevas sí aparecen aquí.",
     methods: {
       fingerprint: "Huella",
       // ADR-010: el método de respaldo es el número de socio (antes "PIN").
@@ -23,6 +24,7 @@ export const checkin = {
     idle: "Coloca tu huella en el lector para ingresar.",
     idleNoReader: "Busca al socio o pídele su número de socio.",
     processing: "Identificando…",
+    operationalError: "No pudimos confirmar la entrada. Revisa el historial antes de volver a intentarlo.",
     successActive: (days: number) =>
       days === 1 ? "Membresía vigente — vence mañana" : `Membresía vigente — vence en ${days} días`,
     successExpiringSoon: (days: number) =>
@@ -37,12 +39,20 @@ export const checkin = {
         : `Membresía vencida hace ${days} días. Pasa con recepción.`,
     deniedInactive: "Socio inactivo. Pasa con recepción.",
     deniedNoMembership: "Sin membresía activa. Pasa con recepción.",
+    deniedUnpaidEnrollment: "Falta el primer pago. Pasa con recepción.",
+    successOverride: "Entrada permitida por recepción.",
     deniedNotFound: "No encontramos a este socio. Revisa su número.",
     // Dedazo de mala calidad (sample_rejected del sidecar): no es un
     // rechazo de acceso, sólo "inténtalo de nuevo".
     sampleRejected: "No se leyó bien la huella. Vuelve a apoyar el dedo.",
     overrideBadge: "Permitido por operador",
-    expiryPill: (date: string) => `Vence: ${date}`,
+    // Recepción (vista compacta): qué pasó con la entrada. El porqué lo
+    // dice la insignia de vigencia junto a esta línea.
+    operator: {
+      registered: "Entrada registrada",
+      registeredExpiring: "Entrada registrada. Ofrécele renovar.",
+      denied: "Acceso negado",
+    },
   },
   numberPad: {
     title: "Pon tu número de socio para entrar",
@@ -64,14 +74,14 @@ export const checkin = {
     success: (name: string) => `Entrada permitida para ${name}.`,
   },
   kiosk: {
-    title: "Tinta — Kiosko",
+    title: "Tinta — Kiosco",
     waiting: "Coloca tu huella en el lector",
     waitingPin: "Coloca tu huella o pon tu número de socio",
     waitingNoReader: "Pon tu número de socio para entrar",
-    waitingNoReaderNoPin: "El kiosko no está configurado todavía. Avísale a recepción.",
+    waitingNoReaderNoPin: "El kiosco no está configurado todavía. Avísale a recepción.",
     sync: "Sincronizado",
     syncOffline: "Sin conexión",
-    exitTitle: "Salir del modo kiosko",
+    exitTitle: "Salir del modo kiosco",
     exitDescription: "Para salir, escribe la contraseña del operador.",
     exitPasswordLabel: "Contraseña",
     exitSubmit: "Salir",
@@ -80,7 +90,7 @@ export const checkin = {
     exitNoCache: "Inicia sesión una vez con internet para poder salir desde aquí.",
     exitOffline: "No se pudo conectar. Vuelve a intentar.",
     exitGenericError: "No se pudo validar la contraseña. Vuelve a intentar.",
-    exitButtonAriaLabel: "Salir del modo kiosko",
+    exitButtonAriaLabel: "Salir del modo kiosco",
     exitHint: "Salir: Esc o Ctrl + Shift + K",
   },
   float: {
@@ -91,12 +101,12 @@ export const checkin = {
     readerDisconnected: "Lector de huella desconectado.",
     enrollPauseTitle: "Registrando huella…",
     enrollPauseBody: "El registro de entradas se reanudará al terminar.",
-    kioskActiveTitle: "El kiosko está activo",
-    kioskActiveBody: "Cierra el kiosko para usar el ventana de entradas.",
-    blockedByKiosk: "El kiosko está activo. Ciérralo para abrir el ventana de entradas.",
-    kioskBlockedByFloat: "El ventana de entradas está activo. Ciérralo para abrir el kiosko.",
-    kioskOpenError: "No se pudo abrir la ventana del kiosko. Intenta de nuevo.",
-    floatOpenError: "No se pudo abrir el ventana de entradas. Intenta de nuevo.",
+    kioskActiveTitle: "El kiosco está abierto",
+    kioskActiveBody: "Cierra el kiosco para usar la ventana de entradas.",
+    blockedByKiosk: "El kiosco está abierto. Ciérralo para abrir la ventana de entradas.",
+    kioskBlockedByFloat: "La ventana de entradas está abierta. Ciérrala para abrir el kiosco.",
+    kioskOpenError: "No se pudo abrir la ventana del kiosco. Intenta de nuevo.",
+    floatOpenError: "No se pudo abrir la ventana de entradas. Intenta de nuevo.",
     noMatchTitle: "No reconocimos la huella",
     closeAria: "Cerrar ventana de entradas",
     lastResultAt: (time: string) => `Hoy ${time}`,

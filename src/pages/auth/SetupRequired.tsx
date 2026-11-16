@@ -1,6 +1,7 @@
 import { ExternalLink } from "lucide-react";
 import { AuthShell } from "@/components/shared/AuthShell";
 import { Button } from "@/components/ui/button";
+import { useLogout } from "@/hooks/useAuth";
 import { useAuthStore } from "@/stores/useAuthStore";
 
 /**
@@ -29,7 +30,7 @@ const DASHBOARD_URL =
 const SETUP_URL = `${DASHBOARD_URL}/setup/step-2`;
 
 export default function SetupRequired() {
-  const clearAuth = useAuthStore((s) => s.clear);
+  const logout = useLogout();
   const user = useAuthStore((s) => s.user);
 
   return (
@@ -37,7 +38,7 @@ export default function SetupRequired() {
       <div className="space-y-1 mb-8 text-center">
         <h1 className="font-display text-3xl font-semibold text-foreground tracking-tight">
           Termina la configuración<br />
-          desde tu dashboard.
+          desde tu cuenta en línea.
         </h1>
         <p className="text-muted-foreground mt-3 leading-relaxed">
           Completa los datos del gimnasio, membresías y formas de pago en la web. Después, vuelve a abrir Tinta en recepción.
@@ -47,7 +48,7 @@ export default function SetupRequired() {
       <div className="space-y-4">
         <Button asChild size="lg" className="w-full">
           <a href={SETUP_URL} target="_blank" rel="noreferrer">
-            Continuar en el dashboard
+            Continuar en mi cuenta en línea
             <ExternalLink className="h-4 w-4 ml-2" />
           </a>
         </Button>
@@ -59,7 +60,7 @@ export default function SetupRequired() {
         {user && (
           <button
             type="button"
-            onClick={() => clearAuth()}
+            disabled={logout.isPending} onClick={() => logout.mutate()}
             className="w-full text-center text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline transition-colors mt-6"
           >
             Cerrar sesión

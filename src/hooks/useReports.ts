@@ -46,6 +46,31 @@ export interface FinancialIntegrity {
   data_watermark?: string;
 }
 
+export interface CashOpeningDifference {
+  session_id: string;
+  /** Business date, YYYY-MM-DD. */
+  date: string;
+  drawer_id?: string;
+  drawer_name?: string;
+  /** opening − expected: negative means cash went missing between counts. */
+  difference: number;
+  opened_by_name?: string;
+  note?: string;
+}
+
+export interface CashSessionDifference {
+  session_id: string;
+  /** Business date, YYYY-MM-DD. */
+  date: string;
+  drawer_id?: string;
+  drawer_name?: string;
+  sequence: number;
+  /** counted − expected: negative is a shortage. */
+  difference: number;
+  counted_by_name?: string;
+  reason?: string;
+}
+
 export interface CashRangeReconciliation {
   complete?: boolean;
   status?: "complete" | "incomplete" | "stale";
@@ -67,11 +92,29 @@ export interface CashRangeReconciliation {
   active_days?: number;
   missing_active_days?: number;
   uncovered_activity_days?: number;
+  /** Ascending YYYY-MM-DD dates behind uncovered_activity_days. */
+  uncovered_activity_dates?: string[];
+  /** Absolute sum of certified shortages; never netted against surpluses. */
+  shortage_total?: number;
+  shortage_sessions?: number;
+  surplus_total?: number;
+  surplus_sessions?: number;
+  /** Certified counts that did not match, newest first. */
+  difference_sessions?: CashSessionDifference[];
+  /** Primeras aperturas que no coincidieron con el corte anterior. Aparte de la cobertura. */
+  opening_shortage_total?: number;
+  opening_shortage_sessions?: number;
+  opening_surplus_total?: number;
+  opening_surplus_sessions?: number;
+  opening_differences?: CashOpeningDifference[];
   historical_activity_days?: number;
   historical_sessions?: number;
   requires_attention?: boolean;
   open_sessions?: number;
   closed_unverified_sessions?: number;
+  // Días pasados que el dueño cerró sin conteo, con nota. No piden atención,
+  // pero el período nunca se marca como caja revisada con ellos.
+  reviewed_sessions?: number;
   reconciled_sessions?: number;
   stale_sessions?: number;
   withdrawn_sessions?: number;
@@ -166,7 +209,8 @@ export interface DashboardData {
     payment_date: string;
     concept: string;
   }[];
-  cash_today: {
+  // Absent for an operator without "view_totals".
+  cash_today?: {
     total: number;
     by_method: Record<PaymentMethod, number>;
   };

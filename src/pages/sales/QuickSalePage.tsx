@@ -1,7 +1,8 @@
+import { useCanWrite } from "@/lib/writeAccess";
 import { normalizeSearchText as normalize } from "@/lib/search";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { CheckCircle2, Loader2, Minus, Plus, Search, Tag, Trash2, X } from "lucide-react";
+import { CheckCircle2, Loader2, Minus, Plus, Receipt, Search, Tag, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +25,7 @@ import { SaleCorrectionModal } from "@/components/sales/SaleCorrectionModal";
 import { createIdempotencyKey } from "@/lib/idempotency";
 import { useAuthStore } from "@/stores/useAuthStore";
 import { changedSaleProducts, emptySaleDraft, moneyCents, saleTotals, useSaleDraft, type CartLine, type SaleAttempt } from "@/components/sales/saleDraft";
+import { HelpHint } from "@/components/shared/HelpHint";
 
 interface LastSale { saleId: string; paymentId: string; folio: string; total: number; paid: number; balance: number; change?: number }
 
@@ -35,6 +37,7 @@ export default function QuickSalePage() {
   return <SaleWorkspace key={key} draftKey={key} />;
 }
 function SaleWorkspace({ draftKey }: { draftKey: string }) {
+  const canWrite = useCanWrite();
   const products = useActiveProducts();
   const sync = useSyncStatus();
   const register = useRegisterSale();
@@ -64,7 +67,7 @@ function SaleWorkspace({ draftKey }: { draftKey: string }) {
     .sort((a, b) => a.name.localeCompare(b.name, "es")), [items, showOutOfStock, category, search]);
   const changed = products.data ? changedSaleProducts(lines, items) : [];
   const totals = saleTotals(lines, promo);
-  const blocked = register.isPending || !!draft.attempt || saved.blocked;
+  const blocked = !canWrite || register.isPending || !!draft.attempt || saved.blocked;
   const needsReview = changed.length > 0;
   const debts = [...(memberHistory.data?.items ?? [])].filter(p => p.balance_pending > 0)
     .sort((a, b) => a.payment_date.localeCompare(b.payment_date));
@@ -97,7 +100,7 @@ function SaleWorkspace({ draftKey }: { draftKey: string }) {
     setError(null); setCheckoutOpen(true);
   }
   async function send(attempt: SaleAttempt) {
-    if (sending.current) return;
+    if (!canWrite || sending.current) return;
     sending.current = true;
     try {
       const res = await register.mutateAsync(attempt.request);
@@ -134,29 +137,34 @@ function SaleWorkspace({ draftKey }: { draftKey: string }) {
     await send(attempt);
   }
   return <div className="flex h-full min-h-0 flex-col">
-    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-5 py-4">
-      <h1 className="text-2xl font-semibold tracking-tight">{t.page.title}</h1>
-      <Button variant="outline" size="sm" asChild><Link to="/billing?concept=product">Ventas del día</Link></Button>
+    <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b px-6 py-6">
+      <h1 className="text-3xl font-bold tracking-tight">{t.page.title}</h1>
+      {/* The draft is saved locally, so leaving is safe; Ingresos shows
+          «Volver a Venta rápida» to come back to it. */}
+      <div className="flex flex-wrap items-center gap-1">
+        <HelpHint topic="vender" task="vender un producto" />
+        <Button variant="ghost" size="sm" asChild><Link to="/billing?concept=product&period=today" state={{ from: "sales" }}><Receipt aria-hidden="true" className="h-4 w-4" />{t.page.daySales}</Link></Button>
+      </div>
     </header>
-    {lastSale && <div role="status" className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-success/10 px-5 py-3">
+    {lastSale && <div role="status" className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-success/10 px-6 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm"><span className="inline-flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" />Venta {lastSale.folio} · {fmtMoney(lastSale.total)}</span>
         {lastSale.balance > 0 && <span>Pendiente: {fmtMoney(lastSale.balance)}</span>}
         {lastSale.change !== undefined && <strong className="text-lg">Cambio: {fmtMoney(lastSale.change)}</strong>}
       </div>
       <div className="flex items-center gap-1"><Button variant="ghost" size="sm" onClick={() => setReceiptOpen(true)}>Ver comprobante</Button>
-        <Button variant="ghost" size="sm" onClick={() => setCorrectionOpen(true)}>Corregir</Button>
+        <Button requiresWrite variant="ghost" size="sm" onClick={() => setCorrectionOpen(true)}>Corregir</Button>
         <Button variant="ghost" size="icon" aria-label="Ocultar última venta" onClick={() => setLastSale(null)}><X className="h-4 w-4" /></Button></div>
     </div>}
     <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1fr)_360px] md:overflow-hidden">
       <section className="flex min-h-0 flex-col">
-        <div className="shrink-0 space-y-3 border-b px-5 py-3">
+        <div className="shrink-0 space-y-3 border-b px-6 py-3">
           <div className="relative"><Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
             <Input ref={searchRef} aria-label="Buscar producto" placeholder="Buscar producto…" value={search} onChange={e => setSearch(e.target.value)} className="h-11 pl-9 pr-10"
               onKeyDown={e => {
                 if (e.key === "Escape") { e.preventDefault(); setSearch(""); }
                 if (e.key === "Enter" && normalize(search) && filtered[0]) { e.preventDefault(); add(filtered[0]); }
               }} />
-            {search && <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1 h-9 w-9" aria-label="Limpiar búsqueda" onClick={() => { setSearch(""); searchRef.current?.focus(); }}><X className="h-4 w-4" /></Button>}
+            {search && <Button type="button" variant="ghost" size="icon" className="absolute right-0 top-0 h-11 w-11" aria-label="Limpiar búsqueda" onClick={() => { setSearch(""); searchRef.current?.focus(); }}><X className="h-4 w-4" /></Button>}
           </div>
           {categories.length > 1 && <div className="flex gap-1.5 overflow-x-auto pb-1" aria-label="Categorías">
             {[null, ...categories].map(c => <Button key={c ?? "all"} variant={category === c ? "secondary" : "ghost"} size="sm" className="shrink-0" aria-pressed={category === c} onClick={() => setCategory(c)}>{c ?? "Todos"}</Button>)}
@@ -178,9 +186,9 @@ function SaleWorkspace({ draftKey }: { draftKey: string }) {
         <div className="flex shrink-0 items-center justify-between border-b px-4 py-3"><h2 className="font-semibold">Venta actual</h2>
           {!!lines.length && <Button variant="ghost" size="sm" onClick={clear} disabled={blocked}><Trash2 className="h-4 w-4" />Vaciar</Button>}</div>
         <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 py-3">
-          {saved.error && <Alert variant="destructive"><AlertDescription>{saved.error}<Button variant="link" onClick={saved.reload}>Recargar venta</Button></AlertDescription></Alert>}
+          {saved.error && <Alert variant="destructive"><AlertDescription>{saved.error}<Button  variant="link" onClick={saved.reload}>Recargar venta</Button></AlertDescription></Alert>}
           {draft.attempt && <Alert><AlertDescription>Esta venta está por confirmar.
-            <Button className="mt-2 w-full" disabled={register.isPending || saved.blocked} onClick={() => { void send(draft.attempt!).catch(() => {}); }}>{register.isPending ? "Confirmando…" : "Reintentar confirmación"}</Button>
+            <Button requiresWrite className="mt-2 w-full" disabled={register.isPending || saved.blocked} onClick={() => { void send(draft.attempt!).catch(() => {}); }}>{register.isPending ? "Confirmando…" : "Reintentar confirmación"}</Button>
           </AlertDescription></Alert>}
           {needsReview && !draft.attempt && <Alert><AlertDescription>Cambiaron productos de esta venta. <Button variant="link" className="px-0" onClick={() => setReviewOpen(true)}>Revisar cambios</Button></AlertDescription></Alert>}
           {!lines.length ? <p className="py-8 text-center text-sm text-muted-foreground">Agrega un producto para empezar.</p> : lines.map(line => <CartRow key={line.product.id} line={line}
@@ -189,13 +197,13 @@ function SaleWorkspace({ draftKey }: { draftKey: string }) {
         <div className="shrink-0 space-y-3 border-t bg-background p-4">
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {!!lines.length && <div className="flex items-center justify-between gap-2">
-            <Button variant="ghost" size="sm" className="h-auto min-h-9 max-w-full justify-start whitespace-normal px-0 text-sm" disabled={blocked} onClick={() => setPromoOpen(true)}><Tag className="h-4 w-4 shrink-0" />{promo?.name ?? "Aplicar promoción"}</Button>
-            {promo && <Button variant="ghost" size="icon" aria-label="Quitar promoción" disabled={blocked} onClick={() => saved.update(d => ({ ...d, promo: null }))}><X className="h-4 w-4" /></Button>}
+            <Button variant="ghost" size="sm" className="h-auto min-h-11 max-w-full justify-start whitespace-normal px-0 text-sm" disabled={blocked} onClick={() => setPromoOpen(true)}><Tag className="h-4 w-4 shrink-0" />{promo?.name ?? "Aplicar promoción"}</Button>
+            {promo && <Button requiresWrite variant="ghost" size="icon" aria-label="Quitar promoción" disabled={blocked} onClick={() => saved.update(d => ({ ...d, promo: null }))}><X className="h-4 w-4" /></Button>}
           </div>}
-          {totals.total === 0 && lines.length > 0 && <p role="alert" className="text-sm text-amber-700">La promoción cubre todo el importe. Ajusta o quita la promoción.</p>}
+          {totals.total === 0 && lines.length > 0 && <p role="alert" className="text-sm text-warning">La promoción cubre todo el importe. Ajusta o quita la promoción.</p>}
           {totals.discount > 0 && <div className="space-y-1 text-xs text-muted-foreground"><div className="flex justify-between"><span>Subtotal</span><span>{fmtMoney(totals.subtotal)}</span></div><div className="flex justify-between"><span>Promoción</span><span>−{fmtMoney(totals.discount)}</span></div></div>}
           <div className="flex items-baseline justify-between"><span>Total</span><strong className="text-2xl tabular-nums">{fmtMoney(totals.total)}</strong></div>
-          <Button size="lg" className="h-12 w-full text-base" disabled={!lines.length || blocked} onClick={checkout}>{totals.total === 0 && lines.length ? "Cambiar promoción" : `Cobrar ${fmtMoney(totals.total)}`}</Button>
+          <Button requiresWrite size="lg" className="h-12 w-full text-base" disabled={!lines.length || blocked} onClick={checkout}>{totals.total === 0 && lines.length ? "Cambiar promoción" : `Cobrar ${fmtMoney(totals.total)}`}</Button>
         </div>
       </aside>
     </div>
@@ -207,11 +215,11 @@ function SaleWorkspace({ draftKey }: { draftKey: string }) {
     <Dialog open={reviewOpen} onOpenChange={setReviewOpen}><DialogContent aria-describedby={undefined} className="max-w-md max-h-[85dvh] overflow-y-auto"><DialogHeader><DialogTitle>Revisar cambios</DialogTitle></DialogHeader>
       {changed.map(l => { const current = items.find(p => p.id === l.product.id && p.active); return <div key={l.product.id} className="border-b py-2 text-sm"><p className="font-medium">{l.product.name}</p>
         <p className="text-muted-foreground">{current ? `${fmtMoney(l.product.price)} → ${fmtMoney(current.price)}${current.name !== l.product.name ? ` · ${current.name}` : ""}` : "Ya no está disponible. Se quitará de la venta."}</p></div>; })}
-      <Button onClick={() => { saved.update(d => ({ ...d, lines: d.lines.flatMap(l => { const p = items.find(p => p.id === l.product.id && p.active); return p ? [{ ...l, product: p }] : []; }) })); setReviewOpen(false); }}>Actualizar venta</Button>
+      <Button requiresWrite onClick={() => { saved.update(d => ({ ...d, lines: d.lines.flatMap(l => { const p = items.find(p => p.id === l.product.id && p.active); return p ? [{ ...l, product: p }] : []; }) })); setReviewOpen(false); }}>Actualizar venta</Button>
     </DialogContent></Dialog>
     <Dialog open={debtOpen} onOpenChange={setDebtOpen}><DialogContent aria-describedby={undefined} className="max-w-md max-h-[85dvh] overflow-y-auto"><DialogHeader><DialogTitle>Saldos de {member?.full_name}</DialogTitle></DialogHeader>
       <p className="font-semibold">Total pendiente: {fmtMoney(memberHistory.data?.total_pending ?? 0)}</p>
-      {debts.map(p => <div key={p.id} className="flex items-center justify-between gap-3 border-b py-2 text-sm"><div><p>{p.reference || (p.concept === "product" ? "Compra de productos" : "Membresía")}</p><p className="text-muted-foreground">{fmtDate(p.payment_date)}</p></div><Button variant="outline" onClick={() => { setDebtOpen(false); setSettlement(p); }}>Abonar a {fmtMoney(p.balance_pending)}</Button></div>)}
+      {debts.map(p => <div key={p.id} className="flex items-center justify-between gap-3 border-b py-2 text-sm"><div><p>{p.reference || (p.concept === "product" ? "Compra de productos" : "Membresía")}</p><p className="text-muted-foreground">{fmtDate(p.payment_date)}</p></div><Button requiresWrite variant="outline" onClick={() => { setDebtOpen(false); setSettlement(p); }}>Abonar a {fmtMoney(p.balance_pending)}</Button></div>)}
     </DialogContent></Dialog>
     {member && settlement && <SettleBalanceModal paymentId={settlement.id} memberName={member.full_name} pendingBalance={settlement.balance_pending} open onOpenChange={open => !open && setSettlement(null)} />}
     <ReceiptViewer paymentId={lastSale?.paymentId ?? null} folio={lastSale?.folio} open={receiptOpen} onOpenChange={setReceiptOpen} />
@@ -227,7 +235,7 @@ function ProductCard({ product, qty, highlighted, disabled, onAdd }: { product: 
       <span className="min-w-0 flex-1 text-sm font-medium leading-snug">{product.name}</span>
       {qty > 0 && <span className="shrink-0 rounded bg-primary px-1.5 py-0.5 text-xs text-primary-foreground">×{qty}</span>}
     </div>
-    <div className="flex flex-col gap-1"><strong className="tabular-nums">{fmtMoney(product.price)}</strong><span className={cn("text-xs tabular-nums", level === "ok" ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400")}>Existencias: {product.stock}</span></div>
+    <div className="flex flex-col gap-1"><strong className="tabular-nums">{fmtMoney(product.price)}</strong><span className={cn("text-xs tabular-nums", level === "ok" ? "text-muted-foreground" : "text-warning dark:text-amber-400")}>Existencias: {product.stock}</span></div>
   </button>;
 }
 function CartRow({ line, stock, disabled, onQuantity }: { line: CartLine; stock: number; disabled: boolean; onQuantity(n: number): void }) {
@@ -240,13 +248,13 @@ function CartRow({ line, stock, disabled, onQuantity }: { line: CartLine; stock:
     setInvalid(false); onQuantity(qty);
   }
   return <div className="space-y-2 rounded-md border bg-background p-3">
-    <div className="flex items-start justify-between gap-2"><span className="text-sm font-medium">{line.product.name}</span><Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" disabled={disabled} aria-label={`Quitar ${line.product.name}`} onClick={() => onQuantity(0)}><X className="h-4 w-4" /></Button></div>
+    <div className="flex items-start justify-between gap-2"><span className="text-sm font-medium">{line.product.name}</span><Button variant="ghost" size="icon" className="-mr-2 -mt-2 shrink-0" disabled={disabled} aria-label={`Quitar ${line.product.name}`} title="Quitar de la venta" onClick={() => onQuantity(0)}><X aria-hidden="true" className="h-4 w-4" /></Button></div>
     <div className="flex items-center justify-between gap-2"><div className="flex items-center gap-1">
-      <Button variant="outline" size="icon" className="h-9 w-8" disabled={disabled} aria-label={`Restar una unidad de ${line.product.name}`} onClick={() => onQuantity(line.qty - 1)}><Minus className="h-4 w-4" /></Button>
-      <Input aria-label={`Cantidad de ${line.product.name}`} inputMode="numeric" value={value} onChange={e => { setValue(e.target.value); setInvalid(false); }} onBlur={commit} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }} disabled={disabled} aria-invalid={invalid} className="h-9 w-14 px-1 text-center tabular-nums" />
-      <Button variant="outline" size="icon" className="h-9 w-8" disabled={disabled} aria-label={`Sumar una unidad de ${line.product.name}`} onClick={() => onQuantity(line.qty + 1)}><Plus className="h-4 w-4" /></Button>
+      <Button variant="outline" size="icon" className="h-11 w-11" disabled={disabled} aria-label={`Restar una unidad de ${line.product.name}`} onClick={() => onQuantity(line.qty - 1)}><Minus className="h-4 w-4" /></Button>
+      <Input aria-label={`Cantidad de ${line.product.name}`} inputMode="numeric" value={value} onChange={e => { setValue(e.target.value); setInvalid(false); }} onBlur={commit} onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); commit(); } }} disabled={disabled} aria-invalid={invalid} className="h-11 w-14 px-1 text-center tabular-nums" />
+      <Button variant="outline" size="icon" className="h-11 w-11" disabled={disabled} aria-label={`Sumar una unidad de ${line.product.name}`} onClick={() => onQuantity(line.qty + 1)}><Plus className="h-4 w-4" /></Button>
     </div><strong className="text-sm tabular-nums">{fmtMoney(moneyCents(line.product.price) * line.qty / 100)}</strong></div>
     {invalid && <p role="alert" className="text-xs text-destructive">Escribe una cantidad entera mayor a cero.</p>}
-    <div className="flex flex-wrap justify-between gap-1 text-xs text-muted-foreground"><span>{fmtMoney(line.product.price)} c/u</span>{line.qty > stock && <span className="text-amber-700 dark:text-amber-400">Existencias por revisar</span>}</div>
+    <div className="flex flex-wrap justify-between gap-1 text-xs text-muted-foreground"><span>{fmtMoney(line.product.price)} c/u</span>{line.qty > stock && <span className="text-warning dark:text-amber-400">Existencias por revisar</span>}</div>
   </div>;
 }

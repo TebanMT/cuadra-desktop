@@ -35,12 +35,7 @@ function newIdempotencyKey(): string {
 
 function errorMessage(error: unknown): string {
   if (error instanceof ApiError) {
-    const details = error.details as Record<string, unknown> | null;
-    return (
-      (details?.exception as string | undefined) ||
-      (details?.message as string | undefined) ||
-      "No pudimos guardar el cambio."
-    );
+    return error.message || "No pudimos guardar el cambio.";
   }
   return "No pudimos guardar el cambio.";
 }
@@ -164,7 +159,7 @@ export function CashDrawerManager({ open, onOpenChange }: CashDrawerManagerProps
                           autoFocus
                         />
                       </div>
-                      <Button type="submit" size="sm" disabled={busy || !editingName.trim()}>
+                      <Button requiresWrite type="submit" size="sm" disabled={busy || !editingName.trim()}>
                         Guardar
                       </Button>
                       <Button
@@ -187,7 +182,7 @@ export function CashDrawerManager({ open, onOpenChange }: CashDrawerManagerProps
                         </p>
                       </div>
                       <div className="flex shrink-0 gap-1">
-                        <Button
+                        <Button requiresWrite
                           type="button"
                           size="sm"
                           variant="ghost"
@@ -202,7 +197,7 @@ export function CashDrawerManager({ open, onOpenChange }: CashDrawerManagerProps
                           <Pencil className="h-4 w-4" />
                         </Button>
                         {!drawer.is_main && (
-                          <Button
+                          <Button requiresWrite
                             type="button"
                             size="sm"
                             variant="ghost"
@@ -235,7 +230,7 @@ export function CashDrawerManager({ open, onOpenChange }: CashDrawerManagerProps
                 placeholder="Ej. Recepción norte"
                 onChange={(event) => setNewName(event.target.value)}
               />
-              <Button type="submit" disabled={busy || !newName.trim()}>
+              <Button requiresWrite type="submit" disabled={busy || !newName.trim()}>
                 {create.isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (

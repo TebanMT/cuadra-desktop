@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { canAccessFeature, type FeatureAccess } from "@/lib/features";
 
@@ -73,26 +73,6 @@ export function useSubscription(enabled = true) {
   });
 }
 
-export interface ExtendTrialInput {
-  days: number;
-}
-
-/** Manual sales tool — extends the trial window (owner-only). */
-export function useExtendTrial() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: ExtendTrialInput) =>
-      api.post<{ applied: boolean; event_id?: string }>(
-        "/api/v1/subscriptions/me/extend-trial",
-        input
-      ),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: KEY });
-      qc.invalidateQueries({ queryKey: ["auth", "me"] });
-    },
-  });
-}
-
 // El flow de checkout vive end-to-end en el dashboard cloud (entinta.app).
 // El desktop sólo abre la URL del dashboard via tauri shell.open en lugar
 // de hablar con un endpoint local de checkout. Si en algún futuro queremos
@@ -117,8 +97,12 @@ export function useExtendTrial() {
  *                          impago (el dueño pudo suscribirse en otra laptop
  *                          mientras este sidecar estaba offline) — mensaje
  *                          neutro que pide sincronizar y se auto-corrige
+ *  - "trial_grace"       → el cloud cerró la prueba (cancelled) y siguen los
+ *                          días de gracia (subscription_ends_at en el futuro)
+ *  - "trial_read_only"   → prueba cerrada y gracia vencida: recepción en solo
+ *                          lectura (isTrialReadOnly), con entradas abiertas
  *  - "past_due"          → no pudimos cobrar la mensualidad
- *  - "cancelled"         → suscripción cancelada
+ *  - "cancelled"         → suscripción de pago cancelada
  */
 export type SubscriptionBannerLevel =
   | "ok"
@@ -126,6 +110,8 @@ export type SubscriptionBannerLevel =
   | "trial_soon"
   | "trial_over"
   | "trial_unconfirmed"
+  | "trial_grace"
+  | "trial_read_only"
   | "past_due"
   | "cancelled";
 
@@ -172,7 +158,12 @@ export function bannerLevelFor(
 ): SubscriptionBannerLevel {
   const status = detail.subscription_status ?? "active";
   if (status === "past_due") return "past_due";
-  if (status === "cancelled") return "cancelled";
+  if (status === "cancelled") {
+    // Una prueba cerrada nunca bloquea (UC-002): gracia y luego solo lectura.
+    if (detail.subscription_plan !== "trial") return "cancelled";
+    const ends = detail.period_ends_at ? new Date(detail.period_ends_at).getTime() : NaN;
+    return Number.isFinite(ends) && ends > nowMs ? "trial_grace" : "trial_read_only";
+  }
   if (detail.subscription_plan === "trial") {
     if (!detail.trial_ends_at) return "ok";
     const end = new Date(detail.trial_ends_at);

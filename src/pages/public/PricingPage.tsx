@@ -1,179 +1,23 @@
+import { SUPPORT_WHATSAPP_URL } from "@/lib/support";
 import { Link } from "react-router-dom";
-import { Check, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-
-const SUPPORT_WHATSAPP_URL = "https://wa.me/524461057446";
-
-interface PlanTier {
-  id: "standard" | "plus";
-  name: string;
-  priceMxn: number;
-  tagline: string;
-  recommended?: boolean;
-  comingSoon?: boolean;
-  bullets: string[];
-  cta: string;
-}
-
-// Standard es lo único vendible HOY. Plus está marcado comingSoon hasta
-// que las tres anclas (app del socio + rutinas, tap-to-sell, WhatsApp
-// completo) entren en producción. Cuando eso pase, cambia comingSoon a
-// false y deja a Plus a $1,199 como precio de lanzamiento.
-const TIERS: PlanTier[] = [
-  {
-    id: "standard",
-    name: "Standard",
-    priceMxn: 799,
-    tagline: "Todo lo necesario para cobrar y operar el día a día.",
-    recommended: true,
-    bullets: [
-      "Socios y membresías ilimitados",
-      "Cobros con comprobante por WhatsApp",
-      "Kiosko con PIN o huella",
-      "Dashboard del dueño desde el celular",
-      "Persecución por pago automatizada",
-      "Productos, inventario y corrección de ventas",
-      "Cierre, conteo, diferencia y retiro de caja",
-      "Gastos, compras para reventa e ingresos extraordinarios",
-      "Ingresos, salidas y resultado del período",
-      "Recordatorios de vencimiento por WhatsApp",
-      "Soporte por WhatsApp",
-      "1 operador + dueño",
-    ],
-    cta: "Comenzar prueba 30 días",
-  },
-  {
-    id: "plus",
-    name: "Plus",
-    priceMxn: 1199,
-    tagline: "Para gyms que ya operan y quieren crecer.",
-    comingSoon: true,
-    bullets: [
-      "Todo lo de Standard",
-      "App del socio con rutinas",
-      "Tap-to-sell para entrenadores",
-      "WhatsApp: recordatorios, seguimiento y mensajes a grupos",
-      "Gastos recurrentes y próximos vencimientos",
-      "Ganancia y margen bruto por producto",
-      "Análisis, tendencias y exportes a PDF/Excel",
-      "Webhook para torniquete/cerradura",
-      "Operadores ilimitados",
-      "Bitácora completa",
-    ],
-    cta: "Avísame cuando esté listo",
-  },
-];
-
-function fmtMxnPrice(amount: number): string {
-  return `$${amount.toLocaleString("es-MX")}`;
-}
+import { TintaWordmark } from "@/components/shared/Logo";
 
 export default function PricingPage() {
-  return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-5xl mx-auto px-6 py-16 sm:py-24">
-        <header className="text-center space-y-4 mb-12 sm:mb-16">
-          <h1
-            className="text-3xl sm:text-5xl font-bold text-foreground"
-            style={{ letterSpacing: "-0.02em" }}
-          >
-            Tinta para tu gimnasio. Cobra a tiempo, deja la libreta.
-          </h1>
-          <p className="text-base sm:text-lg text-muted-foreground max-w-2xl mx-auto">
-            Hecho para gimnasios de barrio: funciona offline, se siente como
-            WhatsApp y no necesitas un técnico para usarlo.
-          </p>
-        </header>
-
-        <div className="grid gap-6 md:grid-cols-2">
-          {TIERS.map((tier) => (
-            <PlanCard key={tier.id} tier={tier} />
-          ))}
-        </div>
-
-        <footer className="mt-12 sm:mt-16 text-center space-y-2">
-          <p className="text-sm text-muted-foreground">
-            Prueba sin tarjeta. Cancela cuando quieras.
-          </p>
-          <p className="text-sm">
-            <a
-              href={SUPPORT_WHATSAPP_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="text-primary hover:underline inline-flex items-center gap-1.5"
-            >
-              <MessageCircle className="h-4 w-4" />
-              ¿Dudas? Escríbenos por WhatsApp
-            </a>
-          </p>
-        </footer>
-      </div>
+  return <main className="min-h-screen bg-background px-6 py-10 text-foreground">
+    <div className="mx-auto max-w-3xl space-y-8">
+      <TintaWordmark className="w-28" />
+      <header className="space-y-2"><h1 className="font-display text-3xl">Plan Standard</h1><p className="text-muted-foreground">Un plan con todas las funciones disponibles para la operación de tu gimnasio.</p></header>
+      <section className="space-y-5 border-y py-6" aria-label="Precio y funciones">
+        <p><strong className="text-4xl tabular-nums">$799</strong><span className="ml-2 text-muted-foreground">MXN al mes</span></p>
+        <ul className="grid gap-3 text-sm sm:grid-cols-2">
+          <li>Socios, membresías y registro de entradas</li><li>Cobros e historial de comprobantes</li><li>Productos, ventas e inventario</li><li>Caja, gastos y reportes</li><li>Comprobantes y recordatorios por WhatsApp desde Tinta</li><li>Soporte por WhatsApp</li>
+        </ul>
+        <p className="text-sm leading-relaxed text-muted-foreground">La recepción puede operar sin internet. La sincronización, los mensajes y la consulta remota requieren conexión. La conexión de un WhatsApp propio está pendiente de disponibilidad.</p>
+        <Button asChild><Link to="/auth/signup">Comenzar prueba de 30 días</Link></Button>
+        <p className="text-sm text-muted-foreground">Prueba sin tarjeta.</p>
+      </section>
+      <a className="inline-flex min-h-11 items-center underline underline-offset-4" href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer">Consultar con soporte</a>
     </div>
-  );
-}
-
-function PlanCard({ tier }: { tier: PlanTier }) {
-  return (
-    <div
-      className={cn(
-        "relative rounded-2xl border bg-card text-card-foreground p-8 shadow-sm flex flex-col gap-6",
-        tier.recommended ? "border-primary/60 ring-2 ring-primary/20" : "border-border",
-        tier.comingSoon && "opacity-80"
-      )}
-    >
-      {tier.recommended && (
-        <span className="absolute -top-3 right-6 inline-flex items-center rounded-full bg-primary text-primary-foreground text-xs font-semibold px-3 py-1 shadow-sm">
-          Disponible ahora
-        </span>
-      )}
-      {tier.comingSoon && (
-        <span className="absolute -top-3 right-6 inline-flex items-center rounded-full bg-muted text-muted-foreground text-xs font-semibold px-3 py-1 shadow-sm border border-border">
-          Próximamente
-        </span>
-      )}
-
-      <div className="space-y-2">
-        <h2 className="text-xl font-semibold tracking-tight">{tier.name}</h2>
-        <div className="flex items-baseline gap-1.5">
-          <span
-            className="text-4xl font-bold tabular"
-            style={{ letterSpacing: "-0.02em" }}
-          >
-            {fmtMxnPrice(tier.priceMxn)}
-          </span>
-          <span className="text-sm text-muted-foreground">MXN/mes</span>
-        </div>
-        <p className="text-sm text-muted-foreground">{tier.tagline}</p>
-      </div>
-
-      <ul className="space-y-2.5 flex-1">
-        {tier.bullets.map((b) => (
-          <li key={b} className="flex items-start gap-2.5 text-sm">
-            <Check className="h-4 w-4 text-success shrink-0 mt-0.5" strokeWidth={2.5} />
-            <span>{b}</span>
-          </li>
-        ))}
-      </ul>
-
-      {tier.comingSoon ? (
-        // Plus aún no se vende — el CTA va a WhatsApp para captura de
-        // lead manual ("avísame cuando esté listo"). Sin signup directo.
-        <Button asChild size="lg" variant="outline" className="w-full">
-          <a href={SUPPORT_WHATSAPP_URL} target="_blank" rel="noreferrer">
-            {tier.cta}
-          </a>
-        </Button>
-      ) : (
-        <Button
-          asChild
-          size="lg"
-          variant={tier.recommended ? "default" : "outline"}
-          className="w-full"
-        >
-          <Link to="/auth/signup">{tier.cta}</Link>
-        </Button>
-      )}
-    </div>
-  );
+  </main>;
 }

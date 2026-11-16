@@ -35,7 +35,9 @@ export function useHotkeys(map: HandlerMap, enabled = true) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (!enabledRef.current) return;
+      if (!enabledRef.current || e.defaultPrevented) return;
+      // A portal may belong to another component; page shortcuts never own it.
+      if (document.querySelector('[role="dialog"][data-state="open"], [role="alertdialog"][data-state="open"]')) return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
       const handler = mapRef.current[key];

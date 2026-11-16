@@ -1,10 +1,12 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SectionCard } from "@/components/shared/PagePrimitives";
+import { RestrictedNote } from "@/components/shared/RestrictedNote";
 import { ReportHelp } from "@/components/reports/ReportContent";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
+import { usePermission } from "@/lib/permissions";
 import type { DashboardData, KpiTrend } from "@/hooks/useReports";
 import { fmtDate } from "@/lib/dates";
 import {
@@ -13,6 +15,7 @@ import {
   type ReviewItem,
 } from "@/lib/dashboard";
 import { financialIntegrityWarningLabel } from "@/strings/financialWarnings";
+import { dashboard as t } from "@/strings/dashboard";
 
 export function LoadError({
   children,
@@ -87,6 +90,7 @@ export function MonthSummary({
   const partial = data.integrity?.status === "incomplete";
   return (
     <SectionCard
+      appearance="plain"
       title="Este mes"
       className="[container-type:inline-size]"
       description={
@@ -137,7 +141,7 @@ export function MonthSummary({
             </dt>
             <dd className="max-w-full text-right [@container(min-width:32rem)]:text-left">
               <span
-                className={`block break-words tabular-nums text-xl [@container(min-width:32rem)]:mt-2 [@container(min-width:32rem)]:text-2xl ${i === 2 ? "font-bold" : "font-semibold"}`}
+                className="block break-words font-display tabular text-xl [@container(min-width:32rem)]:mt-2 [@container(min-width:32rem)]:text-2xl"
               >
                 {metric == null ? "No disponible" : money.fmt(metric.value)}
               </span>
@@ -172,44 +176,16 @@ export function TodaySummary({
   day?: string;
   onEntries(): void;
 }) {
-  const window = dashboardWindow(data, day);
   return (
-    <div className="grid grid-cols-2 gap-3" aria-label="Actividad del gimnasio">
-      <Link
-        to="/members?status=active"
-        className="rounded-xl border bg-card p-4 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <span className="flex w-full justify-between gap-2 text-sm text-muted-foreground">
-          Socios activos
-          <ChevronRight className="h-4 w-4 shrink-0" />
-        </span>
-        <strong className="mt-2 block text-2xl tabular-nums">
-          {data.active_members.value.toLocaleString("es-MX")}
-        </strong>
-        {window &&
-          (data.active_members.delta != null ||
-            data.active_members.delta_pct != null) && (
-            <span className="mt-1 flex flex-wrap gap-x-1 text-xs text-muted-foreground">
-              <Change metric={data.active_members} /> respecto al{" "}
-              {fmtDate(window.to)}
-            </span>
-          )}
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-2 border-y py-2 text-sm" aria-label="Actividad del gimnasio">
+      <Link to="/members?status=active" className="inline-flex min-h-11 items-center gap-2 hover:underline">
+        <strong className="font-display tabular text-base">{data.active_members.value.toLocaleString("es-MX")}</strong>
+        <span className="text-muted-foreground">socios activos</span>
       </Link>
-      <button
-        type="button"
-        onClick={onEntries}
-        disabled={!day}
-        className="flex flex-col items-start rounded-xl border bg-card p-4 text-left hover:bg-muted/40 disabled:opacity-60 focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <span className="flex w-full justify-between gap-2 text-sm text-muted-foreground">
-          Entradas hoy
-          <ChevronRight className="h-4 w-4 shrink-0" />
-        </span>
-        <strong className="mt-2 block text-2xl tabular-nums">
-          {data.checkins_today == null
-            ? "—"
-            : data.checkins_today.toLocaleString("es-MX")}
-        </strong>
+      <button type="button" onClick={onEntries} disabled={!day} className="inline-flex min-h-11 items-center gap-2 hover:underline disabled:opacity-60">
+        <strong className="font-display tabular text-base">{data.checkins_today == null ? "—" : data.checkins_today.toLocaleString("es-MX")}</strong>
+        <span className="text-muted-foreground">entradas hoy</span>
+        <ChevronRight aria-hidden="true" className="h-4 w-4" />
       </button>
     </div>
   );
@@ -223,21 +199,22 @@ export function ReviewList({
   notices?: ReactNode;
 }) {
   const money = useMoneyVisibility();
-  if (!items.length && !notices) return null;
+
   return (
-    <SectionCard title="Por revisar" flush>
+    <SectionCard appearance="plain" title="Por revisar" flush>
+      {!items.length && !notices && <p className="py-3 text-sm text-muted-foreground">No hay pendientes por revisar.</p>}
       <ul className="divide-y">
         {items.map((item) => (
           <li key={item.id}>
             <Link
               to={item.to}
-              className="flex items-center gap-3 px-4 py-3 sm:px-6 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
+              className="flex items-center gap-4 px-1 py-4 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span className="min-w-5 text-center font-semibold tabular-nums">
+              <span className="w-12 shrink-0 text-right font-display tabular text-xl">
                 {item.count}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm">{item.label}</span>
+                <span className="block text-sm font-medium">{item.label}</span>
                 {item.detail && (
                   <span className="block text-xs text-muted-foreground">
                     {item.detail}
@@ -249,12 +226,12 @@ export function ReviewList({
                   </span>
                 )}
               </span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <ChevronRight aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
             </Link>
           </li>
         ))}
       </ul>
-      {notices && <div className="space-y-2 px-4 pb-4 sm:px-6">{notices}</div>}
+      {notices && <div className="space-y-2 py-3">{notices}</div>}
     </SectionCard>
   );
 }
@@ -279,31 +256,37 @@ export function RecentPayments({
   incomePath: string;
 }) {
   const money = useMoneyVisibility();
+  // Without "view_totals" the backend only returns today's payments: say so
+  // in the title and the empty state instead of "nothing recent".
+  const allDays = usePermission("view_totals");
   return (
     <SectionCard
-      title="Últimos cobros"
+      appearance="plain"
+      title={allDays ? t.recentPayments.title : t.recentPayments.todayTitle}
       className="self-stretch"
       action={
         <Link
           to={incomePath}
-          className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+          className="inline-flex min-h-11 items-center gap-0.5 text-sm font-medium text-primary hover:underline"
         >
           Ver ingresos
-          <ArrowUpRight className="h-3 w-3" />
+          {/* Navegación interna: chevron, como «Por revisar». La flecha
+              diagonal queda para lo que abre fuera de Tinta. */}
+          <ChevronRight aria-hidden="true" className="h-4 w-4" />
         </Link>
       }
       flush
     >
       {!data.recent_payments?.length ? (
-        <p className="px-4 pb-5 text-sm text-muted-foreground sm:px-6">
-          Sin cobros recientes.
+        <p className="py-3 text-sm text-muted-foreground">
+          {allDays ? t.recentPayments.empty : t.recentPayments.todayEmpty}
         </p>
       ) : (
         <ul className="divide-y">
           {data.recent_payments.slice(0, 5).map((payment) => (
             <li
               key={payment.id}
-              className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-4 py-3 sm:px-6"
+              className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 py-3"
             >
               <div className="min-w-0 flex-1 basis-36">
                 <p className="break-words text-sm font-medium">
@@ -321,12 +304,17 @@ export function RecentPayments({
                   {fmtDate(payment.payment_date)}
                 </p>
               </div>
-              <span className="max-w-full break-words text-sm tabular-nums font-semibold">
+              <span className="max-w-full break-words font-display tabular text-sm">
                 {money.fmt(payment.amount)}
               </span>
             </li>
           ))}
         </ul>
+      )}
+      {!allDays && (
+        <RestrictedNote permission="view_totals" className="border-t pt-3">
+          {t.recentPayments.otherDaysRestricted}
+        </RestrictedNote>
       )}
     </SectionCard>
   );
@@ -335,8 +323,9 @@ export function RecentPayments({
 export function DashboardSkeleton() {
   return (
     <div role="status" aria-label="Cargando resumen" className="space-y-4">
-      <div className="skeleton h-28 rounded-xl" />
-      <div className="skeleton h-44 rounded-xl" />
+      <p className="text-sm text-muted-foreground">Cargando actividad…</p>
+      <div className="skeleton h-12 rounded-md" />
+      <div className="skeleton h-36 rounded-md" />
     </div>
   );
 }

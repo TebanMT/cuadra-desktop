@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { validateDateFields } from "@/lib/date-input";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { DateInput } from "@/components/ui/date-input";
@@ -91,6 +92,7 @@ import {
 import { common } from "@/strings/common";
 import { ExpenseForm, type ExpenseFormSubmitPayload } from "@/components/expenses/ExpenseForm";
 import { keyForPayload } from "@/lib/idempotency";
+import { useQueryClient } from "@tanstack/react-query";
 import { CashDrawerField } from "@/components/cash/CashDrawerField";
 
 const PAGE_SIZE = 50;
@@ -166,8 +168,8 @@ export function ExpensesWorkspace({ section = "expenses", embedded = false }: { 
     catch(error){toast.error(error instanceof Error?error.message:"No pudimos abrir la compra.");}
   };
   function setView(next:string) {setParams(current=>{const result=new URLSearchParams(current);result.set("view",next);return result;});}
-  return <div className={embedded ? "space-y-4" : "p-4 sm:p-6 space-y-5 max-w-5xl mx-auto pb-24"}>
-    {!embedded && <PageHeader title="Gastos" actions={<div className="flex flex-wrap gap-2"><Button className="bg-foreground text-background hover:bg-foreground/90 font-semibold shadow-sm" onClick={openPurchase}><PackagePlus className="h-4 w-4" />Registrar compra</Button><Button onClick={()=>{setDuplicateFrom(null);setCreateOpen(true);}}><Plus className="h-4 w-4 mr-2"/>Registrar gasto</Button></div>} />}
+  return <PageContainer embedded={embedded} className="space-y-5 pb-24">
+    {!embedded && <PageHeader title="Gastos" actions={<div className="flex flex-wrap gap-2"><Button requiresWrite className="bg-foreground text-background hover:bg-foreground/90 font-semibold shadow-sm" onClick={openPurchase}><PackagePlus className="h-4 w-4" />Registrar compra</Button><Button requiresWrite onClick={()=>{setDuplicateFrom(null);setCreateOpen(true);}}><Plus className="h-4 w-4 mr-2"/>Registrar gasto</Button></div>} />}
     {section === "expenses" && <Tabs value={view} onValueChange={setView} className="space-y-4">
       <div className="flex items-center gap-2 border-b">
         <TabsList aria-label="Vistas de Gastos" className="h-auto min-w-0 flex-1 items-stretch gap-3 border-0 sm:gap-4">
@@ -177,7 +179,7 @@ export function ExpensesWorkspace({ section = "expenses", embedded = false }: { 
           </TabsTrigger>
           <TabsTrigger value="recurring" className="min-h-12 min-w-0 flex-col gap-1 whitespace-normal px-1 leading-tight sm:flex-row sm:gap-2">
             <span>Pagos que se repiten</span>{" "}
-            {!isPlus && <span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium"><Lock aria-hidden="true" className="h-3 w-3" />Plus</span>}
+            {!isPlus && <span className="inline-flex shrink-0 items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground"><Lock aria-hidden="true" className="h-3 w-3" />No habilitado</span>}
           </TabsTrigger>
         </TabsList>
         <button type="button" onClick={money.toggle} className="shrink-0 p-3 text-muted-foreground" aria-label={money.hidden ? "Mostrar montos" : "Ocultar montos"}>
@@ -193,7 +195,7 @@ export function ExpensesWorkspace({ section = "expenses", embedded = false }: { 
             key={status}
             type="button"
             aria-pressed={pendingStatus === status}
-            className={cn("min-h-10 rounded-md px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", pendingStatus === status ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
+            className={cn("min-h-11 rounded-md px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring", pendingStatus === status ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
             onClick={() => {
               if (pendingStatus === status) return;
               setParams(current => {
@@ -212,10 +214,10 @@ export function ExpensesWorkspace({ section = "expenses", embedded = false }: { 
       <TabsContent value="recurring" className="space-y-4">
         {isPlus ? (
           <RecurringPanel items={templates.data?.items ?? []} loading={templates.isLoading} error={templates.error} onEdit={setEditingTemplate} onCreate={()=>setTemplateOpen(true)} />
-        ) : <section aria-label="Pagos que se repiten en Plus" className="rounded-xl border bg-card p-5 space-y-3">
-          <h2 className="font-semibold">Incluido en Plus</h2>
-          <p className="text-sm text-muted-foreground">Programa la renta, los servicios o la nómina para ver cuándo toca pagarlos.</p>
-          <Button variant="outline" asChild><Link to="/settings/subscription">Ver planes</Link></Button>
+        ) : <section aria-label="Pagos que se repiten" className="rounded-xl border bg-card p-5 space-y-3">
+          <h2 className="font-semibold">Acceso no habilitado</h2>
+          <p className="text-sm text-muted-foreground">Programa renta, servicios o nómina. El acceso aún no está habilitado en esta instalación; revisa la sincronización o consulta a soporte.</p>
+          <Button variant="outline" asChild><Link to="/help">Consultar ayuda</Link></Button>
         </section>}
       </TabsContent>
     </Tabs>}
@@ -247,7 +249,7 @@ export function ExpensesWorkspace({ section = "expenses", embedded = false }: { 
         expense={confirmDelete}
         onClose={() => setConfirmDelete(null)}
       />
-  </div>;
+  </PageContainer>;
 }
 
 function LabeledInput({ label, children }: { label: string; children: React.ReactNode }) {
@@ -297,8 +299,7 @@ function CreateDialog({ open, onOpenChange, initialExpense, cashMovements, occur
       handleClose(false);
     } catch (e) {
       if (e instanceof ApiError) {
-        const data = e.details as Record<string, unknown> | null;
-        setServerError((data?.exception as string | undefined) || t.form.errors.generic);
+                setServerError(e.message || t.form.errors.generic);
       } else {
         setServerError(t.form.errors.generic);
       }
@@ -306,7 +307,7 @@ function CreateDialog({ open, onOpenChange, initialExpense, cashMovements, occur
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} busy={create.isPending || pay.isPending || classify.isPending} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{initialExpense ? "Registrar otro gasto similar" : t.form.titleNew}</DialogTitle>
@@ -336,7 +337,7 @@ export function InventoryPurchasesPanel({ items, loading, error, onPay, onCorrec
     {items.length === 0 ? <EmptyState icon={<PackageCheck className="h-8 w-8" />} title="No hay compras de productos por pagar"  /> : <div className="divide-y">{items.map((item) => <div key={item.id} className="p-4 flex flex-wrap items-center gap-3">
       <div className="flex-1 min-w-[180px]"><p className="font-semibold">{item.product_name}</p><p className="text-xs text-muted-foreground">{item.receipt_status === "pending" ? "Pendiente de recibir · registrada" : "Recibido"} {fmtDate(item.created_at)} · {item.quantity} uds × {money.fmt(item.unit_cost)}</p></div>
       <strong className="tabular-nums">{money.fmt(item.total_amount)}</strong>
-      <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">{item.remote ? <span className="text-xs text-muted-foreground">Pago administrado en la web</span> : <><Button className="min-h-10" size="sm" variant="outline" onClick={() => onCorrect(item)}>Corregir</Button><Button className="min-h-10" size="sm" onClick={() => onPay(item)}>Registrar pago</Button></>}</div>
+      <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto">{item.remote ? <span className="text-xs text-muted-foreground">Pago administrado en la web</span> : <><Button requiresWrite className="min-h-11" size="sm" variant="outline" onClick={() => onCorrect(item)}>Corregir</Button><Button requiresWrite className="min-h-11" size="sm" onClick={() => onPay(item)}>Registrar pago</Button></>}</div>
     </div>)}</div>}
   </SectionCard>;
 }
@@ -352,8 +353,8 @@ function InventoryPurchaseHistory({ response, loading, error, from, to, onFrom, 
     <div className="border-t px-4 py-3 space-y-3 bg-muted/20"><dl className="grid grid-cols-2 gap-2 text-sm"><dt>Costo por pieza</dt><dd className="text-right">{item.unit_cost==null?"Sin registrar":visibility.fmt(item.unit_cost)}</dd>{item.paid_on&&<><dt>Fecha de pago</dt><dd className="text-right">{fmtDate(item.paid_on)}</dd></>}{(item.separate_receipt||item.remote)&&<><dt>Entrega</dt><dd className="text-right">{item.receipt_status==="received"?"Recibida":"Por recibir"}</dd></>}</dl>
     {item.remote&&<p className="text-xs text-muted-foreground">El pago se corrige desde la web.</p>}
     <div className="flex flex-wrap gap-2 justify-end">
-     {!item.remote && item.status==="unpaid"&&<><Button variant="outline" size="sm" onClick={()=>onCorrect(item)}>Corregir compra</Button><Button size="sm" onClick={()=>onPay(item)}>Registrar pago</Button></>}
-     {!item.remote && item.status==="paid"&&<><Button variant="outline" size="sm" onClick={()=>onCorrect(item)}>Corregir compra</Button><Button variant="ghost" size="sm" onClick={()=>onReopen(item)}>Volver a pendiente</Button></>}
+     {!item.remote && item.status==="unpaid"&&<><Button requiresWrite variant="outline" size="sm" onClick={()=>onCorrect(item)}>Corregir compra</Button><Button requiresWrite size="sm" onClick={()=>onPay(item)}>Registrar pago</Button></>}
+     {!item.remote && item.status==="paid"&&<><Button requiresWrite variant="outline" size="sm" onClick={()=>onCorrect(item)}>Corregir compra</Button><Button requiresWrite variant="ghost" size="sm" onClick={()=>onReopen(item)}>Volver a pendiente</Button></>}
     </div></div>
    </details>)}
   </div>}
@@ -362,6 +363,7 @@ function InventoryPurchaseHistory({ response, loading, error, from, to, onFrom, 
 }
 
 export function PayInventoryPurchaseDialog({ purchase, cashMovements = [], onClose }: { purchase: InventoryPurchase | null; cashMovements?: CashMovement[]; onClose(): void }) {
+  const [cashReady, setCashReady] = useState(false);
   const pay = usePayInventoryPurchase();
   const [paidOn, setPaidOn] = useState(todayIso());
   const [method, setMethod] = useState<ExpensePaymentMethod>("transfer");
@@ -373,6 +375,7 @@ export function PayInventoryPurchaseDialog({ purchase, cashMovements = [], onClo
   useEffect(() => { if (purchase) { setPaidOn(todayIso()); setMethod("transfer"); setPaidFrom(""); setCashDrawerId(undefined); setCashMovementId(""); setCheckedCash(false); attempt.current = null; } }, [purchase]);
   const compatibleMovements = purchase ? cashMovements.filter((movement) => movement.movement_type === "cash_out" && movement.classification_status === "unclassified" && Math.round(movement.amount * 100) === Math.round(purchase.total_amount * 100)) : [];
   const submit = async () => {
+    if (paidFrom === "cash_drawer" && !cashMovementId && !cashReady) return toast.error("Confirma la caja antes de guardar el movimiento.");
     if (!purchase || !paidOn) return;
     if (!paidFrom) return toast.error("Selecciona de dónde salió el dinero.");
     if (paidFrom === "cash_drawer" && method !== "cash") return toast.error("La caja de recepción sólo se usa para pagos en efectivo.");
@@ -386,7 +389,7 @@ export function PayInventoryPurchaseDialog({ purchase, cashMovements = [], onClo
       onClose();
     } catch (error) { toast.error(error instanceof ApiError ? error.message : t.form.errors.generic); }
   };
-  return <Dialog open={!!purchase} onOpenChange={(open) => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>Registrar pago de compra</DialogTitle><DialogDescription>Registra el pago. Las existencias no cambian.</DialogDescription></DialogHeader>{purchase && <><div className="rounded-md bg-muted p-3 text-sm flex justify-between gap-3"><span>{purchase.product_name} · {purchase.quantity} uds</span><strong>{moneyPlain(purchase.total_amount)}</strong></div><div className="grid sm:grid-cols-2 gap-3"><LabeledInput label="Fecha real de pago"><DateInput context="recent" max={todayIso()} value={paidOn} disabled={!!cashMovementId} onValueChange={(event) => setPaidOn(event)} /></LabeledInput><LabeledInput label="Método"><NativeSelect label="Método" value={method} onChange={(value) => { setMethod(value as ExpensePaymentMethod);  }} options={EXPENSE_PAYMENT_METHODS.map((value) => [value, t.methods[value]])} /></LabeledInput><LabeledInput label="Pagado desde"><NativeSelect label="Pagado desde" value={paidFrom} onChange={(value) => { setPaidFrom(value as typeof paidFrom); setCashMovementId(""); }} options={[["", "Selecciona el origen del dinero"], ["gym_fund", "Dinero del gimnasio fuera de caja"], ["cash_drawer", "Caja de recepción"], ["external", "Dinero personal o de otra persona"]]} /></LabeledInput>{paidFrom === "cash_drawer" && <CashDrawerField value={cashDrawerId} onChange={setCashDrawerId} disabled={!!cashMovementId} id="purchase-cash-drawer" />}{paidFrom === "cash_drawer" && compatibleMovements.length > 0 && <LabeledInput label="Salida de caja ya registrada"><NativeSelect label="Salida de caja ya registrada" value={cashMovementId || (checkedCash ? "_new" : "_choose")} onChange={(value) => { setCheckedCash(value !== "_choose"); const id = value === "_new" || value === "_choose" ? "" : value; setCashMovementId(id); const movement = compatibleMovements.find((candidate) => candidate.id === id); if (movement) { setPaidOn(movement.movement_on); setCashDrawerId(movement.cash_drawer_id); setMethod("cash"); } }} options={[["_choose", "Selecciona si ya registraste la salida"], ["_new", "Es otro pago: registrar una nueva salida"], ...compatibleMovements.map((movement) => [movement.id, `${fmtDate(movement.movement_on)} · ${movement.reason}`] as const)]} /></LabeledInput>}</div><Alert variant="default"><AlertDescription>{paidFrom === "cash_drawer" ? cashMovementId ? "Esta salida ya se descontó de caja." : "Se descontará el pago del efectivo de esta caja." : "Cuenta como compra pagada. El efectivo de recepción no cambia."}</AlertDescription></Alert><Button className="w-full" onClick={event => { if (validateDateFields(event)) submit(); }} disabled={pay.isPending || !paidOn}>{pay.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Registrar pago</Button></>}</DialogContent></Dialog>;
+  return <Dialog busy={pay.isPending} open={!!purchase} onOpenChange={(open) => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>Registrar pago de compra</DialogTitle><DialogDescription>Registra el pago. Las existencias no cambian.</DialogDescription></DialogHeader>{purchase && <><div className="rounded-md bg-muted p-3 text-sm flex justify-between gap-3"><span>{purchase.product_name} · {purchase.quantity} uds</span><strong>{moneyPlain(purchase.total_amount)}</strong></div><div className="grid sm:grid-cols-2 gap-3"><LabeledInput label="Fecha real de pago"><DateInput context="recent" max={todayIso()} value={paidOn} disabled={!!cashMovementId} onValueChange={(event) => setPaidOn(event)} /></LabeledInput><LabeledInput label="Método"><NativeSelect label="Método" value={method} onChange={(value) => { setMethod(value as ExpensePaymentMethod);  }} options={EXPENSE_PAYMENT_METHODS.map((value) => [value, t.methods[value]])} /></LabeledInput><LabeledInput label="Pagado desde"><NativeSelect label="Pagado desde" value={paidFrom} onChange={(value) => { setPaidFrom(value as typeof paidFrom); setCashMovementId(""); }} options={[["", "Selecciona el origen del dinero"], ["gym_fund", "Dinero del gimnasio fuera de caja"], ["cash_drawer", "Caja de recepción"], ["external", "Dinero personal o de otra persona"]]} /></LabeledInput>{paidFrom === "cash_drawer" && <CashDrawerField onReadyChange={setCashReady} value={cashDrawerId} onChange={setCashDrawerId} disabled={!!cashMovementId} id="purchase-cash-drawer" />}{paidFrom === "cash_drawer" && compatibleMovements.length > 0 && <LabeledInput label="Salida de caja ya registrada"><NativeSelect label="Salida de caja ya registrada" value={cashMovementId || (checkedCash ? "_new" : "_choose")} onChange={(value) => { setCheckedCash(value !== "_choose"); const id = value === "_new" || value === "_choose" ? "" : value; setCashMovementId(id); const movement = compatibleMovements.find((candidate) => candidate.id === id); if (movement) { setPaidOn(movement.movement_on); setCashDrawerId(movement.cash_drawer_id); setMethod("cash"); } }} options={[["_choose", "Selecciona si ya registraste la salida"], ["_new", "Es otro pago: registrar una nueva salida"], ...compatibleMovements.map((movement) => [movement.id, `${fmtDate(movement.movement_on)} · ${movement.reason}`] as const)]} /></LabeledInput>}</div><Alert variant="default"><AlertDescription>{paidFrom === "cash_drawer" ? cashMovementId ? "Esta salida ya se descontó de caja." : "Se descontará el pago del efectivo de esta caja." : "Cuenta como compra pagada. El efectivo de recepción no cambia."}</AlertDescription></Alert><Button requiresWrite className="w-full" onClick={event => { if (validateDateFields(event)) submit(); }} disabled={pay.isPending || !paidOn}>{pay.isPending && <Loader2 className="h-4 w-4 animate-spin" />}Registrar pago</Button></>}</DialogContent></Dialog>;
 }
 
 function CorrectInventoryPurchaseDialog({ purchase, onClose }: { purchase: InventoryPurchase | null; onClose(): void }) {
@@ -408,14 +411,14 @@ function CorrectInventoryPurchaseDialog({ purchase, onClose }: { purchase: Inven
       onClose();
     } catch (error) { toast.error(error instanceof ApiError ? error.message : t.form.errors.generic); }
   };
-  return <Dialog open={!!purchase} onOpenChange={(open) => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>Corregir compra recibida</DialogTitle><DialogDescription>{purchase?.separate_receipt ? "Se corregirá la compra. La recepción ya registrada se conserva." : "Se actualizarán la compra y las existencias. Si ya se pagó, también se corregirá el pago."}</DialogDescription></DialogHeader>{purchase && <><div className="rounded-md bg-muted p-3 text-sm"><strong>{purchase.product_name}</strong><p>{purchase.quantity} uds × {moneyPlain(purchase.unit_cost)} = {moneyPlain(purchase.total_amount)}</p></div><LabeledInput label="Acción"><NativeSelect label="Acción" value={mode} onChange={(value) => setMode(value as typeof mode)} options={[["replace", "Corregir cantidad o costo"], ["annul", "Anular compra completa"]]} /></LabeledInput>{mode === "replace" && <div className="grid grid-cols-2 gap-3"><LabeledInput label="Cantidad real"><Input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></LabeledInput><LabeledInput label="Costo unitario real"><Input type="number" min="0.01" step="0.01" value={unitCost} onChange={(event) => setUnitCost(event.target.value)} /></LabeledInput></div>}<LabeledInput label="Motivo de corrección *"><Input maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ej. se capturaron 40 aguas y eran 4" /></LabeledInput><Alert variant="warning"><AlertDescription>{purchase.separate_receipt ? "Las existencias no cambian. Si el conteo está mal, ajústalo en Productos." : mode === "annul" ? "Se restarán las unidades de esta compra. Deben seguir disponibles en inventario." : "Sólo puedes restar unidades que sigan disponibles."}</AlertDescription></Alert><Button className="w-full" variant={mode === "annul" ? "destructive" : "default"} onClick={submit} disabled={correct.isPending || reason.trim().length < 3}>{mode === "annul" ? "Anular compra" : "Guardar corrección"}</Button></>}</DialogContent></Dialog>;
+  return <Dialog busy={correct.isPending} open={!!purchase} onOpenChange={(open) => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>Corregir compra recibida</DialogTitle><DialogDescription>{purchase?.separate_receipt ? "Se corregirá la compra. La recepción ya registrada se conserva." : "Se actualizarán la compra y las existencias. Si ya se pagó, también se corregirá el pago."}</DialogDescription></DialogHeader>{purchase && <><div className="rounded-md bg-muted p-3 text-sm"><strong>{purchase.product_name}</strong><p>{purchase.quantity} uds × {moneyPlain(purchase.unit_cost)} = {moneyPlain(purchase.total_amount)}</p></div><LabeledInput label="Acción"><NativeSelect label="Acción" value={mode} onChange={(value) => setMode(value as typeof mode)} options={[["replace", "Corregir cantidad o costo"], ["annul", "Anular compra completa"]]} /></LabeledInput>{mode === "replace" && <div className="grid grid-cols-2 gap-3"><LabeledInput label="Cantidad real"><Input type="number" min="1" step="1" value={quantity} onChange={(event) => setQuantity(event.target.value)} /></LabeledInput><LabeledInput label="Costo unitario real"><Input type="number" min="0.01" step="0.01" value={unitCost} onChange={(event) => setUnitCost(event.target.value)} /></LabeledInput></div>}<LabeledInput label="Motivo de corrección *"><Input maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ej. se capturaron 40 aguas y eran 4" /></LabeledInput><Alert variant="warning"><AlertDescription>{purchase.separate_receipt ? "Las existencias no cambian. Si el conteo está mal, ajústalo en Productos." : mode === "annul" ? "Se restarán las unidades de esta compra. Deben seguir disponibles en inventario." : "Sólo puedes restar unidades que sigan disponibles."}</AlertDescription></Alert><Button requiresWrite className="w-full" variant={mode === "annul" ? "destructive" : "default"} onClick={submit} disabled={correct.isPending || reason.trim().length < 3}>{mode === "annul" ? "Anular compra" : "Guardar corrección"}</Button></>}</DialogContent></Dialog>;
 }
 
 function ReopenInventoryPurchaseDialog({ purchase, onClose }: { purchase: InventoryPurchase | null; onClose(): void }) {
   const reopen = useReopenInventoryPurchase(); const [reason, setReason] = useState("");
   useEffect(() => { if (purchase) setReason(""); }, [purchase]);
   const submit = async () => { if (!purchase || reason.trim().length < 3) return; try { await reopen.mutateAsync({ id: purchase.id, version: purchase.version, correction_reason: reason.trim() }); toast.success("La compra volvió a Por pagar."); onClose(); } catch (error) { toast.error(error instanceof ApiError ? error.message : t.form.errors.generic); } };
-  return <Dialog open={!!purchase} onOpenChange={(open) => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>Volver compra a pendiente</DialogTitle><DialogDescription>El pago volverá a pendiente y se anulará su salida de caja, si la hubo. Las existencias se conservan.</DialogDescription></DialogHeader><LabeledInput label="Motivo de corrección *"><Input maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ej. cantidad o costo capturado incorrectamente" autoFocus /></LabeledInput><Alert variant="warning"><AlertDescription>Úsalo sólo si marcaste la compra como pagada por error.</AlertDescription></Alert><Button className="w-full" onClick={submit} disabled={reopen.isPending || reason.trim().length < 3}>Reabrir pago</Button></DialogContent></Dialog>;
+  return <Dialog busy={reopen.isPending} open={!!purchase} onOpenChange={(open) => !open && onClose()}><DialogContent><DialogHeader><DialogTitle>Volver compra a pendiente</DialogTitle><DialogDescription>El pago volverá a pendiente y se anulará su salida de caja, si la hubo. Las existencias se conservan.</DialogDescription></DialogHeader><LabeledInput label="Motivo de corrección *"><Input maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Ej. cantidad o costo capturado incorrectamente" autoFocus /></LabeledInput><Alert variant="warning"><AlertDescription>Úsalo sólo si marcaste la compra como pagada por error.</AlertDescription></Alert><Button requiresWrite className="w-full" onClick={submit} disabled={reopen.isPending || reason.trim().length < 3}>Reabrir pago</Button></DialogContent></Dialog>;
 }
 
 function OccurrencesPanel({ items, status, loading, error, isOwner, onResolve, onSkip, onReopen }: { items: ExpenseOccurrence[]; status: "pending" | "skipped"; loading: boolean; error: unknown; isOwner: boolean; onResolve(item: ExpenseOccurrence): void; onSkip(item: ExpenseOccurrence): void; onReopen(item: ExpenseOccurrence): void }) {
@@ -436,7 +439,7 @@ function OccurrencesPanel({ items, status, loading, error, isOwner, onResolve, o
           <p className="text-xs text-muted-foreground">Monto previsto</p>
           <strong className="tabular-nums text-sm">{money.fmt(item.expected_amount)}</strong>
         </div>
-        {isOwner && <Button className="min-h-10 w-full sm:w-auto" variant="outline" onClick={() => onReopen(item)}>Volver a pendiente</Button>}
+        {isOwner && <Button requiresWrite className="min-h-11 w-full sm:w-auto" variant="outline" onClick={() => onReopen(item)}>Volver a pendiente</Button>}
       </div>)}
     </div>;
   }
@@ -454,11 +457,11 @@ function OccurrencesPanel({ items, status, loading, error, isOwner, onResolve, o
   ];
   return <SectionCard title="Próximos pagos"  flush>
     {pending.length === 0 ? <EmptyState icon={<CalendarClock className="h-8 w-8" />} title="Sin pagos pendientes en este período" /> : groups.filter(([, rows]) => rows.length > 0).map(([label, rows]) => <section key={label}>
-      <h3 className={cn("px-4 py-2 text-xs font-semibold uppercase tracking-wide bg-muted/60", label === "Vencidos" && "text-destructive")}>{label}</h3>
+      <h3 className={cn("px-4 py-2 text-sm font-medium bg-muted/60", label === "Vencidos" ? "text-destructive-text" : "text-muted-foreground")}>{label}</h3>
       <div className="divide-y">{rows.map((item) => <div key={item.id} className="p-4 flex flex-wrap items-center gap-3">
         <div className="flex-1 min-w-[180px]"><p className="font-semibold">{item.name || item.payee_name || t.categories[item.category]}</p><p className={cn("text-xs", item.due_on < now ? "text-destructive" : "text-muted-foreground")}>{fmtDate(item.due_on)} · {t.categories[item.category]} · {t.methods[item.payment_method]}</p></div>
         <strong className="tabular-nums">{money.fmt(item.expected_amount)}</strong>
-        <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto"><Button className="min-h-10" size="sm" onClick={() => onResolve(item)}>Registrar pago</Button><Button className="min-h-10" size="sm" variant="ghost" onClick={() => onSkip(item)}>Omitir</Button></div>
+        <div className="grid grid-cols-2 sm:flex gap-2 w-full sm:w-auto"><Button className="min-h-11" size="sm" onClick={() => onResolve(item)}>Registrar pago</Button><Button requiresWrite className="min-h-11" size="sm" variant="ghost" onClick={() => onSkip(item)}>Omitir</Button></div>
       </div>)}</div>
     </section>)}
   </SectionCard>;
@@ -469,7 +472,7 @@ function RecurringPanel({ items, loading, error, onEdit, onCreate }: { items: Ex
   const active = useSetExpenseTemplateActive();
   if (loading) return <LoadingSection label="Cargando pagos…" />;
   if (error) return <PanelError label="No se pudieron cargar los pagos." />;
-  return <SectionCard title="Pagos que se repiten" description="Te recuerda pagar; no hace cargos automáticos." action={<Button size="sm" onClick={onCreate}><Plus className="h-4 w-4 mr-1" />Programar pago</Button>} flush>{items.length === 0 ? <EmptyState icon={<Repeat2 className="h-8 w-8" />} title="Aún no hay pagos programados" hint="Programa la renta, los servicios o la nómina." action={<Button size="sm" onClick={onCreate}>Programar pago</Button>} /> : <div className="divide-y">{items.map((item) => <div key={item.id} className="p-4 grid sm:grid-cols-[1fr_130px_100px_auto] gap-3 items-center"><div><p className="font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">{item.payee_name || "Sin proveedor"} · {t.categories[item.category]}</p><p className="text-xs text-muted-foreground">{frequencyLabel(item.frequency)} · próximo {fmtDate(item.next_due_on)} · {item.classification === "fixed" ? "Fijo" : "Variable"}</p></div><strong className="tabular-nums">{money.fmt(item.expected_amount)}</strong><p className={cn("text-xs", item.active ? "text-emerald-600" : "text-muted-foreground")}>{item.active ? "Activo" : "Pausado"}</p><div className="flex gap-2"><Button className="min-h-10" size="sm" variant="outline" onClick={() => onEdit(item)}>Editar</Button><Button className="min-h-10" size="sm" variant="ghost" title={item.active ? "Pausa futuros pagos; conserva los pendientes." : "Continúa desde hoy, sin agregar pagos del período pausado."} disabled={active.isPending} onClick={() => active.mutate({ id: item.id, active: !item.active, version: item.version }, { onSuccess: () => toast.success(item.active ? "Pago pausado. Los pendientes siguen por pagar." : "Pago reactivado desde hoy, sin agregar atrasos."), onError: (error) => toast.error(error instanceof ApiError ? error.message : t.form.errors.generic) })}>{item.active ? "Pausar" : "Reactivar"}</Button></div></div>)}</div>}</SectionCard>;
+  return <SectionCard title="Pagos que se repiten" description="Te recuerda pagar; no hace cargos automáticos." action={<Button requiresWrite size="sm" onClick={onCreate}><Plus className="h-4 w-4 mr-1" />Programar pago</Button>} flush>{items.length === 0 ? <EmptyState icon={<Repeat2 className="h-8 w-8" />} title="Aún no hay pagos programados" hint="Programa la renta, los servicios o la nómina." action={<Button requiresWrite size="sm" onClick={onCreate}>Programar pago</Button>} /> : <div className="divide-y">{items.map((item) => <div key={item.id} className="p-4 grid sm:grid-cols-[1fr_130px_100px_auto] gap-3 items-center"><div><p className="font-semibold">{item.name}</p><p className="text-xs text-muted-foreground">{item.payee_name || "Sin proveedor"} · {t.categories[item.category]}</p><p className="text-xs text-muted-foreground">{frequencyLabel(item.frequency)} · próximo {fmtDate(item.next_due_on)} · {item.classification === "fixed" ? "Fijo" : "Variable"}</p></div><strong className="tabular-nums">{money.fmt(item.expected_amount)}</strong><p className={cn("text-xs", item.active ? "text-success-text" : "text-muted-foreground")}>{item.active ? "Activo" : "Pausado"}</p><div className="flex gap-2"><Button requiresWrite className="min-h-11" size="sm" variant="outline" onClick={() => onEdit(item)}>Editar</Button><Button requiresWrite className="min-h-11" size="sm" variant="ghost" title={item.active ? "Pausa futuros pagos; conserva los pendientes." : "Continúa desde hoy, sin agregar pagos del período pausado."} disabled={active.isPending} onClick={() => active.mutate({ id: item.id, active: !item.active, version: item.version }, { onSuccess: () => toast.success(item.active ? "Pago pausado. Los pendientes siguen por pagar." : "Pago reactivado desde hoy, sin agregar atrasos."), onError: (error) => toast.error(error instanceof ApiError ? error.message : t.form.errors.generic) })}>{item.active ? "Pausar" : "Reactivar"}</Button></div></div>)}</div>}</SectionCard>;
 }
 
 const CASH_CLASSIFICATION_LABELS: Record<CashMovement["classification_status"], string> = {
@@ -519,11 +522,11 @@ function CashMovementHistoryPanel({
         const actions = cashMovementActions(item);
         return <div key={item.id} className="p-4 flex flex-wrap items-center gap-3">
           <div className="flex-1 min-w-[210px]"><p className="font-semibold">{item.reason}</p><p className="text-xs text-muted-foreground">{fmtDate(item.movement_on)} · {operatorNames[item.operator_id] || "Personal de recepción"} · {CASH_CLASSIFICATION_LABELS[item.classification_status]}</p></div>
-          <strong className={cn("tabular-nums", isOut ? "text-destructive" : "text-emerald-700")}>{isOut ? "−" : "+"}{money.fmt(item.amount)}</strong>
-          {actions.canEdit && <Button className="w-full sm:w-auto min-h-10" size="sm" variant="outline" onClick={() => onEdit(item)}>Editar movimiento</Button>}
-          {actions.canClassify && <Button className="w-full sm:w-auto min-h-10" size="sm" onClick={() => onClassify(item)}>Clasificar</Button>}
-          {actions.canUnclassify && <Button className="w-full sm:w-auto min-h-10" size="sm" variant="outline" onClick={() => onUnclassify(item)}>Corregir clasificación</Button>}
-          {item.classification_status === "expense" && item.expense_id && <Button className="w-full sm:w-auto min-h-10" variant="outline" onClick={() => onCorrectExpense(item)}>Corregir gasto</Button>}{item.classification_status === "inventory_purchase" && <Button className="w-full sm:w-auto min-h-10" variant="outline" onClick={() => onCorrectPurchase(item)}>Corregir compra</Button>}
+          <strong className={cn("tabular-nums", isOut ? "text-destructive" : "text-success-text")}>{isOut ? "−" : "+"}{money.fmt(item.amount)}</strong>
+          {actions.canEdit && <Button requiresWrite className="w-full sm:w-auto min-h-11" size="sm" variant="outline" onClick={() => onEdit(item)}>Editar movimiento</Button>}
+          {actions.canClassify && <Button requiresWrite className="w-full sm:w-auto min-h-11" size="sm" onClick={() => onClassify(item)}>Clasificar</Button>}
+          {actions.canUnclassify && <Button requiresWrite className="w-full sm:w-auto min-h-11" size="sm" variant="outline" onClick={() => onUnclassify(item)}>Corregir clasificación</Button>}
+          {item.classification_status === "expense" && item.expense_id && <Button className="w-full sm:w-auto min-h-11" variant="outline" onClick={() => onCorrectExpense(item)}>Corregir gasto</Button>}{item.classification_status === "inventory_purchase" && <Button className="w-full sm:w-auto min-h-11" variant="outline" onClick={() => onCorrectPurchase(item)}>Corregir compra</Button>}
         </div>;
       })}</div>}
     </SectionCard>}
@@ -532,7 +535,10 @@ function CashMovementHistoryPanel({
 }
 
 function LoadingSection({ label }: { label: string }) { return <SectionCard><div className="flex items-center justify-center gap-2 py-14 text-sm text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />{label}</div></SectionCard>; }
-function PanelError({ label }: { label: string }) { return <Alert variant="destructive"><AlertDescription>{label} Intenta de nuevo.</AlertDescription></Alert>; }
+function PanelError({ label }: { label: string }) {
+  const cache = useQueryClient();
+  return <Alert variant="destructive"><AlertDescription>{label} <Button type="button" variant="outline" size="sm" onClick={() => void cache.refetchQueries({ type: "active", predicate: query => query.state.status === "error" })}>Reintentar consulta</Button></AlertDescription></Alert>;
+}
 
 const frequencies:ExpenseFrequency[]=["weekly","every_14_days","semimonthly","monthly","bimonthly","quarterly","semiannual","annual"];
 function frequencyLabel(value:ExpenseFrequency){return ({weekly:"Semanal",every_14_days:"Cada 14 días",semimonthly:"Quincenal",monthly:"Mensual",bimonthly:"Cada 2 meses",quarterly:"Trimestral",semiannual:"Semestral",annual:"Anual"} as Record<ExpenseFrequency,string>)[value]}
@@ -566,11 +572,12 @@ function TemplateDialog({ open, onOpenChange, initial }: { open: boolean; onOpen
       toast.success(initial ? "Pago que se repite actualizado" : "Pago programado"); onOpenChange(false);
     } catch (error) { toast.error(error instanceof ApiError ? error.message : t.form.errors.generic); }
   };
-  return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{initial ? "Editar pago que se repite" : "Programar pago"}</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Te recuerda pagar; no hace cargos automáticos.</p><div className="grid sm:grid-cols-2 gap-3"><LabeledInput label="Nombre"><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="Ej. Renta del local" autoFocus /></LabeledInput><LabeledInput label="Proveedor"><Input value={payee} maxLength={120} onChange={(e) => setPayee(e.target.value)} /></LabeledInput><LabeledInput label="Monto esperado"><Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" /></LabeledInput><LabeledInput label="Categoría"><NativeSelect label="Categoría" value={category} onChange={(v) => setCategory(v as ExpenseCategory)} options={EXPENSE_CATEGORIES.map((v) => [v, t.categories[v]])} /></LabeledInput><LabeledInput label="Método habitual"><NativeSelect label="Método habitual" value={method} onChange={(v) => setMethod(v as ExpensePaymentMethod)} options={EXPENSE_PAYMENT_METHODS.map((v) => [v, t.methods[v]])} /></LabeledInput><LabeledInput label="Fijo o variable"><NativeSelect label="Fijo o variable" value={classification} onChange={(v) => setClassification(v as "fixed" | "variable")} options={[["fixed", "Fijo"], ["variable", "Variable"]]} /></LabeledInput><LabeledInput label="Frecuencia"><NativeSelect label="Frecuencia" value={frequency} onChange={(v) => setFrequency(v as ExpenseFrequency)} options={frequencies.map((v) => [v, frequencyLabel(v)])} /></LabeledInput><LabeledInput label="Fecha inicial"><DateInput value={startsOn} onValueChange={(e) => setStartsOn(e)} /></LabeledInput><LabeledInput label="Fecha final opcional"><DateInput min={startsOn} value={endsOn} onValueChange={(e) => setEndsOn(e)} /></LabeledInput></div><RecurringPreview start={startsOn} frequency={frequency} end={endsOn} />{frequency === "semimonthly" && <p className="text-xs text-muted-foreground">Se repite el día 15 y el último día del mes.</p>}{frequency === "every_14_days" && <p className="text-xs text-muted-foreground">Se repite cada 14 días a partir de la fecha inicial.</p>}{["monthly", "bimonthly", "quarterly", "semiannual", "annual"].includes(frequency) && Number(startsOn.slice(-2)) >= 29 && <p className="text-xs text-muted-foreground">Si el mes tiene menos días, se usará su último día.</p>}{initial && <Alert><AlertDescription>Los cambios se aplican a pagos pendientes. Para cambiar fechas o frecuencia, primero paga u omite esos pendientes.</AlertDescription></Alert>}<Button className="w-full" disabled={create.isPending || update.isPending} onClick={event => { if (validateDateFields(event)) submit(); }}>Guardar programación</Button></DialogContent></Dialog>;
+  return <Dialog open={open} busy={create.isPending || update.isPending} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{initial ? "Editar pago que se repite" : "Programar pago"}</DialogTitle></DialogHeader><p className="text-sm text-muted-foreground">Te recuerda pagar; no hace cargos automáticos.</p><div className="grid sm:grid-cols-2 gap-3"><LabeledInput label="Nombre"><Input value={name} maxLength={120} onChange={(e) => setName(e.target.value)} placeholder="Ej. Renta del local" autoFocus /></LabeledInput><LabeledInput label="Proveedor"><Input value={payee} maxLength={120} onChange={(e) => setPayee(e.target.value)} /></LabeledInput><LabeledInput label="Monto esperado"><Input value={amount} onChange={(e) => setAmount(e.target.value)} type="number" min="0.01" step="0.01" inputMode="decimal" /></LabeledInput><LabeledInput label="Categoría"><NativeSelect label="Categoría" value={category} onChange={(v) => setCategory(v as ExpenseCategory)} options={EXPENSE_CATEGORIES.map((v) => [v, t.categories[v]])} /></LabeledInput><LabeledInput label="Método habitual"><NativeSelect label="Método habitual" value={method} onChange={(v) => setMethod(v as ExpensePaymentMethod)} options={EXPENSE_PAYMENT_METHODS.map((v) => [v, t.methods[v]])} /></LabeledInput><LabeledInput label="Fijo o variable"><NativeSelect label="Fijo o variable" value={classification} onChange={(v) => setClassification(v as "fixed" | "variable")} options={[["fixed", "Fijo"], ["variable", "Variable"]]} /></LabeledInput><LabeledInput label="Frecuencia"><NativeSelect label="Frecuencia" value={frequency} onChange={(v) => setFrequency(v as ExpenseFrequency)} options={frequencies.map((v) => [v, frequencyLabel(v)])} /></LabeledInput><LabeledInput label="Fecha inicial"><DateInput value={startsOn} onValueChange={(e) => setStartsOn(e)} /></LabeledInput><LabeledInput label="Fecha final opcional"><DateInput min={startsOn} value={endsOn} onValueChange={(e) => setEndsOn(e)} /></LabeledInput></div><RecurringPreview start={startsOn} frequency={frequency} end={endsOn} />{frequency === "semimonthly" && <p className="text-xs text-muted-foreground">Se repite el día 15 y el último día del mes.</p>}{frequency === "every_14_days" && <p className="text-xs text-muted-foreground">Se repite cada 14 días a partir de la fecha inicial.</p>}{["monthly", "bimonthly", "quarterly", "semiannual", "annual"].includes(frequency) && Number(startsOn.slice(-2)) >= 29 && <p className="text-xs text-muted-foreground">Si el mes tiene menos días, se usará su último día.</p>}{initial && <Alert><AlertDescription>Los cambios se aplican a pagos pendientes. Para cambiar fechas o frecuencia, primero paga u omite esos pendientes.</AlertDescription></Alert>}<Button requiresWrite className="w-full" disabled={create.isPending || update.isPending} onClick={event => { if (validateDateFields(event)) submit(); }}>Guardar programación</Button></DialogContent></Dialog>;
 }
 
 function OccurrenceResolutionDialog({ occurrence, onClose }: { occurrence: ExpenseOccurrence | null; onClose(): void }) {
- return <Dialog open={!!occurrence} onOpenChange={open => !open && onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Registrar pago</DialogTitle></DialogHeader>{occurrence && <ScheduledPaymentForm key={occurrence.id} occurrence={occurrence} onClose={onClose} />}</DialogContent></Dialog>;
+ const [busy, setBusy] = useState(false);
+ return <Dialog busy={busy} open={!!occurrence} onOpenChange={open => !open && onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Registrar pago</DialogTitle></DialogHeader>{occurrence && <ScheduledPaymentForm key={occurrence.id} occurrence={occurrence} onClose={onClose} onBusyChange={setBusy} />}</DialogContent></Dialog>;
 }
 
 function SkipOccurrenceDialog({ occurrence, onClose }: { occurrence: ExpenseOccurrence | null; onClose(): void }) {
@@ -581,7 +588,7 @@ function SkipOccurrenceDialog({ occurrence, onClose }: { occurrence: ExpenseOccu
     if (!occurrence || reason.trim().length < 2) return toast.error("Explica brevemente por qué no aplica.");
     skip.mutate({ id: occurrence.id, reason: reason.trim() }, { onSuccess: () => { toast.success("Pago omitido."); onClose(); }, onError: (error) => toast.error(error instanceof ApiError ? error.message : t.form.errors.generic) });
   };
-  return <AlertDialog open={!!occurrence} onOpenChange={(open) => !open && onClose()}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Omitir este pago</AlertDialogTitle><AlertDialogDescription>Omite un pago si ya no corresponde. Si lo pagarás después, déjalo pendiente.</AlertDialogDescription></AlertDialogHeader><LabeledInput label="Razón"><Input value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} placeholder="Ej. servicio cancelado" autoFocus /></LabeledInput><AlertDialogFooter><AlertDialogCancel disabled={skip.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={(event) => { event.preventDefault(); confirm(); }} disabled={skip.isPending}>Omitir pago</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>;
+  return <AlertDialog open={!!occurrence} onOpenChange={(open) => !open && onClose()}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Omitir este pago</AlertDialogTitle><AlertDialogDescription>Omite un pago si ya no corresponde. Si lo pagarás después, déjalo pendiente.</AlertDialogDescription></AlertDialogHeader><LabeledInput label="Razón"><Input value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} placeholder="Ej. servicio cancelado" autoFocus /></LabeledInput><AlertDialogFooter><AlertDialogCancel disabled={skip.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction requiresWrite onClick={(event) => { event.preventDefault(); confirm(); }} disabled={skip.isPending}>Omitir pago</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>;
 }
 
 function ReopenOccurrenceDialog({ occurrence, onClose }: { occurrence: ExpenseOccurrence | null; onClose(): void }) {
@@ -595,7 +602,7 @@ function ReopenOccurrenceDialog({ occurrence, onClose }: { occurrence: ExpenseOc
       onError: (error) => toast.error(error instanceof ApiError ? error.message : t.form.errors.generic),
     });
   };
-  return <AlertDialog open={!!occurrence} onOpenChange={(open) => !open && onClose()}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Volver pago a pendiente</AlertDialogTitle><AlertDialogDescription>{occurrence?.status === "paid" ? "El pago volverá a pendiente. Se anularán el gasto y su salida de caja, si la hubo." : "El pago volverá a aparecer en Pendientes."}</AlertDialogDescription></AlertDialogHeader><LabeledInput label="Motivo de la corrección *"><Input value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} placeholder="Ej. lo omití por error" autoFocus /></LabeledInput><AlertDialogFooter><AlertDialogCancel disabled={reopen.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={(event) => { event.preventDefault(); confirm(); }} disabled={reopen.isPending || reason.trim().length < 3}>Volver a pendiente</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>;
+  return <AlertDialog open={!!occurrence} onOpenChange={(open) => !open && onClose()}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Volver pago a pendiente</AlertDialogTitle><AlertDialogDescription>{occurrence?.status === "paid" ? "El pago volverá a pendiente. Se anularán el gasto y su salida de caja, si la hubo." : "El pago volverá a aparecer en Pendientes."}</AlertDialogDescription></AlertDialogHeader><LabeledInput label="Motivo de la corrección *"><Input value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} placeholder="Ej. lo omití por error" autoFocus /></LabeledInput><AlertDialogFooter><AlertDialogCancel disabled={reopen.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction requiresWrite onClick={(event) => { event.preventDefault(); confirm(); }} disabled={reopen.isPending || reason.trim().length < 3}>Volver a pendiente</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>;
 }
 
 function CashClassificationDialog({ movement, onClose }: { movement: CashMovement | null; onClose(): void }) {
@@ -633,7 +640,7 @@ function CashClassificationDialog({ movement, onClose }: { movement: CashMovemen
           </div></details>
         </> : <p className="text-sm text-muted-foreground">No se contará como gasto.</p>}
         <details className="text-xs text-muted-foreground"><summary className="cursor-pointer">¿Fue una devolución a un cliente?</summary><p className="mt-2">Anula esta salida y registra la devolución desde el cobro original para no descontar el dinero dos veces.</p></details>
-        <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose} disabled={classify.isPending}>Cancelar</Button><Button onClick={submit} disabled={classify.isPending}>Guardar clasificación</Button></div>
+        <div className="flex justify-end gap-2"><Button variant="outline" onClick={onClose} disabled={classify.isPending}>Cancelar</Button><Button requiresWrite onClick={submit} disabled={classify.isPending}>Guardar clasificación</Button></div>
       </>}
     </DialogContent>
   </Dialog>;
@@ -653,10 +660,11 @@ function UnclassifyCashDialog({ movement, onClose }: { movement: CashMovement | 
       toast.error(error instanceof ApiError ? error.message : t.form.errors.generic);
     }
   };
-  return <AlertDialog open={!!movement} onOpenChange={(open) => !open && onClose()}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Corregir clasificación del movimiento</AlertDialogTitle><AlertDialogDescription>{movement?.classification_status === "expense" ? "El gasto se quitará del resultado. Si cubría un pago programado, volverá a pendiente. El efectivo no cambia." : "La salida volverá a “Por clasificar”. El efectivo no cambia."}</AlertDialogDescription></AlertDialogHeader><LabeledInput label="Motivo de la corrección *"><Input value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} placeholder="Ej. se clasificó como renta por error" autoFocus /></LabeledInput><AlertDialogFooter><AlertDialogCancel disabled={unclassify.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction onClick={(event) => { event.preventDefault(); submit(); }} disabled={unclassify.isPending || reason.trim().length < 3}>Corregir clasificación</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>;
+  return <AlertDialog open={!!movement} onOpenChange={(open) => !open && onClose()}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Corregir clasificación del movimiento</AlertDialogTitle><AlertDialogDescription>{movement?.classification_status === "expense" ? "El gasto se quitará del resultado. Si cubría un pago programado, volverá a pendiente. El efectivo no cambia." : "La salida volverá a “Por clasificar”. El efectivo no cambia."}</AlertDialogDescription></AlertDialogHeader><LabeledInput label="Motivo de la corrección *"><Input value={reason} maxLength={200} onChange={(event) => setReason(event.target.value)} placeholder="Ej. se clasificó como renta por error" autoFocus /></LabeledInput><AlertDialogFooter><AlertDialogCancel disabled={unclassify.isPending}>Cancelar</AlertDialogCancel><AlertDialogAction requiresWrite onClick={(event) => { event.preventDefault(); submit(); }} disabled={unclassify.isPending || reason.trim().length < 3}>Corregir clasificación</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>;
 }
 
 function EditCashMovementDialog({ movement, onClose }: { movement: CashMovement | null; onClose(): void }) {
+  const [cashReady, setCashReady] = useState(false);
   const update = useUpdateCashMovement();
   const remove = useDeleteCashMovement();
   const [movementOn, setMovementOn] = useState(todayIso());
@@ -681,6 +689,7 @@ function EditCashMovementDialog({ movement, onClose }: { movement: CashMovement 
     return numeric;
   };
   const save = async () => {
+    if (!cashReady) return toast.error("Confirma la caja antes de guardar el movimiento.");
     if (!movement) return;
     const numeric = validate();
     if (numeric === null) return;
@@ -698,9 +707,9 @@ function EditCashMovementDialog({ movement, onClose }: { movement: CashMovement 
       onClose();
     } catch (error) { toast.error(error instanceof ApiError ? error.message : t.form.errors.generic); }
   };
-  return <Dialog open={!!movement} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Editar movimiento de caja</DialogTitle><DialogDescription>Corrige la fecha, el monto o el concepto del movimiento.</DialogDescription></DialogHeader><div className="grid sm:grid-cols-2 gap-3"><LabeledInput label="Fecha"><DateInput context="recent" max={todayIso()} value={movementOn} onValueChange={(event) => setMovementOn(event)} /></LabeledInput><LabeledInput label="Monto"><Input type="number" min="0.01" step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} /></LabeledInput><LabeledInput label="Tipo"><NativeSelect label="Tipo" value={movementType} onChange={(value) => setMovementType(value as typeof movementType)} options={[["cash_in", "Entrada física"], ["cash_out", "Salida física"]]} /></LabeledInput><LabeledInput label="Concepto"><Input maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} /></LabeledInput><CashDrawerField value={cashDrawerId} onChange={setCashDrawerId} id="edit-cash-movement-drawer" /><LabeledInput label="Motivo de corrección *"><Input maxLength={200} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} placeholder="Ej. monto capturado incorrectamente" /></LabeledInput></div><Alert variant="warning"><AlertDescription>Los cortes afectados por esta corrección deberán revisarse.</AlertDescription></Alert><div className="flex flex-wrap justify-between gap-2"><Button variant="ghost" className="text-destructive" onClick={destroy} disabled={remove.isPending || update.isPending || correctionReason.trim().length < 3}>Anular movimiento</Button><Button onClick={event => { if (validateDateFields(event)) save(); }} disabled={remove.isPending || update.isPending || correctionReason.trim().length < 3}>Guardar corrección</Button></div></DialogContent></Dialog>;
+  return <Dialog busy={update.isPending || remove.isPending} open={!!movement} onOpenChange={(open) => !open && onClose()}><DialogContent className="max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Editar movimiento de caja</DialogTitle><DialogDescription>Corrige la fecha, el monto o el concepto del movimiento.</DialogDescription></DialogHeader><div className="grid sm:grid-cols-2 gap-3"><LabeledInput label="Fecha"><DateInput context="recent" max={todayIso()} value={movementOn} onValueChange={(event) => setMovementOn(event)} /></LabeledInput><LabeledInput label="Monto"><Input type="number" min="0.01" step="0.01" inputMode="decimal" value={amount} onChange={(event) => setAmount(event.target.value)} /></LabeledInput><LabeledInput label="Tipo"><NativeSelect label="Tipo" value={movementType} onChange={(value) => setMovementType(value as typeof movementType)} options={[["cash_in", "Entrada física"], ["cash_out", "Salida física"]]} /></LabeledInput><LabeledInput label="Concepto"><Input maxLength={200} value={reason} onChange={(event) => setReason(event.target.value)} /></LabeledInput><CashDrawerField onReadyChange={setCashReady} value={cashDrawerId} onChange={setCashDrawerId} id="edit-cash-movement-drawer" /><LabeledInput label="Motivo de corrección *"><Input maxLength={200} value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} placeholder="Ej. monto capturado incorrectamente" /></LabeledInput></div><Alert variant="warning"><AlertDescription>Los cortes afectados por esta corrección deberán revisarse.</AlertDescription></Alert><div className="flex flex-wrap justify-between gap-2"><Button requiresWrite variant="ghost" className="text-destructive" onClick={destroy} disabled={remove.isPending || update.isPending || correctionReason.trim().length < 3}>Anular movimiento</Button><Button requiresWrite onClick={event => { if (validateDateFields(event)) save(); }} disabled={remove.isPending || update.isPending || correctionReason.trim().length < 3}>Guardar corrección</Button></div></DialogContent></Dialog>;
 }
-function NativeSelect({label,value,onChange,options}:{label:string;value:string;onChange:(value:string)=>void;options:Array<readonly [string,string]>}){return <select aria-label={label} className="h-10 w-full rounded-md border bg-background px-3 text-sm" value={value} onChange={e=>onChange(e.target.value)}>{options.map(([v,optionLabel])=><option key={v} value={v}>{optionLabel}</option>)}</select>}
+function NativeSelect({label,value,onChange,options}:{label:string;value:string;onChange:(value:string)=>void;options:Array<readonly [string,string]>}){return <select aria-label={label} className="h-11 w-full rounded-md border bg-background px-3 text-sm" value={value} onChange={e=>onChange(e.target.value)}>{options.map(([v,optionLabel])=><option key={v} value={v}>{optionLabel}</option>)}</select>}
 
 function EditDialog({
   expense,
@@ -736,8 +745,7 @@ function EditDialog({
       onClose();
     } catch (e) {
       if (e instanceof ApiError) {
-        const data = e.details as Record<string, unknown> | null;
-        setServerError((data?.exception as string | undefined) || t.form.errors.generic);
+                setServerError(e.message || t.form.errors.generic);
       } else {
         setServerError(t.form.errors.generic);
       }
@@ -795,7 +803,7 @@ function EditDialog({
               >
                 {t.page.rowDelete}
               </Button>
-              <Button variant="outline" size="sm" onClick={() => onRepeat(expense)}>
+              <Button requiresWrite variant="outline" size="sm" onClick={() => onRepeat(expense)}>
                 <Copy className="h-4 w-4 mr-1" />Repetir gasto
               </Button>
             </div>
@@ -852,7 +860,7 @@ function DeleteConfirm({ expense, onClose }: { expense: Expense | null; onClose(
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={del.isPending}>{common.cancel}</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogAction requiresWrite
             onClick={(e) => {
               e.preventDefault();
               confirm();

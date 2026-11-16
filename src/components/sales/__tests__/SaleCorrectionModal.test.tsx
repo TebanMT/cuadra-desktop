@@ -53,9 +53,12 @@ vi.mock("sonner", () => ({
   toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() },
 }));
 
-vi.mock("@/components/cash/CashDrawerField", () => ({
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({
   CashDrawerField: () => null,
-}));
+});
+});
 
 vi.mock("@/stores/useAuthStore", () => ({
   useAuthStore: (selector: (state: { user: { role: "owner" | "operator" } }) => unknown) =>

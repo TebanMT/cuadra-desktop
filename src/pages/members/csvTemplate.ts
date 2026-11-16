@@ -16,9 +16,9 @@ export function buildMembersCSVTemplate(): string {
     "membership_expiry_date",
   ].join(",");
   const rows = [
-    'Ana López García,5512345678,ana@gmail.com,1990-03-15,Promo enero,Mensual,2026-04-01,2026-05-01',
+    'Ana López García,5512345678,ana@example.com,1990-03-15,Promo enero,Mensual,2026-04-01,2026-05-01',
     'Pedro Hernández,5598765432,,1985-07-22,,,,',
-    'María Sánchez,5555551122,maria.s@hotmail.com,,,,,',
+    'María Sánchez,5555551122,maria@example.com,,,,,',
   ];
   return [header, ...rows].join("\n") + "\n";
 }
@@ -92,4 +92,33 @@ export function parseCSVForPreview(text: string): string[][] {
 // check client-side sea consistente: espacios, guiones, parens fuera.
 export function normalizePhoneForCompare(raw: string): string {
   return raw.replace(/[\s\-()]/g, "").trim();
+}
+
+export const MEMBER_CSV_FIELDS = [
+  { key: "full_name", label: "Nombre completo", aliases: ["nombre", "nombre completo"] },
+  { key: "phone", label: "Teléfono", aliases: ["telefono", "celular"] },
+  { key: "email", label: "Correo (opcional)", aliases: ["correo", "correo electronico"] },
+  { key: "birthdate", label: "Nacimiento (opcional)", aliases: ["nacimiento", "fecha de nacimiento"] },
+  { key: "notes", label: "Notas (opcional)", aliases: ["notas"] },
+  { key: "membership_type_name", label: "Plan de membresía (opcional)", aliases: ["plan", "membresia"] },
+  { key: "membership_start_date", label: "Inicio de membresía (opcional)", aliases: ["inicio", "fecha de inicio"] },
+  { key: "membership_expiry_date", label: "Vencimiento (opcional)", aliases: ["vencimiento", "fecha de vencimiento"] },
+];
+
+export function inferMemberColumns(headers: string[]): number[] {
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase();
+  return MEMBER_CSV_FIELDS.map(field => headers.findIndex(header => [field.key, ...field.aliases].includes(normalize(header))));
+}
+
+export function mapMemberCSV(rows: string[][], columns: number[]): string {
+  const quote = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  return [MEMBER_CSV_FIELDS.map(field => field.key), ...rows.slice(1).map(row => columns.map(index => index < 0 ? "" : row[index] ?? ""))]
+    .map(row => row.map(quote).join(",")).join("\r\n") + "\r\n";
+}
+
+export function summarizeMemberImport(rows: string[][], duplicateIndexes: number[], allowDuplicates: boolean) {
+  const incomplete = rows.flatMap((row, index) => !row[0]?.trim() || !row[1]?.trim() ? [index] : []);
+  const invalid = new Set(incomplete);
+  const skipped = allowDuplicates ? [] : [...new Set(duplicateIndexes)].filter(index => !invalid.has(index));
+  return { incomplete, skipped, candidates: rows.length - incomplete.length - skipped.length };
 }

@@ -144,9 +144,9 @@ export function PromotionForm({
 
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>{t.form.kind}</Label>
+          <Label htmlFor="promo-kind">{t.form.kind}</Label>
           <Select value={kind} onValueChange={(v) => setKind(v as PromotionKind)}>
-            <SelectTrigger>
+            <SelectTrigger id="promo-kind">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -163,12 +163,12 @@ export function PromotionForm({
         </div>
 
         <div className="space-y-2">
-          <Label>{t.form.appliesTo}</Label>
+          <Label htmlFor="promo-applies">{t.form.appliesTo}</Label>
           <Select
             value={appliesTo}
             onValueChange={(v) => setAppliesTo(v as PromotionAppliesTo)}
           >
-            <SelectTrigger>
+            <SelectTrigger id="promo-applies">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -203,7 +203,7 @@ export function PromotionForm({
                 value={valueStr}
                 onChange={(e) => setValueStr(e.target.value.replace(/[^\d.]/g, ""))}
                 inputMode="decimal"
-                className="pr-7 h-9"
+                className="pr-7 h-11"
               />
               <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
                 %
@@ -324,7 +324,7 @@ export function PromotionForm({
         <Button type="button" variant="ghost" onClick={onCancel} disabled={submitting}>
           {t.form.cancel}
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button requiresWrite type="submit" disabled={submitting}>
           {submitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
           {t.form.save}
         </Button>

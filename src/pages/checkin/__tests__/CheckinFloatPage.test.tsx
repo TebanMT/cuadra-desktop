@@ -59,8 +59,15 @@ vi.mock("@/lib/kioskWindow", () => ({
 
 // MemberPhoto resuelve la URL del sidecar vía Tauri command — irrelevante
 // para la máquina de estados.
+const memberPhoto = vi.fn((_props: { memberId?: string }) => null);
 vi.mock("@/components/members/MemberPhoto", () => ({
-  MemberPhoto: () => null,
+  MemberPhoto: (props: { memberId?: string }) => memberPhoto(props),
+}));
+
+// La ficha dice si el socio tiene foto; sin ella no se pide la imagen.
+let memberPhotoUrl: string | undefined;
+vi.mock("@/hooks/useMembers", () => ({
+  useMember: (id: string | null) => ({ data: id ? { member: { id, photo_url: memberPhotoUrl } } : undefined }),
 }));
 
 import CheckinFloatPage from "../CheckinFloatPage";
@@ -93,6 +100,22 @@ describe("CheckinFloatPage", () => {
     kioskPresent = false;
     playCheckinTone.mockClear();
     closeCurrentWindow.mockClear();
+    memberPhoto.mockClear();
+    memberPhotoUrl = undefined;
+  });
+
+  it("sin foto registrada no pide la imagen al sidecar: quedan las iniciales", () => {
+    render(<CheckinFloatPage />);
+    act(() => feedOpts!.onCheckin(makeEvent()));
+    expect(memberPhoto).not.toHaveBeenCalled();
+    expect(screen.getByText("AL")).toBeInTheDocument();
+  });
+
+  it("con foto registrada la muestra para reconocer al socio", () => {
+    memberPhotoUrl = "members/m-1.jpg";
+    render(<CheckinFloatPage />);
+    act(() => feedOpts!.onCheckin(makeEvent()));
+    expect(memberPhoto).toHaveBeenCalledWith({ memberId: "m-1" });
   });
 
   it("en idle muestra 'Esperando huella…' con el feed habilitado", () => {

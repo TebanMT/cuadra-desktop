@@ -10,8 +10,11 @@ export const members = {
     sort: {
       nameAsc: "Nombre A–Z",
       nameDesc: "Nombre Z–A",
-      expiryAsc: "Vencimiento ↑",
-      expiryDesc: "Vencimiento ↓",
+      expiryAsc: "Vence primero",
+      expiryDesc: "Vence al último",
+      // En «Sin vigencia» todos ya vencieron: el mismo orden dicho en pasado.
+      expiredRecentFirst: "Vencieron hace menos",
+      expiredOldestFirst: "Vencieron hace más",
       newest: "Más recientes",
       oldest: "Más antiguos",
     },
@@ -19,11 +22,23 @@ export const members = {
       all: "Todos",
       active: "Activos",
       expiringSoon: "Por vencer",
-      // "Por cobrar" incluye vencidos clásicos y socios inscritos sin
-      // primer pago (pending_payment). Para el operador es la misma
-      // acción: cobrar.
-      expired: "Por cobrar",
+      // Los tres casos sin vigencia, cada uno con su acción: a un vencido
+      // se le cobra la renovación, a uno sin primer pago se le termina el
+      // alta y a uno sin membresía se le activa. «Sin vigencia» (`expired`)
+      // sigue existiendo como la suma de los tres.
+      lapsed: "Vencidos",
+      noMembership: "Sin membresía",
+      unpaidEnrollment: "Sin primer pago",
+      expired: "Sin vigencia",
+      expiredHint: "Vencidos, socios sin primer pago y socios sin membresía, juntos.",
+      lapsedHint: "Su membresía ya venció. Cobra la renovación desde la fila o su ficha.",
+      noMembershipHint: "Socios dados de alta que nunca han tenido membresía. Actívala desde la fila o su ficha.",
+      unpaidEnrollmentHint: "Ya tienen plan elegido pero falta el primer cobro para que puedan entrar.",
+      expiredHintRecentFirst: "Primero los que vencieron hace menos; al final, quienes no tienen fecha de vencimiento.",
       inactive: "Inactivos",
+      unrenewed: "Sin renovar · 60 días",
+      balance: "Con saldo",
+      more: "Más filtros",
     },
     columns: {
       photo: "Foto",
@@ -44,6 +59,10 @@ export const members = {
     },
     rowActions: {
       pay: "Cobrar",
+      payFor: (name: string) => `Cobrar a ${name}`,
+      activate: "Activar membresía",
+      activateFor: (name: string) => `Activar membresía de ${name}`,
+      whatsappFor: (name: string) => `Abrir WhatsApp de ${name}`,
       checkin: "Registrar entrada",
       more: "Más",
       noPlan: "Sin plan",
@@ -60,17 +79,15 @@ export const members = {
     createdAt: (date: string) => `Alta ${date}`,
     membership: {
       title: "Membresía actual",
-      none: "Este socio no tiene membresía activa.",
-      pendingTitle: "Falta primer pago",
+      none: "Este socio no tiene membresía.",
       pendingBody:
         "La membresía se activa con el primer pago, aunque sea parcial.",
-      pendingChargeCta: "Cobrar ahora",
-      vigente: "Vigente",
-      expiring: (days: number) => `Vence en ${days} ${days === 1 ? "día" : "días"}`,
-      expired: (days: number) => `Vencida hace ${Math.abs(days)} ${Math.abs(days) === 1 ? "día" : "días"}`,
-      due: "Vence",
+      // La insignia ya dice el plazo («hace 39 días»); esta línea da la fecha exacta.
+      dueFuture: "Vence el",
+      duePast: "Venció el",
       pay: "Cobrar renovación",
       payFirst: "Cobrar primer pago",
+      activate: "Activar membresía",
       lock: "Ajustar vigencia",
     },
     tabs: {
@@ -100,8 +117,17 @@ export const members = {
       } as Record<string, string>,
       notesEmpty: "Sin notas.",
     },
+    inactiveNote:
+      "Este socio está inactivo. Reactívalo para cobrar su membresía; verificar acceso registra el resultado de la revisión, no autoriza su entrada.",
+    checkinHint: {
+      enter: "para registrar la entrada",
+      verify: "para verificar el acceso",
+    },
     actions: {
       checkin: "Registrar entrada",
+      // Sin vigencia o inactivo: el botón revisa y registra el intento,
+      // no autoriza el paso.
+      verify: "Verificar acceso",
       edit: "Editar",
       markInactive: "Marcar inactivo",
       markActive: "Reactivar",
@@ -109,11 +135,12 @@ export const members = {
       changeNumber: "Cambiar número de socio",
     },
     shortcuts: {
-      title: "Atajos",
-      pay: "P → cobrar",
-      checkin: "C → registrar entrada",
-      edit: "E → editar",
-      close: "Esc → cerrar",
+      title: "Atajos de teclado",
+      pay: "cobrar a este socio",
+      checkin: "preparar su entrada (Enter la registra)",
+      verify: "preparar la verificación (Enter la registra)",
+      edit: "editar",
+      back: "volver",
     },
   },
   form: {
@@ -125,14 +152,6 @@ export const members = {
       open: "Ver socio",
       dismiss: "Ocultar sugerencias",
       createNew: (name: string) => `Crear nuevo socio: "${name}"`,
-      status: {
-        active: "Activo",
-        expiringSoon: "Por vencer",
-        expired: "Vencido",
-        pendingPayment: "Sin primer pago",
-        inactive: "Inactivo",
-        noPlan: "Sin plan",
-      },
     },
     sections: {
       basics: "Datos básicos",
@@ -150,11 +169,11 @@ export const members = {
       startDate: "Fecha de inicio",
       paymentMethod: "Método de pago",
     },
-    addEmail: "+ Agregar email",
-    addBirthdate: "+ Agregar fecha de nacimiento",
-    addPhoto: "+ Agregar foto",
-    addNotes: "+ Agregar notas",
-    addGender: "+ Agregar género",
+    addEmail: "Agregar email",
+    addBirthdate: "Agregar fecha de nacimiento",
+    addPhoto: "Agregar foto",
+    addNotes: "Agregar notas",
+    addGender: "Agregar género",
     gender: {
       label: "Género",
       hint: "Opcional. Lo usamos sólo para reportes.",
@@ -235,6 +254,7 @@ export const members = {
       set: "Establecer fecha",
       reset: "Volver al vencimiento calculado",
     },
+    resetHint: "Quita las extensiones y fechas que pusiste a mano. Los días de promociones se quedan.",
     daysSuffix: "días → nuevo vencimiento:",
     reasonLabel: "Motivo",
     reasonPlaceholder: "Ej. Pausa por viaje o compensación por cierre del gym",
@@ -401,9 +421,9 @@ export const members = {
     loadTypes: "No pudimos cargar las membresías.",
   },
   import: {
-    title: "Importar socios desde Excel",
+    title: "Importar socios desde CSV",
     subtitle:
-      "Sube tu libreta exportada como CSV y damos de alta a todos en un click.",
+      "Prepara tu archivo, revisa los socios y confirma la importación.",
     backToList: "Volver a socios",
     steps: {
       one: "1. Sube tu archivo",
@@ -420,16 +440,16 @@ export const members = {
       structure: {
         title: "Cómo debe verse tu archivo",
         intro:
-          "La primera fila son los nombres de las columnas. Estas son las 5 obligatorias para los socios y 3 opcionales para asignarles membresía:",
-        required: "Obligatorias:",
+          "Usa la plantilla o asocia las columnas de tu archivo. Nombre y teléfono son necesarios; los demás datos pueden quedar vacíos.",
+        required: "Datos del socio:",
         optional: "Opcionales (membresía actual):",
         rules: {
           phone: "Teléfono: 10 dígitos sin espacios ni guiones.",
-          dates: "Fechas: en formato AAAA-MM-DD (por ejemplo 1990-03-15).",
+          dates: "Fechas: escribe año-mes-día. Por ejemplo, el 15 de marzo de 1990 se escribe 1990-03-15.",
           membership:
             "Si llenas las 3 columnas de membresía, te traes al socio con su plan ya al día. Si las dejas vacías, lo cobras después.",
           plan:
-            "El nombre del plan tiene que existir en Configuración antes de importar.",
+            "Crea el plan en Membresías antes de importar y usa exactamente el mismo nombre.",
         },
       },
       continue: "Continuar",
@@ -486,7 +506,7 @@ export const members = {
       networkRetry: "Falló la subida. Vuelve a intentar.",
     },
     cta: {
-      importFromExcel: "Importar desde Excel",
+      importFromExcel: "Importar socios",
     },
   },
 };

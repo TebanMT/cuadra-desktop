@@ -7,14 +7,12 @@ import {
   BarChart,
   CartesianGrid,
   Legend,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
-import { ArrowUpRight, HelpCircle } from "lucide-react";
+import { ChevronRight, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -39,8 +37,10 @@ import {
   type ReportView,
 } from "@/lib/report-period";
 import { fmtDate } from "@/lib/dates";
+import { reports as rt } from "@/strings/reports";
 import { api } from "@/lib/api";
 import {
+  CHART_COLORS,
   CHART_MARGINS,
   GRID_PROPS,
   X_AXIS_PROPS,
@@ -96,6 +96,8 @@ export function ReportHelp({
   );
 }
 
+/** La comparación siempre lleva cifra: «+12% · antes $10,500». Sin dato
+ * del período anterior no se muestra nada (nunca un porcentaje suelto). */
 function Delta({
   metric,
   monetary = true,
@@ -104,12 +106,44 @@ function Delta({
   monetary?: boolean;
 }) {
   const money = useMoneyVisibility();
-  if ((monetary && money.hidden) || metric?.delta_pct == null) return null;
+  if ((monetary && money.hidden) || metric?.delta == null) return null;
+  const previous = metric.value - metric.delta;
+  const shown = monetary
+    ? money.fmt(previous)
+    : previous.toLocaleString("es-MX");
+  const pct =
+    metric.delta_pct == null
+      ? null
+      : `${metric.delta_pct > 0 ? "+" : ""}${metric.delta_pct.toFixed(0)}%`;
   return (
-    <span className="text-xs tabular text-muted-foreground">
-      {metric.delta_pct > 0 ? "+" : ""}
-      {metric.delta_pct.toFixed(0)}%
+    <span className="block text-xs tabular text-muted-foreground">
+      {pct && <>{pct} · </>}antes {shown}
     </span>
+  );
+}
+
+function hasComparison(metrics: (KpiTrend | undefined)[]) {
+  return metrics.some((metric) => metric?.delta != null);
+}
+
+/** Explica a qué período se refiere «antes». Si ninguna cifra trae
+ * comparación, desaparece. */
+function ComparisonCaption({
+  data,
+  metrics,
+  monetary = true,
+}: {
+  data: ReportsRangeData;
+  metrics: (KpiTrend | undefined)[];
+  monetary?: boolean;
+}) {
+  const money = useMoneyVisibility();
+  if ((monetary && money.hidden) || !hasComparison(metrics)) return null;
+  const previous = comparisonDates(data);
+  return (
+    <p className="text-xs text-muted-foreground">
+      «Antes» es el período del {fmtDate(previous.from)} al {fmtDate(previous.to)}.
+    </p>
   );
 }
 
@@ -123,10 +157,9 @@ export function FinancialSummary({
   const money = useMoneyVisibility(),
     s = reportSummary(data);
   const fmt = (value?: number) =>
-    value == null ? "No disponible" : money.fmt(value).replace(/\.00$/, "");
+    value == null ? "No disponible" : money.fmt(value);
   const integrity = data.integrity;
   const resultLabel = s.resultIsPartial ? "Resultado parcial" : "Resultado";
-  const previous = comparisonDates(data);
   const incomeRows = [
     { label: "Membresías", value: s.membershipIncome?.value },
     {
@@ -180,9 +213,31 @@ export function FinancialSummary({
         from={data.from}
         to={data.to}
       />
+      {/* Orden de lectura = orden visual: Ingresos − Salidas = Resultado.
+          Un lector de pantalla no debe oír el resultado antes que sus partes. */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <section
-          className="order-first col-span-2 rounded-xl border bg-card p-4 md:order-last md:col-span-1"
+          className="min-w-0 rounded-xl border bg-card p-4"
+          aria-label="Ingresos"
+        >
+          <h2 className="text-sm font-medium">Ingresos</h2>
+          <p className="mt-2 break-words font-display text-xl tabular sm:text-2xl">
+            {fmt(s.income.value)}
+          </p>
+          <Delta metric={s.income} />
+        </section>
+        <section
+          className="min-w-0 rounded-xl border bg-card p-4"
+          aria-label="Salidas"
+        >
+          <h2 className="text-sm font-medium">Salidas</h2>
+          <p className="mt-2 break-words font-display text-xl tabular sm:text-2xl">
+            {fmt(s.outflows?.value)}
+          </p>
+          <Delta metric={s.outflows} />
+        </section>
+        <section
+          className="col-span-2 min-w-0 rounded-xl border bg-card p-4 md:col-span-1"
           aria-label={resultLabel}
         >
           <div className="flex items-center justify-between">
@@ -193,7 +248,7 @@ export function FinancialSummary({
             </ReportHelp>
           </div>
           <p
-            className={`mt-1 break-words text-3xl font-bold tabular ${s.resultIsPartial ? "text-warning-foreground" : (s.periodResult?.value ?? 0) < 0 ? "text-destructive" : "text-foreground"}`}
+            className={`mt-1 break-words font-display text-3xl tabular ${s.resultIsPartial ? "text-warning-foreground" : (s.periodResult?.value ?? 0) < 0 ? "text-destructive" : "text-foreground"}`}
           >
             {fmt(s.periodResult?.value)}
           </p>
@@ -205,30 +260,11 @@ export function FinancialSummary({
             <Delta metric={s.periodResult} />
           )}
         </section>
-        <section
-          className="min-w-0 rounded-xl border bg-card p-4"
-          aria-label="Ingresos"
-        >
-          <h2 className="text-sm font-medium">Ingresos</h2>
-          <p className="mt-2 break-words text-xl font-bold tabular sm:text-2xl">
-            {fmt(s.income.value)}
-          </p>
-          <Delta metric={s.income} />
-        </section>
-        <section
-          className="min-w-0 rounded-xl border bg-card p-4"
-          aria-label="Salidas"
-        >
-          <h2 className="text-sm font-medium">Salidas</h2>
-          <p className="mt-2 break-words text-xl font-bold tabular sm:text-2xl">
-            {fmt(s.outflows?.value)}
-          </p>
-          <Delta metric={s.outflows} />
-        </section>
       </div>
-      <p className="text-xs text-muted-foreground">
-        Comparado con {fmtDate(previous.from)} — {fmtDate(previous.to)}
-      </p>
+      <ComparisonCaption
+        data={data}
+        metrics={[s.income, s.outflows, s.resultIsPartial ? undefined : s.periodResult]}
+      />
       <div className="grid gap-4 md:grid-cols-2">
         <Breakdown title="Ingresos" rows={incomeRows} fmt={fmt}>
           <ReportLink to={reportLink(paths.income, data.from, data.to)}>
@@ -274,11 +310,11 @@ export function ReportLink({
 }) {
   return (
     <Link
-      className="inline-flex min-h-10 items-center gap-1 text-sm font-medium text-primary hover:underline"
+      className="inline-flex min-h-11 items-center gap-0.5 text-sm font-medium text-primary hover:underline"
       to={to}
     >
       {children}
-      <ArrowUpRight aria-hidden className="h-3.5 w-3.5 shrink-0" />
+      <ChevronRight aria-hidden className="h-4 w-4 shrink-0" />
     </Link>
   );
 }
@@ -327,13 +363,7 @@ export function ReportContent({
 }) {
   const money = useMoneyVisibility();
   const s = reportSummary(data);
-  const fmt = (value: number) => money.fmt(value).replace(/\.00$/, "");
-  const previous = comparisonDates(data);
-  const comparison = (
-    <p className="text-xs text-muted-foreground">
-      Comparado con {fmtDate(previous.from)} — {fmtDate(previous.to)}
-    </p>
-  );
+  const fmt = (value: number) => money.fmt(value);
   if (view === "members")
     return (
       <div className="space-y-5">
@@ -349,7 +379,11 @@ export function ReportContent({
             metric={data.totals.checkins}
           />
         </div>
-        {comparison}
+        <ComparisonCaption
+          data={data}
+          metrics={[data.totals.new_members, data.totals.checkins]}
+          monetary={false}
+        />
         <ReportTrend
           key="attendance"
           data={data}
@@ -386,7 +420,7 @@ export function ReportContent({
             }
           />
         </div>
-        {comparison}
+        <ComparisonCaption data={data} metrics={[s.productIncome]} />
         <SectionCard
           title="Productos con más ingresos"
           description="Ordenados por cobros del período, incluidos abonos."
@@ -428,17 +462,20 @@ export function ReportContent({
         {data.critical_stock && (
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
             <div>
-              <h3 className="text-sm font-semibold">Inventario hoy</h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {data.critical_stock.out_count} sin existencias ·{" "}
-                {data.critical_stock.low_count} bajo mínimo
+              {/* Mismo nombre y filtro que Inicio y Productos: «Por surtir». */}
+              <h3 className="text-sm font-semibold">{rt.kpis.criticalStock} hoy</h3>
+              <p className="mt-1 text-sm tabular text-muted-foreground">
+                {rt.kpis.criticalStockHint(
+                  data.critical_stock.out_count,
+                  data.critical_stock.low_count,
+                )}
               </p>
             </div>
-            <ReportLink to="/products?low_stock=1">Ver productos</ReportLink>
+            <ReportLink to="/products?low_stock=1">Ver productos por surtir</ReportLink>
           </div>
         )}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
-          <span className="text-sm">Ganancia de productos · Plus</span>
+          <span className="text-sm">Ganancia de productos</span>
           <ReportLink
             to={reportLink(paths.analysis, data.from, data.to, {
               view: "products",
@@ -512,7 +549,7 @@ function NumberCard({
   return (
     <section className="min-w-0 rounded-xl border bg-card p-4">
       <h2 className="text-sm text-muted-foreground">{label}</h2>
-      <p className="mt-2 break-words text-2xl font-bold tabular">{value}</p>
+      <p className="mt-2 break-words font-display text-2xl tabular">{value}</p>
       <Delta metric={metric} monetary={monetary} />
     </section>
   );
@@ -577,7 +614,9 @@ function CurrentMembers({ data }: { data: ReportsRangeData }) {
             value: counts.data?.expiring_soon,
             status: "expiring_soon",
           },
-          { label: "Vencidos", value: counts.data?.expired, status: "expired" },
+          // Mismo conteo y nombre que el filtro de Socios: vencidos, sin
+          // primer pago y sin membresía.
+          { label: "Sin vigencia", value: counts.data?.expired, status: "expired" },
           {
             label: "Con saldo",
             value: current.data?.attention_summary?.pending_balance,
@@ -758,7 +797,15 @@ export function ReportTrend({
         <>
           <div className="h-56 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={series.rows} margin={CHART_MARGINS}>
+              {/* Datos por día o por mes: barras, no línea. Una barra por
+                  período se lee como «cuánto ese día»; la línea sugiere una
+                  continuidad que no existe. */}
+              <BarChart
+                data={series.rows}
+                margin={CHART_MARGINS}
+                barGap={2}
+                barCategoryGap="24%"
+              >
                 <CartesianGrid {...GRID_PROPS} />
                 <XAxis dataKey="label" {...X_AXIS_PROPS} />
                 <YAxis
@@ -769,39 +816,43 @@ export function ReportTrend({
                 />
                 <Tooltip
                   contentStyle={TOOLTIP_STYLE}
+                  cursor={{ fill: "hsl(var(--muted) / 0.6)" }}
+                  labelStyle={{ color: "hsl(var(--foreground))", fontWeight: 600 }}
                   formatter={(value: number) => fmt(value)}
                 />
-                <Legend />
+                {monetary && (
+                  <Legend iconType="square" wrapperStyle={{ fontSize: 12 }} />
+                )}
                 {monetary ? (
                   <>
-                    <Line
+                    <Bar
                       isAnimationActive={false}
                       dataKey="income"
                       name="Ingresos"
-                      stroke="hsl(var(--chart-1))"
-                      strokeWidth={2}
-                      dot={series.rows.length === 1}
+                      fill="hsl(var(--primary))"
+                      radius={[2, 2, 0, 0]}
+                      maxBarSize={28}
                     />
-                    <Line
+                    <Bar
                       isAnimationActive={false}
                       dataKey="outflows"
                       name="Salidas"
-                      stroke="hsl(var(--destructive))"
-                      strokeWidth={2}
-                      dot={series.rows.length === 1}
+                      fill={CHART_COLORS.danger}
+                      radius={[2, 2, 0, 0]}
+                      maxBarSize={28}
                     />
                   </>
                 ) : (
-                  <Line
+                  <Bar
                     isAnimationActive={false}
                     dataKey="count"
                     name="Asistencias"
-                    stroke="hsl(var(--chart-2))"
-                    strokeWidth={2}
-                    dot={series.rows.length === 1}
+                    fill="hsl(var(--primary))"
+                    radius={[2, 2, 0, 0]}
+                    maxBarSize={32}
                   />
                 )}
-              </LineChart>
+              </BarChart>
             </ResponsiveContainer>
           </div>
           <Button

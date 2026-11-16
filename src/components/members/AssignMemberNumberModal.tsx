@@ -1,3 +1,4 @@
+import { useCanWrite, READ_ONLY_MESSAGE } from "@/lib/writeAccess";
 import { useEffect, useState } from "react";
 import { Loader2, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ interface Props {
 }
 
 export function AssignMemberNumberModal({ memberId, memberName, initialNumber, open, onOpenChange }: Props) {
+  const canWrite = useCanWrite();
   const assign = useAssignMemberNumber(memberId);
   const [number, setNumber] = useState<number | null>(null);
   // dispatch refleja el último resultado del envío por WhatsApp tras un
@@ -37,13 +39,14 @@ export function AssignMemberNumberModal({ memberId, memberName, initialNumber, o
         setNumber(initialNumber);
       } else {
         setNumber(null);
-        generate();
+        if (canWrite) generate();
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, initialNumber]);
+  }, [open, initialNumber, canWrite]);
 
   async function generate() {
+    if (!canWrite || assign.isPending) return;
     setError(null);
     try {
       const res = await assign.mutateAsync();
@@ -51,8 +54,7 @@ export function AssignMemberNumberModal({ memberId, memberName, initialNumber, o
       setDispatch(res.dispatch ?? null);
     } catch (err) {
       if (err instanceof ApiError) {
-        const data = err.details as Record<string, unknown> | null;
-        setError((data?.exception as string | undefined) || t.form.errors.generic);
+        setError(err.message || t.form.errors.generic);
       } else {
         setError(t.form.errors.generic);
       }
@@ -83,7 +85,7 @@ export function AssignMemberNumberModal({ memberId, memberName, initialNumber, o
             </Alert>
           )}
 
-          <p className="text-sm text-muted-foreground">{t.memberNumber.description}</p>
+          <p className="text-sm text-muted-foreground">{canWrite ? t.memberNumber.description : READ_ONLY_MESSAGE}</p>
 
           <div className="rounded-lg border-2 border-primary/20 bg-primary/5 p-6 text-center space-y-2">
             <div className="text-sm font-medium text-muted-foreground">
@@ -116,7 +118,7 @@ export function AssignMemberNumberModal({ memberId, memberName, initialNumber, o
             <Button
               variant="outline"
               onClick={generate}
-              disabled={assign.isPending}
+              disabled={!canWrite || assign.isPending}
               type="button"
             >
               <RefreshCw className="h-4 w-4" />

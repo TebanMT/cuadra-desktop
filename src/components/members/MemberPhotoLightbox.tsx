@@ -20,6 +20,11 @@ interface Props {
   // En tablas con row-click, evita que el clic abra el detalle del socio
   // al mismo tiempo. Default false para callers donde no hay row-click.
   stopPropagation?: boolean;
+  // false cuando el socio no tiene `photo_url`: no pedimos la foto al
+  // sidecar (sería un 404 seguro) y el avatar queda como iniciales sin
+  // botón, porque no hay nada que ver. undefined conserva el
+  // comportamiento anterior para callers que no conocen el dato.
+  hasPhoto?: boolean;
 }
 
 // MemberPhotoLightbox — avatar clickeable que abre la foto del socio en
@@ -31,21 +36,36 @@ interface Props {
 // resuelve esto sin meter una página separada — clic, ver, cerrar con
 // Esc o click fuera.
 //
-// Sin foto: el dialog muestra las mismas iniciales del avatar pero en
-// formato grande, con un texto "Este socio no tiene foto" — útil para
-// confirmar el estado rápido sin tener que pasar a editar.
+// Sin foto registrada (`hasPhoto={false}`): sólo iniciales, sin botón ni
+// «Ver foto de…». Con foto registrada que todavía no llega al caché local,
+// el diálogo lo explica en vez de decir que no hay foto.
 export function MemberPhotoLightbox({
   memberId,
   fullName,
   avatarClassName,
   fallbackClassName,
   stopPropagation,
+  hasPhoto,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
-  const src = useMemberPhotoSrc(memberId);
+  const src = useMemberPhotoSrc(hasPhoto === false ? undefined : memberId);
   const palette = getAvatarPalette(fullName);
   const initials = getInitials(fullName);
+
+  if (hasPhoto === false) {
+    // El nombre siempre acompaña al avatar: las iniciales son decorativas.
+    return (
+      <Avatar className={avatarClassName} aria-hidden>
+        <AvatarFallback
+          className={cn("font-semibold", fallbackClassName)}
+          style={{ backgroundColor: palette.bg, color: palette.text }}
+        >
+          {initials}
+        </AvatarFallback>
+      </Avatar>
+    );
+  }
 
   function handleClick(e: React.MouseEvent) {
     if (stopPropagation) e.stopPropagation();
@@ -92,7 +112,9 @@ export function MemberPhotoLightbox({
                 >
                   {initials}
                 </div>
-                <p className="text-sm text-muted-foreground">Este socio no tiene foto.</p>
+                <p className="text-sm text-muted-foreground">
+                  {hasPhoto ? "La foto todavía no se descarga en esta computadora. Aparecerá al sincronizar." : "Este socio no tiene foto."}
+                </p>
               </>
             )}
           </div>

@@ -76,6 +76,7 @@ const emptyValues: ExpenseFormValues = {
 };
 
 export function ExpenseForm({ mode, initial, submitting, onSubmit, onCancel, serverError, cashMovements = [], occurrences = [], lockedCategory = false, submitLabel }: Props) {
+  const [cashReady, setCashReady] = useState(false);
   const [values, setValues] = useState<ExpenseFormValues>(() => ({ ...emptyValues, expense_date: todayIso(), ...initial }));
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof ExpenseFormValues, string>>>({});
   const [classificationTouched, setClassificationTouched] = useState(!!initial);
@@ -106,6 +107,7 @@ export function ExpenseForm({ mode, initial, submitting, onSubmit, onCancel, ser
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (values.paid_from === "cash_drawer" && !usesCash && !cashReady) { setFieldErrors({ paid_from: "Confirma la caja antes de guardar." }); return; }
     setFieldErrors({});
 
     const nextErrors: Partial<Record<keyof ExpenseFormValues, string>> = {};
@@ -226,7 +228,7 @@ export function ExpenseForm({ mode, initial, submitting, onSubmit, onCancel, ser
       </div>
 
       {values.paid_from === "cash_drawer" && (
-        <CashDrawerField
+        <CashDrawerField onReadyChange={setCashReady}
           value={values.cash_drawer_id}
           onChange={(value) => update("cash_drawer_id", value)}
           id="expense-cash-drawer"
@@ -297,7 +299,7 @@ export function ExpenseForm({ mode, initial, submitting, onSubmit, onCancel, ser
         <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           {t.form.cancel}
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button requiresWrite type="submit" disabled={submitting || (values.paid_from === "cash_drawer" && !usesCash && !cashReady)}>
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {submitLabel ?? (mode === "edit" ? "Guardar cambios" : t.form.submit)}
         </Button>

@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { useEffect, useState } from "react";
 import { KeyRound, Loader2, Trash2 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/dialog";
 import { useQueryClient } from "@tanstack/react-query";
 import { auth as authStrings } from "@/strings/auth";
+import { SettingsBackLink } from "@/components/settings/SettingsBackLink";
 
 const NAME_LOOKS_LIKE_EMAIL = /[@]/;
 
@@ -115,6 +117,13 @@ export default function ProfilePage() {
     setPhoneNumber(split.number);
   }, [user?.phone]);
 
+  // Un operador dado de alta sólo con teléfono no tiene correo: entra con
+  // su PIN y nada más. No le mostramos un campo vacío ni le hablamos de
+  // correo y contraseña, y no le ofrecemos borrar el PIN (se quedaría sin
+  // forma de entrar hasta que el dueño le genere otro).
+  const email = user?.email?.trim() ?? "";
+  const hasEmail = email.length > 0;
+
   const looksWrong =
     !!user?.full_name && NAME_LOOKS_LIKE_EMAIL.test(user.full_name);
 
@@ -151,8 +160,9 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl mx-auto">
+    <PageContainer contentWidth="form" className="space-y-6">
       <div className="space-y-1">
+        <SettingsBackLink />
         <h1
           className="text-3xl font-bold text-foreground"
           style={{ letterSpacing: "-0.02em" }}
@@ -188,22 +198,19 @@ export default function ProfilePage() {
               autoFocus
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
-              placeholder="Ej. Esteban Mendiola"
+              placeholder="Ej. Ana López Ruiz"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="email">Correo electrónico</Label>
-            <Input
-              id="email"
-              value={user?.email ?? ""}
-              disabled
-              className="opacity-60"
-            />
-            <p className="text-xs text-muted-foreground">
-              Para cambiar el correo, contacta al dueño del gym.
-            </p>
-          </div>
+          {hasEmail && (
+            <dl className="space-y-1">
+              <dt className="text-sm font-medium">Correo electrónico</dt>
+              <dd className="text-sm">{email}</dd>
+              <dd className="text-xs text-muted-foreground">
+                {user?.role === "owner" ? "Para cambiar tu correo, contacta a soporte desde Ayuda." : "Para cambiar el correo, pídeselo al dueño del gimnasio."}
+              </dd>
+            </dl>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="phone">Teléfono (opcional)</Label>
@@ -217,7 +224,7 @@ export default function ProfilePage() {
           </div>
 
           <div className="flex justify-end pt-2">
-            <Button
+            <Button requiresWrite
               type="submit"
               size="lg"
               disabled={update.isPending}
@@ -233,12 +240,13 @@ export default function ProfilePage() {
       <SectionCard title="PIN de recepción">
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground">
-            Es lo que tocas en la pantalla de inicio para entrar rápido sin
-            tipear tu correo y contraseña.
+            {hasEmail
+              ? "Son 4 dígitos para entrar rápido a la recepción sin escribir tu correo y contraseña."
+              : "Son los 4 dígitos con los que entras a la recepción. Si lo olvidas, el dueño puede generarte uno nuevo."}
           </p>
           {user?.has_pin ? (
             <div className="flex flex-col sm:flex-row gap-2">
-              <Button
+              <Button requiresWrite
                 type="button"
                 variant="outline"
                 onClick={openPinDialog}
@@ -246,18 +254,20 @@ export default function ProfilePage() {
               >
                 <KeyRound className="h-4 w-4 mr-2" /> Cambiar PIN
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={removePIN}
-                disabled={clearPIN.isPending}
-                className="text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4 mr-2" /> Borrar PIN
-              </Button>
+              {hasEmail && (
+                <Button requiresWrite
+                  type="button"
+                  variant="ghost"
+                  onClick={removePIN}
+                  disabled={clearPIN.isPending}
+                  className="text-destructive hover:bg-destructive/10"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" /> Borrar PIN
+                </Button>
+              )}
             </div>
           ) : (
-            <Button
+            <Button requiresWrite
               type="button"
               onClick={openPinDialog}
               disabled={assignPIN.isPending}
@@ -291,6 +301,7 @@ export default function ProfilePage() {
               disabled={assignPIN.isPending}
               size="lg"
               ariaLabel="PIN"
+              masked
             />
           ) : (
             <NumberPad
@@ -300,10 +311,11 @@ export default function ProfilePage() {
               disabled={assignPIN.isPending}
               size="lg"
               ariaLabel="PIN"
+              masked
             />
           )}
         </DialogContent>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

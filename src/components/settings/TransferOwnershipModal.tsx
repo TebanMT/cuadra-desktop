@@ -172,7 +172,7 @@ export function TransferOwnershipModal({ open, onOpenChange }: Props) {
               <Button variant="outline" onClick={() => onOpenChange(false)} disabled={confirm.isPending}>
                 {t.transfer.cancel}
               </Button>
-              <Button onClick={confirmTransfer} disabled={confirm.isPending}>
+              <Button requiresWrite onClick={confirmTransfer} disabled={confirm.isPending}>
                 {confirm.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {confirm.isPending ? t.transfer.confirming : t.transfer.confirm}
               </Button>

@@ -100,6 +100,7 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
 
   const [draft, setDraft] = useState<RefundDraft>({});
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [cashReady, setCashReady] = useState(false);
   const [cashDrawerId, setCashDrawerId] = useState<string>();
   const [date, setDate] = useState(todayIso());
   const [reason, setReason] = useState("");
@@ -219,6 +220,7 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
     event.preventDefault();
     setError(null);
     if (!isOwner || !sale) return;
+    if (method === "cash" && preview.moneyReturned > 0 && !cashReady) return setError("Confirma la caja antes de registrar la devolución.");
     if (selectedLines.length === 0) {
       setError(t.page.refund.errors.noLines);
       return;
@@ -260,9 +262,7 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
       if (caught instanceof ApiError) {
         const details = caught.details as Record<string, unknown> | null;
         setError(
-          (details?.exception as string | undefined) ||
-            (details?.message as string | undefined) ||
-            caught.message ||
+          caught.message ||
             t.page.refund.errors.generic
         );
         return;
@@ -272,7 +272,7 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => !refund.isPending && onOpenChange(next)}>
+    <Dialog busy={refund.isPending} open={open} onOpenChange={(next) => !refund.isPending && onOpenChange(next)}>
       <DialogContent
         className="max-h-[92vh] max-w-4xl overflow-y-auto"
         onInteractOutside={(event) => event.preventDefault()}
@@ -327,10 +327,10 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
 
             <div className="flex flex-wrap items-end justify-between gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
               <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                <p className="text-xs font-medium text-muted-foreground">
                   {t.page.refund.availableMoney}
                 </p>
-                <p className="mt-1 text-xl font-bold tabular text-foreground">
+                <p className="mt-1 font-display tabular text-xl text-foreground">
                   {fmtMoney(sale.refundable)}
                 </p>
               </div>
@@ -396,7 +396,7 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
                             onChange={(event) => setQuantity(line, Number(event.target.value))}
                             disabled={!lineDraft.selected || max <= 0}
                             aria-label={`Cantidad a devolver de ${line.product_name}`}
-                            className="mx-auto h-9 w-24 text-center tabular"
+                            className="mx-auto h-11 w-24 text-center tabular"
                           />
                         </td>
                         <td className="px-3 py-3">
@@ -494,7 +494,7 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
                 </fieldset>
 
                 {method === "cash" && (
-                  <CashDrawerField
+                  <CashDrawerField onReadyChange={setCashReady}
                     date={date}
                     value={cashDrawerId}
                     onChange={setCashDrawerId}
@@ -547,10 +547,10 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
               >
                 {t.page.refund.cancel}
               </Button>
-              <Button
+              <Button requiresWrite
                 type="submit"
                 variant="destructive"
-                disabled={refund.isPending || selectedLines.length === 0}
+                disabled={refund.isPending || selectedLines.length === 0 || (method === "cash" && preview.moneyReturned > 0 && !cashReady)}
               >
                 {refund.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
                 {refund.isPending ? t.page.refund.submitting : t.page.refund.submit}
@@ -566,8 +566,8 @@ export function ProductRefundModal({ saleId, open, onOpenChange }: ProductRefund
 function PreviewNumber({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-border bg-card px-4 py-3">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="mt-1 text-xl font-bold tabular text-foreground">{value}</p>
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+      <p className="mt-1 font-display tabular text-xl text-foreground">{value}</p>
     </div>
   );
 }

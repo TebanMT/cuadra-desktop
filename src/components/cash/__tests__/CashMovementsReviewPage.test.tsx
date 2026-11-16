@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { useAuthStore } from "@/stores/useAuthStore";
 import type { CashCloseReport, CashSessionSnapshot } from "@/hooks/useCashClose";
 const mock = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("@/lib/api", () => ({ api: { get: mock.get } }));
@@ -24,7 +25,8 @@ function show(search = cashMovementReviewSearch(date, opened.drawer_id)) {
 }
 
 describe("Detalle de movimientos de caja", () => {
-  beforeEach(() => { vi.clearAllMocks(); mock.get.mockResolvedValue(report()); });
+  // The page lives behind OwnerOnlyRoute: the owner is signed in.
+  beforeEach(() => { vi.clearAllMocks(); useAuthStore.setState({ user: { user_id: "owner", role: "owner" } as never }); mock.get.mockResolvedValue(report()); });
   it("muestra los cinco cobros y devoluciones aunque no haya movimientos de efectivo registrados aparte", async () => {
     show();
     expect(await screen.findByText("Mensualidad")).toBeVisible();

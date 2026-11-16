@@ -1,5 +1,7 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { useCanWrite, READ_ONLY_MESSAGE } from "@/lib/writeAccess";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
   ArrowLeft,
@@ -11,6 +13,7 @@ import {
   AlertCircle,
   Loader2,
   RefreshCw,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -33,6 +36,7 @@ import { useAuthStore } from "@/stores/useAuthStore";
 import { ApiError } from "@/lib/api";
 import { members as t } from "@/strings/members";
 import {
+  MEMBER_CSV_FIELDS, inferMemberColumns, mapMemberCSV, summarizeMemberImport,
   buildMembersCSVTemplate,
   normalizePhoneForCompare,
   parseCSVForPreview,
@@ -49,14 +53,19 @@ const MAX_BYTES = 5 * 1024 * 1024;
 const DUP_SNAPSHOT_PAGE_SIZE = 500;
 
 export default function MemberImportPage() {
+  const canWrite = useCanWrite();
   const navigate = useNavigate();
   const role = useAuthStore((s) => s.user?.role);
   const isOwner = role === "owner";
 
   const [stage, setStage] = useState<Stage>("pick");
   const [file, setFile] = useState<File | null>(null);
-  const [rawText, setRawText] = useState<string>("");
-  const [parsed, setParsed] = useState<string[][]>([]);
+  const [sourceRows, setSourceRows] = useState<string[][]>([]);
+  const [columns, setColumns] = useState<number[]>([]);
+  const rawText = useMemo(() => mapMemberCSV(sourceRows, columns), [sourceRows, columns]);
+  const parsed = useMemo(() => parseCSVForPreview(rawText), [rawText]);
+  const selectedColumns = columns.filter(index => index >= 0);
+  const mappingValid = columns[0] >= 0 && columns[1] >= 0 && new Set(selectedColumns).size === selectedColumns.length;
   const [pickError, setPickError] = useState<string | null>(null);
   const [allowDuplicates, setAllowDuplicates] = useState(false);
   const [result, setResult] = useState<ImportMembersResponse | null>(null);
@@ -78,7 +87,7 @@ export default function MemberImportPage() {
   const importMutation = useImportMembers();
 
   // Filas de datos parseadas (sin header). Validamos liviano para preview.
-  const dataRows = parsed.length > 1 ? parsed.slice(1) : [];
+  const dataRows = useMemo(() => parsed.length > 1 ? parsed.slice(1) : [], [parsed]);
   const previewRows = dataRows.slice(0, 20);
 
   // Detección client-side de duplicados intra-base y intra-archivo. El BE
@@ -116,8 +125,8 @@ export default function MemberImportPage() {
       const txt = String(reader.result || "");
       const rows = parseCSVForPreview(txt);
       setFile(f);
-      setRawText(txt);
-      setParsed(rows);
+      setSourceRows(rows);
+      setColumns(inferMemberColumns(rows[0] ?? []));
     };
     reader.onerror = () => setPickError(t.import.errors.generic);
     reader.readAsText(f, "UTF-8");
@@ -138,11 +147,11 @@ export default function MemberImportPage() {
   }
 
   async function handleSubmit() {
-    if (!file) return;
+    if (!canWrite || !file || !mappingValid || importMutation.isPending) return;
     setResult(null);
     try {
       const res = await importMutation.mutateAsync({
-        file,
+        file: new File([rawText], file.name, { type: "text/csv" }),
         allow_duplicates: allowDuplicates,
       });
       setResult(res);
@@ -162,20 +171,20 @@ export default function MemberImportPage() {
   function resetForAnother() {
     setStage("pick");
     setFile(null);
-    setRawText("");
-    setParsed([]);
+    setSourceRows([]);
+    setColumns([]);
     setPickError(null);
     setAllowDuplicates(false);
     setResult(null);
   }
 
   // Operador (no-owner) ve un read-only con explicación + link al dueño.
-  if (!isOwner) {
+  if (!isOwner || !canWrite) {
     return (
-      <div className="p-6 space-y-6 max-w-3xl mx-auto">
+      <PageContainer contentWidth="form" className="space-y-6">
         <PageHeader
           title={t.import.title}
-          subtitle="Solo el dueño del gym puede importar masivo."
+          subtitle={!canWrite ? READ_ONLY_MESSAGE : "Solo el dueño del gimnasio puede importar socios."}
           actions={
             <Button variant="outline" onClick={() => navigate("/members")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -190,12 +199,12 @@ export default function MemberImportPage() {
             que entre con su cuenta para importar.
           </AlertDescription>
         </Alert>
-      </div>
+      </PageContainer>
     );
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-4xl mx-auto">
+    <PageContainer contentWidth="reading" className="space-y-6">
       <PageHeader
         title={t.import.title}
         subtitle={t.import.subtitle}
@@ -212,6 +221,7 @@ export default function MemberImportPage() {
       {stage === "pick" && (
         <PickStep
           file={file}
+          headers={sourceRows[0] ?? []} columns={columns} onColumns={setColumns} mappingValid={mappingValid}
           pickError={pickError}
           dataRowsCount={dataRows.length}
           onFile={handleFileSelected}
@@ -224,6 +234,7 @@ export default function MemberImportPage() {
         <PreviewStep
           dataRowsCount={dataRows.length}
           previewRows={previewRows}
+          allRows={dataRows}
           dupInBase={dupAnalysis.inBase}
           dupInFile={dupAnalysis.inFile}
           allowDuplicates={allowDuplicates}
@@ -241,7 +252,7 @@ export default function MemberImportPage() {
           onGoToList={() => navigate("/members")}
         />
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -281,6 +292,7 @@ function StepBar({ stage }: { stage: Stage }) {
 
 interface PickStepProps {
   file: File | null;
+  headers: string[]; columns: number[]; onColumns(value: number[]): void; mappingValid: boolean;
   pickError: string | null;
   dataRowsCount: number;
   onFile(f: File | undefined | null): void;
@@ -289,6 +301,7 @@ interface PickStepProps {
 }
 
 function PickStep({
+  headers, columns, onColumns, mappingValid,
   file,
   pickError,
   dataRowsCount,
@@ -316,7 +329,7 @@ function PickStep({
             onFile(e.dataTransfer.files?.[0]);
           }}
           className={
-            "w-full flex flex-col items-center justify-center gap-3 py-12 px-6 rounded-lg border-2 border-dashed transition-colors text-center " +
+            "w-full flex flex-col items-center justify-center gap-3 px-6 rounded-lg border-2 border-dashed transition-colors text-center " + (file ? "py-5 " : "py-10 ") +
             (isDrag
               ? "border-foreground bg-muted/40"
               : "border-border hover:border-foreground/40 hover:bg-muted/20")
@@ -381,31 +394,42 @@ function PickStep({
         </div>
       </SectionCard>
 
+      {file && <SectionCard title="Asociar columnas" description="Revisa qué columna del archivo corresponde a cada dato. Las columnas opcionales pueden quedar vacías.">
+        <div className="grid gap-4 sm:grid-cols-2">{MEMBER_CSV_FIELDS.map((field, index) => <label key={field.key} className="space-y-1 text-sm">
+          <span className="block font-medium">{field.label}</span>
+          <select className="h-11 w-full rounded-md border bg-background px-3" value={columns[index] ?? -1} onChange={event => onColumns(columns.map((value, position) => position === index ? Number(event.target.value) : value))}>
+            <option value={-1}>Sin columna</option>
+            {headers.map((header, position) => <option key={position} value={position}>{header || `Columna ${position + 1}`}</option>)}
+          </select>
+        </label>)}</div>
+        {!mappingValid && <p role="status" className="mt-3 text-sm text-warning">Asocia Nombre y Teléfono. Cada columna debe usarse una sola vez.</p>}
+      </SectionCard>}
+
       <SectionCard
         title={t.import.step1.structure.title}
         description={t.import.step1.structure.intro}
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+            <p className="mb-2 text-sm font-medium text-muted-foreground">
               {t.import.step1.structure.required}
             </p>
-            <ul className="text-sm space-y-1 font-mono">
-              <li>full_name</li>
-              <li>phone</li>
-              <li>email</li>
-              <li>birthdate</li>
-              <li>notes</li>
+            <ul className="text-sm space-y-1">
+              <li>Nombre completo</li>
+              <li>Teléfono</li>
+              <li>Correo (opcional)</li>
+              <li>Nacimiento (opcional)</li>
+              <li>Notas (opcional)</li>
             </ul>
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wider font-semibold text-muted-foreground mb-2">
+            <p className="mb-2 text-sm font-medium text-muted-foreground">
               {t.import.step1.structure.optional}
             </p>
-            <ul className="text-sm space-y-1 font-mono">
-              <li>membership_type_name</li>
-              <li>membership_start_date</li>
-              <li>membership_expiry_date</li>
+            <ul className="text-sm space-y-1">
+              <li>Nombre del plan</li>
+              <li>Fecha de inicio</li>
+              <li>Fecha de vencimiento</li>
             </ul>
           </div>
         </div>
@@ -413,13 +437,13 @@ function PickStep({
           <li>{t.import.step1.structure.rules.phone}</li>
           <li>{t.import.step1.structure.rules.dates}</li>
           <li>{t.import.step1.structure.rules.membership}</li>
-          <li>{t.import.step1.structure.rules.plan}</li>
+          <li>{t.import.step1.structure.rules.plan} <Link className="underline" to="/settings/membership-types">Abrir planes de membresía</Link></li>
         </ul>
       </SectionCard>
 
       <div className="flex justify-end">
         <Button
-          disabled={!file || dataRowsCount === 0}
+          disabled={!file || dataRowsCount === 0 || !mappingValid}
           onClick={onContinue}
         >
           {t.import.step1.continue}
@@ -432,6 +456,7 @@ function PickStep({
 interface PreviewStepProps {
   dataRowsCount: number;
   previewRows: string[][];
+  allRows: string[][];
   dupInBase: number[];
   dupInFile: number[];
   allowDuplicates: boolean;
@@ -444,6 +469,7 @@ interface PreviewStepProps {
 function PreviewStep({
   dataRowsCount,
   previewRows,
+  allRows,
   dupInBase,
   dupInFile,
   allowDuplicates,
@@ -454,11 +480,22 @@ function PreviewStep({
 }: PreviewStepProps) {
   const dupInBaseSet = useMemo(() => new Set(dupInBase), [dupInBase]);
   const dupInFileSet = useMemo(() => new Set(dupInFile), [dupInFile]);
-  const totalDup = dupInBase.length;
+  const duplicateRows = new Set([...dupInBase, ...dupInFile]);
+  const totalDup = duplicateRows.size;
+  const analysis = summarizeMemberImport(allRows, [...duplicateRows], allowDuplicates);
+  const incompleteRows = analysis.incomplete.length;
 
   return (
     <div className="space-y-4">
-      <SectionCard title={t.import.step2.heading(dataRowsCount)}>
+      <SectionCard title={`${dataRowsCount} filas revisadas`}>
+        <dl className="mb-4 grid gap-3 text-sm sm:grid-cols-3">
+          <div><dt className="text-muted-foreground">Listas para validar</dt><dd className="text-xl font-semibold tabular-nums">{analysis.candidates}</dd></div>
+          <div><dt className="text-muted-foreground">Duplicadas: se omitirán</dt><dd className="text-xl font-semibold tabular-nums">{analysis.skipped.length}</dd></div>
+          <div><dt className="text-muted-foreground">Requieren corrección</dt><dd className="text-xl font-semibold tabular-nums">{incompleteRows}</dd></div>
+        </dl>
+        <p className="mb-3 text-sm text-muted-foreground">El servidor realizará la validación final antes de guardar. {allowDuplicates && "Permitir teléfonos repetidos está activado."}</p>
+        {incompleteRows > 0 && <Alert variant="warning" className="mb-3"><AlertDescription>{incompleteRows} filas del archivo no tienen nombre o teléfono: {analysis.incomplete.map(index => index + 2).join(", ")}. Regresa al archivo para corregirlas antes de importar.</AlertDescription></Alert>}
+
         {totalDup > 0 && (
           <Alert className="mb-4">
             <AlertTriangle className="h-4 w-4" />
@@ -517,12 +554,12 @@ function PreviewStep({
                     </DataTableCell>
                     <DataTableCell>
                       {flagInBase && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-900 dark:bg-yellow-900/40 dark:text-yellow-200 mr-1">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning-soft text-warning-foreground mr-1">
                           {t.import.step2.flags.duplicateInBase}
                         </span>
                       )}
                       {flagInFile && (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-900 dark:bg-orange-900/40 dark:text-orange-200">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-warning-soft text-warning-foreground">
                           {t.import.step2.flags.duplicateInFile}
                         </span>
                       )}
@@ -540,14 +577,14 @@ function PreviewStep({
           <ArrowLeft className="h-4 w-4 mr-2" />
           {t.import.step2.back}
         </Button>
-        <Button onClick={onSubmit} disabled={isLoading || dataRowsCount === 0}>
+        <Button onClick={onSubmit} disabled={isLoading || analysis.candidates === 0 || incompleteRows > 0}>
           {isLoading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               {t.import.step2.ctaLoading}
             </>
           ) : (
-            t.import.step2.cta(dataRowsCount)
+            t.import.step2.cta(analysis.candidates)
           )}
         </Button>
       </div>
@@ -577,10 +614,10 @@ function ResultStep({ result, onImportAnother, onGoToList }: ResultStepProps) {
             className={
               "h-12 w-12 rounded-full flex items-center justify-center shrink-0 " +
               (allOk
-                ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300"
+                ? "bg-success-soft text-success-text"
                 : nothing
-                ? "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300"
-                : "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-200")
+                ? "bg-destructive-soft text-destructive-text"
+                : "bg-warning-soft text-warning-foreground")
             }
           >
             {allOk ? (
@@ -600,17 +637,20 @@ function ResultStep({ result, onImportAnother, onGoToList }: ResultStepProps) {
                 : t.import.step3.headingPartial}
             </h3>
             <div className="flex flex-wrap gap-4 mt-2 text-sm">
-              <span className="text-emerald-700 dark:text-emerald-300 font-medium">
-                ✓ {t.import.step3.summaryImported(summary.imported_count)}
+              <span className="inline-flex items-center gap-1.5 text-success-text font-medium tabular">
+                <CircleCheck className="h-4 w-4" aria-hidden />
+                {t.import.step3.summaryImported(summary.imported_count)}
               </span>
               {summary.skipped_count > 0 && (
-                <span className="text-yellow-700 dark:text-yellow-300 font-medium">
-                  ⚠ {t.import.step3.summarySkipped(summary.skipped_count)}
+                <span className="inline-flex items-center gap-1.5 text-warning font-medium tabular">
+                  <AlertTriangle className="h-4 w-4" aria-hidden />
+                  {t.import.step3.summarySkipped(summary.skipped_count)}
                 </span>
               )}
               {summary.errors_count > 0 && (
-                <span className="text-red-700 dark:text-red-300 font-medium">
-                  ✗ {t.import.step3.summaryErrors(summary.errors_count)}
+                <span className="inline-flex items-center gap-1.5 text-destructive-text font-medium tabular">
+                  <XCircle className="h-4 w-4" aria-hidden />
+                  {t.import.step3.summaryErrors(summary.errors_count)}
                 </span>
               )}
             </div>
@@ -659,7 +699,7 @@ function ResultStep({ result, onImportAnother, onGoToList }: ResultStepProps) {
                     Fila {e.row_number}
                   </span>
                   <span className="font-medium">{e.full_name || "—"}</span>
-                  <span className="text-red-700 dark:text-red-300 text-xs">
+                  <span className="text-destructive-text text-xs">
                     {e.message}
                   </span>
                 </li>

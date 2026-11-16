@@ -49,11 +49,21 @@ export const auth = {
       offline: "Necesitas internet para iniciar sesión la primera vez.",
       generic: "Algo salió mal. Vuelve a intentar en un momento.",
     },
+    // Aviso al entrar cuando la prueba ya terminó (UC-002). El texto depende
+    // de en qué punto está: días de gracia, solo lectura o aún sin confirmar
+    // por el cloud.
     trialExpired: {
       title: "Tu prueba terminó",
-      body: "Para seguir usando Tinta, activa tu plan.",
-      activate: "Activar Tinta Pro",
-      later: "Recordármelo después",
+      grace: (date: string) =>
+        `Puedes seguir usando todo hasta el ${date}. Después, la recepción queda en solo lectura: podrás consultar socios y registrar entradas, pero no cobrar ni hacer cambios.`,
+      readOnly:
+        "La recepción quedó en solo lectura: puedes consultar socios y registrar entradas. Para cobrar, dar de alta o hacer cambios, activa tu plan.",
+      pending:
+        "En unos días la recepción quedará en solo lectura: podrás consultar socios y registrar entradas, pero no cobrar ni hacer cambios. Activa tu plan para seguir con todo.",
+      operatorHint: "Avísale al dueño del gimnasio para que active el plan.",
+      activate: "Activar mi plan",
+      later: "Ahora no",
+      ok: "Entendido",
     },
   },
   forgot: {

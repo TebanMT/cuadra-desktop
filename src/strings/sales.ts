@@ -1,6 +1,7 @@
 export const sales = {
   page: {
     title: "Venta rápida",
+    daySales: "Ventas del día",
     associate: "Agregar socio",
     associated: (name: string) => `Socio: ${name}`,
     removeAssociation: "Quitar",

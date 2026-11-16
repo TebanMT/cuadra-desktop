@@ -343,7 +343,7 @@ export function MembershipTypeForm({
         <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           {t.types.form.cancel}
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button requiresWrite type="submit" disabled={submitting}>
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {initial ? t.types.form.submitEdit : t.types.form.submitNew}
         </Button>

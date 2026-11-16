@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { renderWithProviders } from "@/test/utils";
 import MembershipTypesPage from "../MembershipTypes";
+import { useAuthStore } from "@/stores/useAuthStore";
 
 const { mockGet } = vi.hoisted(() => ({
   mockGet: vi.fn(async () => [
@@ -37,7 +38,10 @@ vi.mock("@/lib/api", async () => {
 });
 
 describe("MembershipTypesPage", () => {
-  beforeEach(() => mockGet.mockClear());
+  beforeEach(() => {
+    mockGet.mockClear();
+    useAuthStore.setState({ readOnly: false, user: { user_id: "u1", role: "owner" } as never });
+  });
 
   it("lists active and inactive types and opens deactivate confirm", async () => {
     const user = userEvent.setup();
@@ -58,5 +62,20 @@ describe("MembershipTypesPage", () => {
     await waitFor(() => {
       expect(screen.getByText(/¿Desactivar "Mensual"\?/i)).toBeInTheDocument();
     });
+  });
+
+  it("a un operador le muestra los planes sin acciones de gestión", async () => {
+    useAuthStore.setState({ user: { user_id: "u2", role: "operator", permissions: [] } as never });
+    renderWithProviders(
+      <MemoryRouter>
+        <MembershipTypesPage />
+      </MemoryRouter>
+    );
+
+    expect(await screen.findByText("Mensual")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /desactivar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /editar/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Solo el dueño puede cambiar los planes y las cuotas.")).toBeInTheDocument();
+    expect(screen.getByText("Consulta los planes y las promociones que puedes aplicar al cobrar.")).toBeInTheDocument();
   });
 });

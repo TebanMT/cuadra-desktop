@@ -1,3 +1,4 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -110,7 +111,7 @@ export function ReportsScreen({
   const analysisSearch = new URLSearchParams(reportSearch);
   analysisSearch.set("view", "products");
   return (
-    <div className="mx-auto max-w-6xl space-y-5 p-4 pb-24 sm:p-6">
+    <PageContainer className="space-y-5 pb-24">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
           {mode === "cash"
@@ -128,7 +129,7 @@ export function ReportsScreen({
                 Análisis{" "}
                 {!isPlus && (
                   <Lock
-                    aria-label="Requiere Plus"
+                    aria-label="Acceso no habilitado"
                     className="ml-1 h-3.5 w-3.5"
                   />
                 )}
@@ -252,7 +253,7 @@ export function ReportsScreen({
           )}
         </>
       )}
-    </div>
+    </PageContainer>
   );
 }
 
@@ -265,11 +266,11 @@ export function PlusNotice({
     <section className="rounded-xl border bg-card p-6">
       <h2 className="flex items-center gap-2 text-lg font-semibold">
         <Lock className="h-5 w-5" />
-        Análisis disponible en Plus
+        Acceso a análisis no habilitado
       </h2>
       <p className="mt-2 text-sm text-muted-foreground">{description}</p>
       <Button asChild className="mt-4">
-        <Link to="/settings/subscription">Ver plan Plus</Link>
+        <Link to="/help">Consultar ayuda</Link>
       </Button>
     </section>
   );
@@ -351,8 +352,8 @@ function ReportDownload({
           </>
         ) : (
           <DropdownMenuItem asChild>
-            <Link to="/settings/subscription">
-              Descargas disponibles en Plus
+            <Link to="/help">
+              Consultar acceso a descargas
             </Link>
           </DropdownMenuItem>
         )}

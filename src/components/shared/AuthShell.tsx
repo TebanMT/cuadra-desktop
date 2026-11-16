@@ -10,7 +10,7 @@ const LANDING_URL =
 
 /**
  * Shell común de pantallas de auth — single-column centrado, brand
- * arriba (LoginLogo con esquinas crop marks + tagline), form en el
+ * arriba (logo oficial + descripción), form en el
  * medio, footer editorial abajo.
  *
  * Surfaces vía semantic tokens (bg-background / text-muted-foreground)
@@ -31,8 +31,8 @@ export function AuthShell({
   hideTagline = false,
 }: AuthShellProps) {
   return (
-    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-12">
-      <div className="mb-10 sm:mb-12">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center px-6 py-8">
+      <div className="mb-8">
         <LoginLogo showTagline={!hideTagline} />
       </div>
 
@@ -57,7 +57,7 @@ export function AuthShell({
 
       {!hideFooter && (
         <p className="mt-6 text-center text-xs text-muted-foreground max-w-xs leading-relaxed">
-          Hecho para gyms de barrio que están operando como negocio.
+          Tinta · Gestión de tu gimnasio
         </p>
       )}
     </div>

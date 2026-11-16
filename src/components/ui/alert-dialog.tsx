@@ -1,6 +1,8 @@
+import { useCanWrite, READ_ONLY_MESSAGE } from "@/lib/writeAccess";
 import * as React from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { cn } from "@/lib/utils";
+import { useReturnFocus } from "@/lib/returnFocus";
 import { buttonVariants } from "@/components/ui/button";
 
 export const AlertDialog = AlertDialogPrimitive.Root;
@@ -25,19 +27,23 @@ AlertDialogOverlay.displayName = "AlertDialogOverlay";
 export const AlertDialogContent = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Content>
->(({ className, ...props }, ref) => (
+>(({ className, onOpenAutoFocus, onCloseAutoFocus, ...props }, ref) => {
+  const focus = useReturnFocus(onOpenAutoFocus, onCloseAutoFocus);
+  return (
   <AlertDialogPortal>
     <AlertDialogOverlay />
     <AlertDialogPrimitive.Content
       ref={ref}
+      onOpenAutoFocus={focus.onOpenAutoFocus}
+      onCloseAutoFocus={focus.onCloseAutoFocus}
       className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg sm:rounded-lg",
+        "fixed left-[50%] top-[50%] z-50 grid w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-app-md sm:rounded-xl",
         className
       )}
       {...props}
     />
   </AlertDialogPortal>
-));
+); });
 AlertDialogContent.displayName = "AlertDialogContent";
 
 export const AlertDialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
@@ -74,14 +80,18 @@ AlertDialogDescription.displayName = "AlertDialogDescription";
 
 export const AlertDialogAction = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Action>,
-  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Action> & { requiresWrite?: boolean }
+>(({ className, requiresWrite = false, disabled, ...props }, ref) => {
+  const canWrite = useCanWrite();
+  return (
   <AlertDialogPrimitive.Action
     ref={ref}
     className={cn(buttonVariants(), className)}
     {...props}
+    disabled={disabled || (requiresWrite && !canWrite)}
+    title={requiresWrite && !canWrite ? READ_ONLY_MESSAGE : props.title}
   />
-));
+); });
 AlertDialogAction.displayName = "AlertDialogAction";
 
 export const AlertDialogCancel = React.forwardRef<

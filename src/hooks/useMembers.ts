@@ -1,7 +1,16 @@
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
-export type MemberStatusFilter = "" | "active" | "expiring_soon" | "expired" | "inactive" | "unrenewed";
+export type MemberStatusFilter =
+  | ""
+  | "active"
+  | "expiring_soon"
+  | "lapsed"
+  | "no_membership"
+  | "unpaid_enrollment"
+  | "expired"
+  | "inactive"
+  | "unrenewed";
 export type MemberSort = "name" | "expiry" | "created_at";
 export type SortDir = "asc" | "desc";
 
@@ -215,13 +224,16 @@ export function useMembersList(filters: ListMembersInput, enabled = true) {
   });
 }
 
-const COUNT_FILTERS: MemberStatusFilter[] = ["active", "expiring_soon", "expired", "inactive"];
+const COUNT_FILTERS: MemberStatusFilter[] = ["active", "expiring_soon", "expired", "inactive", "lapsed", "no_membership", "unpaid_enrollment"];
 
 export interface MemberStatusCounts {
   total: number;
   active: number;
   expiring_soon: number;
   expired: number;
+  lapsed: number;
+  no_membership: number;
+  unpaid_enrollment: number;
   inactive: number;
 }
 
@@ -237,13 +249,16 @@ export function useMemberStatusCounts() {
           })
         ),
       ]);
-      const [all, active, expiring, expired, inactive] = queries;
+      const [all, active, expiring, expired, inactive, lapsed, noMembership, unpaid] = queries;
       return {
         total: all.total,
         active: active.total,
         expiring_soon: expiring.total,
         expired: expired.total,
         inactive: inactive.total,
+        lapsed: lapsed.total,
+        no_membership: noMembership.total,
+        unpaid_enrollment: unpaid.total,
       };
     },
     staleTime: 30_000,

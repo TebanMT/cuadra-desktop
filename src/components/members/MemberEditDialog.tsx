@@ -53,8 +53,7 @@ export function MemberEditDialog({ memberId, initial, open, onOpenChange }: Prop
       handleClose(false);
     } catch (e) {
       if (e instanceof ApiError) {
-        const data = e.details as Record<string, unknown> | null;
-        setServerError((data?.exception as string | undefined) || t.form.errors.generic);
+        setServerError(e.message || t.form.errors.generic);
       } else {
         setServerError(t.form.errors.generic);
       }

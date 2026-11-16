@@ -41,13 +41,15 @@ export const reports = {
     inventoryPurchases: "Compras pagadas para reventa",
     cogs: "Costo de productos vendidos",
     expensesGeneral: "Gastos de operación",
-    criticalStock: "Existencias bajas",
+    // Mismo nombre que el filtro de Productos e Inicio: pocas existencias
+    // o agotados.
+    criticalStock: "Por surtir",
     criticalStockHint: (out: number, low: number) =>
       out > 0
-        ? `${out} sin existencias · ${low} bajo mínimo`
+        ? `${out} ${out === 1 ? "agotado" : "agotados"} · ${low} con pocas existencias`
         : low > 0
-        ? `${low} bajo mínimo`
-        : "Todo en orden",
+        ? `${low} con pocas existencias`
+        : "Nada por surtir",
   },
   charts: {
     incomeByDay: "Ingresos por día",

@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
-import { Loader2, RefreshCw, ShieldAlert } from "lucide-react";
+import { useCanWrite } from "@/lib/writeAccess";
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { Children, cloneElement, isValidElement, useId, useEffect, useState } from "react";
+import { Loader2, Lock, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -21,20 +23,30 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  PAYMENT_METHOD_KEYS,
   TAX_REGIMES_MX,
   TIMEZONES_MX,
   useGymProfile,
   useUpdateGymProfile,
+  useUpdatePaymentMethods,
+  type PaymentMethodKey,
   type UpdateGymProfileInput,
 } from "@/hooks/useGym";
+import { useSetupStatus } from "@/hooks/useSetupStatus";
 import { useRefreshIdentity } from "@/hooks/useAuth";
 import { canAccessPlusFeatures } from "@/hooks/useSubscription";
 import { ApiError } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
-import { settings as t } from "@/strings/settings";
-import { TransferOwnershipModal } from "@/components/settings/TransferOwnershipModal";
+import { settings as t, timezoneName } from "@/strings/settings";
+import { PaymentMethodsCard } from "@/components/settings/PaymentMethodsCard";
+import {
+  chosenPaymentMethods,
+  paymentMethodsText,
+  savedPaymentSelection,
+  type PaymentMethodSelection,
+} from "@/components/settings/paymentMethods";
+import { SettingsBackLink } from "@/components/settings/SettingsBackLink";
 import { Link } from "react-router-dom";
-import { Lock } from "lucide-react";
 
 const RFC_REGEX = /^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$/;
 const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/;
@@ -65,16 +77,26 @@ export default function GymProfilePage() {
   const update = useUpdateGymProfile();
   const refreshIdentity = useRefreshIdentity();
   const role = useAuthStore((s) => s.user?.role);
-  const canEdit = role === "owner";
+  const canWrite = useCanWrite();
+  const canEdit = role === "owner" && canWrite;
   const gym = useAuthStore((s) => s.gym);
   const isPlus = canAccessPlusFeatures(gym);
   const [form, setForm] = useState<FormState | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [transferOpen, setTransferOpen] = useState(false);
   // Phone se edita con dial + number locales (UX no-técnica) y se serializa
   // a E.164 hacia form.whatsapp_number, que es lo que viaja al BE.
   const [phoneDialCode, setPhoneDialCode] = useState<string>(DEFAULT_DIAL_CODE);
   const [phoneNumber, setPhoneNumber] = useState("");
+  // Métodos de pago: viajan a su propio endpoint, pero se guardan con el
+  // mismo botón que el resto de los datos (un solo «Guardar cambios»).
+  const setup = useSetupStatus();
+  const savePayments = useUpdatePaymentMethods();
+  const [methodsDraft, setMethodsDraft] = useState<PaymentMethodSelection | null>(null);
+  const savedMethods = setup.data ? savedPaymentSelection(setup.data.payment_methods) : null;
+  const methods = methodsDraft ?? savedMethods;
+  const methodsChanged =
+    !!methodsDraft && !!savedMethods && PAYMENT_METHOD_KEYS.some((key) => methodsDraft[key] !== savedMethods[key]);
+  const saving = update.isPending || savePayments.isPending;
 
   async function onRefresh() {
     try {
@@ -135,31 +157,22 @@ export default function GymProfilePage() {
     }
   }, [phoneDialCode, phoneNumber, form]);
 
-  if (profile.isLoading || !form) {
-    return (
-      <div className="p-8 flex items-center justify-center py-20">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (profile.error) {
-    return (
-      <div className="p-8 max-w-2xl">
-        <Alert variant="destructive">
-          <AlertDescription>{t.gymProfile.loadError}</AlertDescription>
-        </Alert>
-      </div>
-    );
-  }
+  if (profile.error && !form) return <PageContainer contentWidth="form" className="space-y-3"><Alert variant="destructive"><AlertDescription>{t.gymProfile.loadError}</AlertDescription></Alert><Button variant="outline" onClick={() => void profile.refetch()}>Reintentar</Button></PageContainer>;
+  if (profile.isLoading || !form) return <div role="status" className="p-8 flex items-center justify-center gap-2 py-20 text-muted-foreground"><Loader2 aria-hidden="true" className="h-5 w-5 animate-spin motion-reduce:animate-none" />Cargando datos del gym…</div>;
 
   function update_<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => (f ? { ...f, [key]: value } : f));
   }
 
+  function toggleMethod(key: PaymentMethodKey, checked: boolean) {
+    if (!methods) return;
+    setError(null);
+    setMethodsDraft({ ...methods, [key]: checked });
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form) return;
+    if (!form || saving) return;
     setError(null);
 
     if (!form.name.trim()) {
@@ -176,6 +189,11 @@ export default function GymProfilePage() {
     }
     if (form.secondary_color && !HEX_REGEX.test(form.secondary_color)) {
       setError(t.gymProfile.errors.colorInvalid);
+      return;
+    }
+    const chosen = methodsChanged && methodsDraft ? chosenPaymentMethods(methodsDraft) : [];
+    if (methodsChanged && chosen.length === 0) {
+      setError(t.gymProfile.paymentMethods.needOne);
       return;
     }
 
@@ -213,7 +231,6 @@ export default function GymProfilePage() {
 
     try {
       await update.mutateAsync(payload);
-      toast.success(t.gymProfile.saved);
     } catch (err) {
       // Conflict de WhatsApp: el BE devuelve 422 con mensaje del sentinel
       // ErrWhatsAppAlreadyTaken. Lo traducimos a copy específica para que
@@ -228,57 +245,80 @@ export default function GymProfilePage() {
         return;
       }
       setError(err instanceof ApiError ? err.message : t.gymProfile.saveError);
+      return;
     }
+
+    // Segundo endpoint. Si falla, los datos del gym ya quedaron: se dice
+    // exactamente qué faltó y el borrador de métodos se conserva para
+    // reintentar con el mismo botón (el PATCH del perfil es idempotente).
+    if (methodsChanged) {
+      try {
+        await savePayments.mutateAsync(chosen);
+        setMethodsDraft(null);
+      } catch (err) {
+        setError(t.gymProfile.saveBoth.methodsFailed(err instanceof ApiError ? err.message : undefined));
+        return;
+      }
+    }
+    toast.success(t.gymProfile.saved);
   }
 
+  const timezoneOptions = TIMEZONES_MX.includes(form.timezone)
+    ? TIMEZONES_MX
+    : [form.timezone, ...TIMEZONES_MX];
+
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="space-y-1">
-          <h1
-            className="text-3xl font-bold text-foreground"
-            style={{ letterSpacing: "-0.02em" }}
+    <PageContainer contentWidth="form" className="space-y-6">
+      <div className="space-y-1">
+        <SettingsBackLink />
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="space-y-1">
+            <h1
+              className="text-3xl font-bold text-foreground"
+              style={{ letterSpacing: "-0.02em" }}
+            >
+              {t.gymProfile.title}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {canEdit ? t.gymProfile.subtitle : t.gymProfile.subtitleOperator}
+            </p>
+          </div>
+          {/* Nivel 1 de re-pareo: bota al cloud, baja los datos frescos
+              del gym + dueño, re-mirrorea el SQLite local. No revoca
+              credenciales — sólo refresca identidad. Útil cuando ves
+              nombre vacío / phone null tras un setup desde otro device. */}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onRefresh}
+            disabled={refreshIdentity.isPending}
+            title="Volver a leer los datos del gym desde la nube"
           >
-            {t.gymProfile.title}
-          </h1>
-          <p className="text-sm text-muted-foreground">{t.gymProfile.subtitle}</p>
+            {refreshIdentity.isPending ? (
+              <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" />
+            ) : (
+              <RefreshCw aria-hidden="true" className="h-4 w-4" />
+            )}
+            Refrescar datos
+          </Button>
         </div>
-        {/* Nivel 1 de re-pareo: bota al cloud, baja los datos frescos
-            del gym + dueño, re-mirrorea el SQLite local. No revoca
-            credenciales — sólo refresca identidad. Útil cuando ves
-            nombre vacío / phone null tras un setup desde otro device. */}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={onRefresh}
-          disabled={refreshIdentity.isPending}
-          title="Volver a leer los datos del gym desde la nube"
-        >
-          {refreshIdentity.isPending ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <RefreshCw className="h-4 w-4 mr-2" />
-          )}
-          Refrescar datos
-        </Button>
       </div>
 
-      {!canEdit && (
-        // Banner read-only para operadores. La razón se explica explícita:
-        // "el dueño es quien edita los datos del gym". El BE también enforce
-        // owner-only en PATCH /gyms/me — esto es la otra cara de la moneda
-        // para que el operador no llene un form que va a recibir 403.
-        <Alert>
-          <AlertDescription>{t.gymProfile.readOnlyForOperator}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* Envolver el form en <fieldset disabled> propaga el disabled a todos
-          los inputs/selects/buttons descendientes sin tener que tocar cada
-          uno individualmente. Es HTML nativo, accesible (screen readers
-          anuncian "disabled") y a prueba de inputs nuevos que se agreguen. */}
-      <fieldset disabled={!canEdit} className="contents">
+      {!canEdit ? (
+        // Sólo lectura (operador, o dueño con la recepción en solo lectura):
+        // los valores se leen como texto, no como un formulario apagado que
+        // parece de ejemplo. Una línea dice quién puede cambiarlos. El BE
+        // también restringe PATCH /gyms/me al dueño.
+        <ReadOnlyProfile
+          form={form}
+          whatsapp={phoneNumber ? `+${phoneDialCode} ${phoneNumber}` : ""}
+          note={role === "owner" ? t.gymProfile.readOnlySession : t.gymProfile.readOnlyForOperator}
+          methods={methods}
+          methodsLoadFailed={!!setup.error && !setup.data}
+          onRetryMethods={() => void setup.refetch()}
+        />
+      ) : (
       <form onSubmit={submit} className="space-y-4" noValidate>
         {error && (
           <Alert variant="destructive">
@@ -288,9 +328,7 @@ export default function GymProfilePage() {
 
         <Card>
           <CardContent className="pt-5 pb-5 space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              {t.gymProfile.sections.general}
-            </h2>
+            <h2 className="text-base font-semibold">{t.gymProfile.sections.general}</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label={t.gymProfile.fields.name}>
                 <Input value={form.name} onChange={(e) => update_("name", e.target.value)} />
@@ -315,9 +353,9 @@ export default function GymProfilePage() {
                     <SelectValue placeholder={t.gymProfile.placeholders.timezone} />
                   </SelectTrigger>
                   <SelectContent>
-                    {TIMEZONES_MX.map((tz) => (
+                    {timezoneOptions.map((tz) => (
                       <SelectItem key={tz} value={tz}>
-                        {tz.replace("America/", "")}
+                        {timezoneName(tz)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -333,21 +371,18 @@ export default function GymProfilePage() {
             isPlus ? Card : PlusLockedCard — ver git history y comentario
             `CUANDO PLUS SE LIBERE` en src/hooks/useSubscription.ts. */}
         {isPlus && (
-          <Card>
-            <CardContent className="pt-5 pb-5 space-y-4">
-              <div className="flex items-baseline justify-between">
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                  {t.gymProfile.sections.tax}
-                </h2>
-                <p className="text-xs text-muted-foreground">{t.gymProfile.help.taxOptional}</p>
-              </div>
+          <details className="rounded-lg border bg-card">
+            <summary className="cursor-pointer min-h-11 px-5 py-4">
+              <h2 className="inline text-base font-semibold">{t.gymProfile.sections.tax}</h2>
+            </summary>
+            <CardContent className="pt-0 pb-5 space-y-4">
+              <p className="text-sm text-muted-foreground">{t.gymProfile.help.taxOptional}</p>
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label={t.gymProfile.fields.rfc}>
                   <Input
                     value={form.rfc}
                     onChange={(e) => update_("rfc", e.target.value.toUpperCase())}
                     placeholder={t.gymProfile.placeholders.rfc}
-                    className="uppercase tracking-wider"
                   />
                 </Field>
                 <Field label={t.gymProfile.fields.legalName}>
@@ -383,7 +418,7 @@ export default function GymProfilePage() {
                 </Field>
               </div>
             </CardContent>
-          </Card>
+          </details>
         )}
 
         {/* Branding (logo + colores) — feature Plus, mismo trato que Tax.
@@ -391,11 +426,11 @@ export default function GymProfilePage() {
             LogoURL / PrimaryColor / SecondaryColor (gym.HasPlusOnlyFields),
             así que la defensa en profundidad sigue activa. */}
         {isPlus && (
-          <Card>
-            <CardContent className="pt-5 pb-5 space-y-4">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                {t.gymProfile.sections.branding}
-              </h2>
+          <details className="rounded-lg border bg-card">
+            <summary className="cursor-pointer min-h-11 px-5 py-4">
+              <h2 className="inline text-base font-semibold">{t.gymProfile.sections.branding} (opcional)</h2>
+            </summary>
+            <CardContent className="pt-0 pb-5 space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <Field label={t.gymProfile.fields.logo}>
                   <Input
@@ -421,14 +456,12 @@ export default function GymProfilePage() {
                 </div>
               </div>
             </CardContent>
-          </Card>
+          </details>
         )}
 
         <Card>
           <CardContent className="pt-5 pb-5 space-y-4">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-              {t.gymProfile.sections.operations}
-            </h2>
+            <h2 className="text-base font-semibold">{t.gymProfile.sections.operations}</h2>
             <div className="grid gap-4 md:grid-cols-2">
               <Field label={t.gymProfile.fields.openTime}>
                 <Input
@@ -453,7 +486,7 @@ export default function GymProfilePage() {
                     step={5}
                     onValueChange={([v]) => update_("kiosk_volume", v)}
                   />
-                  <span className="w-10 text-sm tabular-nums text-muted-foreground">
+                  <span className="w-12 shrink-0 text-right text-sm tabular text-muted-foreground">
                     {t.gymProfile.help.kioskVolume(form.kiosk_volume)}
                   </span>
                 </div>
@@ -467,7 +500,7 @@ export default function GymProfilePage() {
                     step={500}
                     onValueChange={([v]) => update_("kiosk_feedback_ttl_ms", v)}
                   />
-                  <span className="w-12 text-sm tabular-nums text-muted-foreground">
+                  <span className="w-24 shrink-0 text-right text-sm tabular text-muted-foreground">
                     {t.gymProfile.help.kioskFeedbackTtl(form.kiosk_feedback_ttl_ms / 1000)}
                   </span>
                 </div>
@@ -476,22 +509,30 @@ export default function GymProfilePage() {
           </CardContent>
         </Card>
 
+        <PaymentMethodsCard
+          value={methods}
+          loadFailed={!!setup.error}
+          onRetry={() => void setup.refetch()}
+          onToggle={toggleMethod}
+          disabled={saving}
+        />
+
         {/* Access webhook — feature Plus. Mismo trato que Tax/Branding:
             sección oculta entera para Standard mientras Plus no se vende.
             Cuando Plus se libere, revertir al patrón isPlus ? Card :
             PlusLockedCard. */}
         {isPlus && (
-        <Card>
-          <CardContent className="pt-5 pb-5 space-y-3">
-            <div>
-              <h2 className="font-semibold">Acceso por hardware (avanzado)</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Tinta envía una notificación a la URL que configures cada vez que un
-                socio entra correctamente. Tu electricista o instalador puede usar eso
-                para abrir un torniquete, cerradura, etc. Si no usas hardware, déjalo
-                vacío.
-              </p>
-            </div>
+        <details className="rounded-lg border bg-card">
+          <summary className="cursor-pointer min-h-11 px-5 py-4">
+            <h2 className="inline text-base font-semibold">Acceso por hardware (avanzado)</h2>
+          </summary>
+          <CardContent className="pt-0 pb-5 space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Tinta envía una notificación a la URL que configures cada vez que un
+              socio entra correctamente. Tu electricista o instalador puede usar eso
+              para abrir un torniquete, cerradura, etc. Si no usas hardware, déjalo
+              vacío.
+            </p>
             <Field label="URL del webhook">
               <Input
                 type="url"
@@ -515,7 +556,7 @@ export default function GymProfilePage() {
                   autoComplete="off"
                 />
                 {form.access_webhook_secret_set && (
-                  <Button
+                  <Button requiresWrite
                     type="button"
                     variant="outline"
                     onClick={() => {
@@ -535,7 +576,7 @@ export default function GymProfilePage() {
                     }}
                     disabled={update.isPending}
                   >
-                    Borrar
+                    Borrar secreto
                   </Button>
                 )}
               </div>
@@ -546,63 +587,122 @@ export default function GymProfilePage() {
               </p>
             </Field>
           </CardContent>
-        </Card>
+        </details>
         )}
 
-        {canEdit && (
-          <div className="flex justify-end gap-2">
-            <Button type="submit" disabled={update.isPending}>
-              {update.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
-              {update.isPending ? t.gymProfile.saving : t.gymProfile.save}
-            </Button>
-          </div>
-        )}
+        {/* Un solo botón guarda datos generales, operación y métodos de pago. */}
+        <div className="flex justify-end gap-2">
+          <Button requiresWrite type="submit" size="lg" disabled={saving}>
+            {saving && <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin motion-reduce:animate-none" />}
+            {saving ? t.gymProfile.saving : t.gymProfile.save}
+          </Button>
+        </div>
       </form>
-      </fieldset>
-
-      {role === "owner" && (
-        <Card className="border-destructive/40">
-          <CardContent className="pt-5 pb-5 space-y-3">
-            <div className="flex items-start gap-3">
-              <ShieldAlert className="h-5 w-5 text-destructive mt-0.5 shrink-0" />
-              <div className="flex-1">
-                <h2 className="font-semibold">{t.gymProfile.sections.danger}</h2>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {t.gymProfile.transferDescription}
-                </p>
-              </div>
-            </div>
-            <div className="flex justify-end">
-              <Button
-                variant="outline"
-                className="border-destructive text-destructive hover:bg-destructive/10"
-                onClick={() => setTransferOpen(true)}
-              >
-                {t.gymProfile.transferOwnership}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
       )}
 
-      <TransferOwnershipModal open={transferOpen} onOpenChange={setTransferOpen} />
+      {/* "Zona delicada" (transfer the gym to another owner) is hidden on
+          purpose: the flow does not work yet. useStartTransferOwnership
+          posts to /gyms/me/transfer-ownership/start, a route the server
+          does not have, and the confirm step sends `otp` while the server
+          reads `code`. TransferOwnershipModal and its hooks stay in place;
+          render them here again once both are fixed. */}
+    </PageContainer>
+  );
+}
+
+function ReadOnlyProfile({
+  form,
+  whatsapp,
+  note,
+  methods,
+  methodsLoadFailed,
+  onRetryMethods,
+}: {
+  form: FormState;
+  whatsapp: string;
+  note: string;
+  methods: PaymentMethodSelection | null;
+  methodsLoadFailed: boolean;
+  onRetryMethods(): void;
+}) {
+  const g = t.gymProfile;
+  const hours =
+    form.open_time && form.close_time
+      ? g.hours(form.open_time, form.close_time)
+      : form.open_time || form.close_time;
+  return (
+    <div className="space-y-6">
+      <p role="note" className="flex items-start gap-2 text-sm text-muted-foreground">
+        <Lock aria-hidden="true" className="mt-0.5 h-4 w-4 shrink-0" />
+        {note}
+      </p>
+      <ReadOnlySection
+        title={g.sections.general}
+        rows={[
+          [g.fields.name, form.name],
+          [g.fields.city, form.city],
+          [g.fields.whatsapp, whatsapp],
+          [g.fields.timezone, timezoneName(form.timezone)],
+        ]}
+      />
+      <ReadOnlySection
+        title={g.sections.operations}
+        rows={[
+          ["Horario", hours],
+          [g.fields.kioskVolume, g.help.kioskVolume(form.kiosk_volume)],
+          [g.fields.kioskFeedbackTtl, g.help.kioskFeedbackTtl(form.kiosk_feedback_ttl_ms / 1000)],
+        ]}
+      />
+      <section aria-labelledby="gym-methods-title" className="space-y-2">
+        <h2 id="gym-methods-title" className="text-base font-semibold">{g.paymentMethods.title}</h2>
+        {methods ? (
+          <p className="border-y py-3 text-sm font-medium">{paymentMethodsText(methods)}</p>
+        ) : methodsLoadFailed ? (
+          <div className="flex flex-wrap items-center gap-3 border-y py-3 text-sm">
+            <span>{g.paymentMethods.loadError}</span>
+            <Button type="button" variant="outline" size="sm" onClick={onRetryMethods}>
+              {g.paymentMethods.retry}
+            </Button>
+          </div>
+        ) : (
+          <p role="status" className="border-y py-3 text-sm text-muted-foreground">Consultando métodos de pago…</p>
+        )}
+      </section>
     </div>
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function ReadOnlySection({ title, rows }: { title: string; rows: [string, string][] }) {
+  const titleId = useId();
   return (
-    <div className="space-y-1">
-      <Label>{label}</Label>
-      {children}
-    </div>
+    <section aria-labelledby={titleId} className="space-y-2">
+      <h2 id={titleId} className="text-base font-semibold">{title}</h2>
+      <dl className="divide-y border-y">
+        {rows.map(([label, value]) => (
+          <div key={label} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,14rem)_1fr] sm:gap-4">
+            <dt className="text-sm text-muted-foreground">{label}</dt>
+            <dd className="text-sm font-medium tabular">
+              {value || <span className="font-normal text-muted-foreground">{t.gymProfile.notSet}</span>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  const labelId = useId();
+  function labelControls(nodes: React.ReactNode): React.ReactNode {
+    return Children.map(nodes, node => {
+      if (!isValidElement<Record<string, unknown>>(node)) return node;
+      if ([Input, SelectTrigger, Slider, PhoneInput].includes(node.type as typeof Input)) {
+        return cloneElement(node, { "aria-labelledby": labelId });
+      }
+      return node.props.children ? cloneElement(node, {}, labelControls(node.props.children as React.ReactNode)) : node;
+    });
+  }
+  return <div className="space-y-1"><Label id={labelId}>{label}</Label>{labelControls(children)}</div>;
 }
 
 // PlusLockedCard reemplaza una sección Plus-only cuando el gym no está en
@@ -621,9 +721,7 @@ function PlusLockedCard({
     <Card className="border-dashed">
       <CardContent className="pt-5 pb-5 space-y-3">
         <div className="flex items-baseline justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-            {sectionTitle}
-          </h2>
+          <h2 className="text-base font-semibold">{sectionTitle}</h2>
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
             <Lock className="h-3 w-3" />
             {t.plus.badge}

@@ -1,9 +1,14 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { useCanWrite } from "@/lib/writeAccess";
+import { usePermission } from "@/lib/permissions";
+import { RestrictedNote } from "@/components/shared/RestrictedNote";
 import { StockCountButton } from "@/components/products/StockCount";
 import { ExpensesWorkspace } from "@/pages/expenses/ExpensesPage";
 import { PurchaseDeliveries } from "@/components/products/PurchaseDeliveries";
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
+  ChevronDown,
   ArrowDown,
   ArrowUp,
   ArrowUpDown,
@@ -12,10 +17,8 @@ import {
   Search,
   BadgeMinus,
   BadgePlus,
-  Coins,
   Package,
   PackagePlus,
-  PackageX,
   X as XIcon,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -47,7 +50,6 @@ import {
   PageHeader,
   SectionCard,
 } from "@/components/shared/PagePrimitives";
-import { StatCard, StatListCard } from "@/components/shared/StatCard";
 import {
   DEFAULT_CATEGORIES,
   stockLevel,
@@ -142,14 +144,29 @@ function SortableHeader({
 }
 
 export default function ProductsPage() {
-  const [search, setSearch] = useState("");
+  const canWrite = useCanWrite();
+  // Per-operator permissions: editing the catalog (create, edit, price,
+  // deactivate) needs "products"; adjusting stock needs "inventory".
+  const mayEditProducts = usePermission("products");
+  const mayAdjust = usePermission("inventory");
+  const canEditProducts = canWrite && mayEditProducts;
+  const canAdjust = canWrite && mayAdjust;
+  // Hidrata los filtros iniciales desde la URL: ?q= llega de Buscar (el
+  // producto elegido abre el catálogo ya filtrado) y ?low_stock=1 de «Por
+  // surtir» en Inicio o del KPI de existencias del reporte.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const queryParam = searchParams.get("q");
+  const [search, setSearch] = useState(() => queryParam ?? "");
   const debouncedSearch = useDebounce(search, 300);
   const [category, setCategory] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<ProductStatusFilter>("active");
-  // Hidrata el filtro inicial desde el query param (?low_stock=1) — el KPI
-  // "Existencias bajas" del reporte navega aquí con ese flag, y queremos que el
-  // filtro arranque ya aplicado.
-  const [searchParams, setSearchParams] = useSearchParams();
+  // Apply ?q= once and drop it from the URL: a new search from Buscar sets it
+  // again, and typing here never fights with a stale param.
+  useEffect(() => {
+    if (queryParam === null) return;
+    setSearch(queryParam);
+    setSearchParams(current => { const next = new URLSearchParams(current); next.delete("q"); return next; }, { replace: true });
+  }, [queryParam, setSearchParams]);
   const purchasesView = searchParams.get("view") === "purchases";
   const isOwner = useAuthStore(s => s.user?.role === "owner");
   const navigate = useNavigate();
@@ -180,16 +197,16 @@ export default function ProductsPage() {
   const deepLink = useProductForDeepLink(editParam);
   useEffect(() => {
     if (!editParam || deepLink.data === undefined) return;
-    if (deepLink.data) {
+    if (deepLink.data && canEditProducts) {
       setEditing(deepLink.data);
-    } else {
+    } else if (!deepLink.data) {
       toast.error(t.errors.deepLinkNotFound);
     }
     const next = new URLSearchParams(searchParams);
     next.delete("edit");
     setSearchParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editParam, deepLink.data]);
+  }, [editParam, deepLink.data, canEditProducts]);
   // El costo y los márgenes son sensibles y forman parte de Análisis Plus.
   // Se requieren ambas condiciones: permiso de dueño y plan Plus. Standard
   // conserva catálogo, stock, ventas, compras y captura de costos.
@@ -279,94 +296,33 @@ export default function ProductsPage() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <PageContainer className="space-y-4">
       <PageHeader
         title={t.page.title}
 
         actions={
-          <div className="flex gap-2">{!purchasesView && <StockCountButton desktop />}<Button
+          <div className="flex gap-2">{!purchasesView && <StockCountButton desktop />}{(purchasesView || canEditProducts) && <Button requiresWrite
             size="lg"
+            disabled={purchasesView ? !canWrite : !canEditProducts}
             onClick={() => purchasesView ? openPurchase() : setCreateOpen(true)}
-            className={cn("h-10 rounded-md font-semibold shadow-sm", purchasesView && "bg-foreground text-background hover:bg-foreground/90")}
           >
-            {purchasesView ? <PackagePlus className="h-4 w-4 mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+            {purchasesView ? <PackagePlus aria-hidden="true" className="h-4 w-4" /> : <Plus aria-hidden="true" className="h-4 w-4" />}
             {purchasesView ? "Registrar compra" : t.page.new}
-          </Button></div>
+          </Button>}</div>
         }
       />
 
-      <div className="flex gap-5 border-b" aria-label="Vistas de Productos">{[["catalog","Catálogo"],["purchases","Compras"]].map(([id,label])=><button key={id} type="button" onClick={()=>setSearchParams(current=>{const next=new URLSearchParams(current);next.set("view",id);return next;})} className={cn("h-11 border-b-2 px-1 text-sm",purchasesView===(id==="purchases")?"border-foreground font-semibold":"border-transparent text-muted-foreground")}>{label}</button>)}</div>
-      {purchasesView ? <div className="space-y-5"><PurchaseDeliveries />{isOwner&&<ExpensesWorkspace section="purchases" embedded />}</div> : <>
+      {!purchasesView && canWrite && (!mayEditProducts || !mayAdjust) && (
+        <div className="space-y-1">
+          {!mayEditProducts && <RestrictedNote permission="products">{t.page.restricted.edit}</RestrictedNote>}
+          {!mayAdjust && <RestrictedNote permission="inventory">{t.page.restricted.adjust}</RestrictedNote>}
+        </div>
+      )}
+      <div className="flex gap-5 border-b" role="group" aria-label="Vistas de Productos">{[["catalog","Catálogo"],["purchases","Compras"]].map(([id,label])=><button key={id} type="button" aria-pressed={purchasesView===(id==="purchases")} onClick={()=>setSearchParams(current=>{const next=new URLSearchParams(current);next.set("view",id);return next;})} className={cn("h-11 border-b-2 px-1 text-sm",purchasesView===(id==="purchases")?"border-foreground font-semibold":"border-transparent text-muted-foreground")}>{label}</button>)}</div>
+      {/* The operator sees what they can act on (merchandise to receive) and
+          is told where the rest lives, never a blank tab. */}
+      {purchasesView ? <div className="space-y-5"><PurchaseDeliveries showEmpty={!isOwner} />{isOwner ? <ExpensesWorkspace section="purchases" embedded /> : <p className="text-sm text-muted-foreground">{t.page.purchases.ownerHistory}</p>}</div> : <>
 
-
-      {/* Stats calculadas en backend sobre el filtro completo, no sólo la
-          página visible. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          title="Productos"
-          value={total}
-          icon={Package}
-          tone="neutral"
-          hint={hasActiveFilters ? "en el filtro" : "en el catálogo"}
-        />
-        {/* Existencias bajas — junta "stock bajo" y "agotados" (la salud de
-            inventario que le importa a recepción) en un solo card. */}
-        <StatListCard
-          title={t.page.stockHealth.title}
-          icon={PackageX}
-          tone={
-            totals.out_count > 0
-              ? "danger"
-              : totals.low_count > 0
-                ? "warning"
-                : "neutral"
-          }
-          rows={[
-            { label: t.page.stockHealth.low, value: totals.low_count },
-            { label: t.page.stockHealth.out, value: totals.out_count },
-          ]}
-          hint={
-            totals.low_count === 0 && totals.out_count === 0
-              ? t.page.stockHealth.allOk
-              : undefined
-          }
-        />
-        <StatCard
-          title="Valor de stock"
-          value={money.fmt(totals.total_value)}
-          icon={PackagePlus}
-          tone="success"
-          hint="precio venta × existencias"
-        />
-        {/* Valor potencial del inventario actual. La ganancia realmente
-            obtenida por producto vive en Reportes > Análisis (Plus), donde
-            puede compararse sin mezclarla con el resumen operativo. */}
-        {showMargins && (
-          <StatListCard
-            title="Ganancia potencial"
-            icon={Coins}
-            tone="success"
-            rows={[
-              {
-                label: "En el stock actual",
-                value: money.fmt(totals.potential_profit),
-                chip:
-                  !money.hidden && totals.margin_pct != null
-                    ? `${totals.margin_pct >= 0 ? "+" : ""}${totals.margin_pct.toFixed(0)}%`
-                    : undefined,
-              },
-            ]}
-            hint={
-              totals.products_with_cost < totals.products_total
-                ? t.page.margin.coverage(
-                    totals.products_with_cost,
-                    totals.products_total
-                  )
-                : undefined
-            }
-          />
-        )}
-      </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3">
@@ -376,7 +332,7 @@ export default function ProductsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={t.page.searchPlaceholder}
-            className="pl-9 pr-9 h-10"
+            className="pl-9 pr-11 h-11"
             aria-label={t.page.searchPlaceholder}
           />
           {/* Botón limpiar búsqueda — aparece solo cuando hay texto.
@@ -386,7 +342,7 @@ export default function ProductsPage() {
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center h-7 w-7 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              className="absolute right-0 top-0 inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label="Limpiar búsqueda"
               title="Limpiar búsqueda"
             >
@@ -396,7 +352,7 @@ export default function ProductsPage() {
         </div>
 
         <Select value={category || "_all"} onValueChange={(v) => setCategory(v === "_all" ? "" : v)}>
-          <SelectTrigger className="h-10 w-[180px]">
+          <SelectTrigger aria-label="Categoría" className="h-11 w-[180px]">
             <SelectValue placeholder={t.page.filters.categoryAll} />
           </SelectTrigger>
           <SelectContent>
@@ -410,7 +366,7 @@ export default function ProductsPage() {
         </Select>
 
         <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as ProductStatusFilter)}>
-          <SelectTrigger className="h-10 w-[160px]">
+          <SelectTrigger aria-label="Estado del producto" className="h-11 w-[160px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -420,24 +376,33 @@ export default function ProductsPage() {
           </SelectContent>
         </Select>
 
-        <label className="flex items-center gap-2 cursor-pointer h-10 px-3 rounded-md border border-input hover:bg-muted">
-          <Switch checked={lowStockOnly} onCheckedChange={setLowStockOnly} />
+        <label className="flex items-center gap-2 cursor-pointer h-11 px-3 rounded-md border border-input hover:bg-muted">
+          <Switch aria-label={t.page.filters.lowStockOnly} checked={lowStockOnly} onCheckedChange={setLowStockOnly} />
           <span className="text-sm whitespace-nowrap">{t.page.filters.lowStockOnly}</span>
         </label>
       </div>
 
       {list.error && (
         <Alert variant="destructive">
-          <AlertDescription>{t.errors.loadList}</AlertDescription>
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>{t.errors.loadList}{list.data ? " Mostramos la última información disponible; puede haber cambiado." : " Reintenta para consultar tus existencias."}</span>
+            <Button variant="outline" disabled={list.isFetching} onClick={() => void list.refetch()}>{list.isFetching ? "Reintentando…" : "Reintentar"}</Button>
+          </AlertDescription>
         </Alert>
       )}
+      {list.data && !list.error && <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm" aria-label="Existencias del catálogo">
+        <span><strong className="font-display tabular">{total}</strong> {total === 1 ? "producto" : "productos"}{hasActiveFilters ? " en el filtro" : ""}</span>
+        <span><strong className="font-display tabular">{totals.low_count}</strong> {t.page.stockSummary.low}</span>
+        <span><strong className="font-display tabular">{totals.out_count}</strong> {t.page.stockSummary.out(totals.out_count)}</span>
+        {list.isFetching && <span role="status" className="text-muted-foreground">Actualizando…</span>}
+      </div>}
 
-      <SectionCard flush>
+      {(!list.error || items.length > 0) && <SectionCard flush>
         {list.isLoading && items.length === 0 ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          <div role="status" className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" /> Cargando productos…
           </div>
-        ) : items.length === 0 ? (
+        ) : list.error && items.length === 0 ? null : items.length === 0 ? (
           <EmptyState
             icon={<Package className="h-5 w-5" />}
             title={hasActiveFilters ? t.page.noResults : t.page.empty}
@@ -458,7 +423,7 @@ export default function ProductsPage() {
         ) : (
           <DataTable>
             <DataTableHead>
-              <DataTableTh className="w-12 pl-5" />
+              <DataTableTh className="w-12 pl-5"><span className="sr-only">Foto</span></DataTableTh>
               <SortableHeader
                 label="Producto"
                 column="name"
@@ -490,36 +455,23 @@ export default function ProductsPage() {
                 align="right"
               />
               <DataTableTh>Estado</DataTableTh>
-              <DataTableTh className="w-24 text-right pr-5">Acciones</DataTableTh>
+              <DataTableTh className="w-20 text-right pr-5"><span className="sr-only">Acciones</span></DataTableTh>
             </DataTableHead>
             <DataTableBody>
               {items.map((p) => (
                 <DataTableRow
                   key={p.id}
-                  onClick={() => setEditing(p)}
-                  // Keyboard a11y: la fila completa funciona como botón.
-                  // Tab la enfoca; Enter / Space disparan "Editar". Sin
-                  // esto, los operadores con teclado solo (o screen
-                  // readers) no podían interactuar con la tabla.
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      setEditing(p);
-                    }
-                  }}
-                  aria-label={`Editar ${p.name}`}
-                  className={cn(
-                    "group cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
-                    !p.active && "opacity-60"
-                  )}
+                  // Click anywhere on the row is a mouse shortcut for «Editar»;
+                  // keyboard and screen readers use the named button on the
+                  // product name, so the row is not a second control.
+                  onClick={canEditProducts ? () => setEditing(p) : undefined}
+                  className={cn("group", !p.active && "opacity-60")}
                 >
                   <DataTableCell className="w-12 pl-5">
-                    <div className="h-10 w-10 rounded-md border border-border bg-muted flex items-center justify-center overflow-hidden relative">
-                      <span className="text-xs font-semibold text-muted-foreground">
-                        {p.name.slice(0, 2).toUpperCase()}
-                      </span>
+                    {/* Products are not people: a photo or a package icon,
+                        never initials. */}
+                    <div className="h-11 w-10 rounded-md border border-border bg-muted flex items-center justify-center overflow-hidden relative">
+                      <Package aria-hidden="true" className="h-4 w-4 text-muted-foreground" />
                       <ProductPhoto
                         productId={p.id}
                         imageUrl={p.image_url}
@@ -527,59 +479,26 @@ export default function ProductsPage() {
                       />
                     </div>
                   </DataTableCell>
-                  {/* Nombre — affordance visible para "click para editar":
-                      hover muestra underline + cursor pointer. La fila
-                      entera también dispara editar al click, esto solo
-                      le da pista visual al operador. */}
                   <DataTableCell>
-                    <span className="font-semibold text-foreground group-hover:underline underline-offset-4 decoration-muted-foreground/40">
-                      {p.name}
-                    </span>
+                    {canEditProducts ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setEditing(p); }}
+                        aria-label={t.page.rowEditLabel(p.name)}
+                        className="rounded text-left font-semibold text-foreground underline-offset-4 decoration-muted-foreground/40 group-hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+                      >
+                        {p.name}
+                      </button>
+                    ) : (
+                      <span className="font-semibold text-foreground">{p.name}</span>
+                    )}
                   </DataTableCell>
                   <DataTableCell className="text-muted-foreground">{p.category}</DataTableCell>
                   <DataTableCell className="text-right tabular font-medium text-foreground">
                     {formatMoney(p.price)}
                   </DataTableCell>
-                  {/* Stock cell — clickeable cuando el producto está activo:
-                      tocar el número abre el modal de ajuste directo. Es la
-                      affordance natural ("para cambiar este número, tócalo")
-                      y evita exigir que el operador encuentre el botón en
-                      hover. stopPropagation evita disparar el row-click de
-                      Editar. Keyboard: focusable + Enter/Space dispara ajuste. */}
-                  <DataTableCell
-                    className={cn("text-right tabular", stockColorClass(p))}
-                    onClick={
-                      p.active
-                        ? (e) => {
-                            e.stopPropagation();
-                            setAdjusting(p);
-                          }
-                        : undefined
-                    }
-                    title={p.active ? t.page.rowAdjust : undefined}
-                  >
-                    {p.active ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setAdjusting(p);
-                        }}
-                        onKeyDown={(e) => {
-                          // Prevenimos que Enter/Space en este botón
-                          // burbujeen al row (que dispararía editar).
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.stopPropagation();
-                          }
-                        }}
-                        className="font-semibold rounded px-1.5 py-0.5 -mx-1.5 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 transition-colors"
-                        aria-label={`Ajustar existencias de ${p.name}`}
-                      >
-                        {p.stock}
-                      </button>
-                    ) : (
-                      <span className="font-semibold">{p.stock}</span>
-                    )}
+                  <DataTableCell className={cn("text-right tabular", stockColorClass(p))}>
+                    <span className="font-semibold">{p.stock}</span>
                     {p.stock_minimum > 0 && (
                       <span className="ml-1 text-xs text-muted-foreground">/ {p.stock_minimum}</span>
                     )}
@@ -591,44 +510,36 @@ export default function ProductsPage() {
                       <Badge variant="outline">{t.page.badges.inactive}</Badge>
                     )}
                   </DataTableCell>
-                  {/* Acciones — solo "Ajustar existencias" como botón explícito.
-                      Editar se accede via row-click / Enter / click en el
-                      nombre (underline en hover). Quitamos el botón
-                      Editar que vivía aquí en hover porque competía con
-                      Ajustar y era invisible para touch/teclado. */}
-                  <DataTableCell
-                    className="text-right pr-3"
-                    children={
-                      <div
-                        className="inline-flex items-center gap-1"
-                        onClick={(e) => e.stopPropagation()}
+                  <DataTableCell className="text-right pr-3">
+                    {p.active && canAdjust && (
+                      <Button
+                        requiresWrite
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => { e.stopPropagation(); setAdjusting(p); }}
+                        title={t.page.rowAdjust}
+                        aria-label={t.page.rowAdjustLabel(p.name)}
                       >
-                        {p.active && (
-                          <button
-                            type="button"
-                            onClick={() => setAdjusting(p)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                e.stopPropagation();
-                              }
-                            }}
-                            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 transition-colors"
-                            title={t.page.rowAdjust}
-                            aria-label={`${t.page.rowAdjust} de ${p.name}`}
-                          >
-                            <PackagePlus className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    }
-                  />
+                        <PackagePlus aria-hidden="true" />
+                      </Button>
+                    )}
+                  </DataTableCell>
                 </DataTableRow>
               ))}
             </DataTableBody>
           </DataTable>
         )}
-      </SectionCard>
+      </SectionCard>}
 
+      {isOwner && list.data && !list.error && <details className="group border-t pt-2">
+        <summary className="min-h-11 flex items-center cursor-pointer text-sm font-medium"><ChevronDown aria-hidden="true" className="mr-2 h-4 w-4 -rotate-90 transition-transform group-open:rotate-0" />Ver valor y ganancia del inventario</summary>
+        <dl className="flex flex-wrap gap-x-8 gap-y-3 py-3 text-sm">
+          <div><dt className="text-muted-foreground">Valor de venta de las existencias</dt><dd className="font-semibold tabular-nums">{money.fmt(totals.total_value)}</dd></div>
+          {showMargins && <div><dt className="text-muted-foreground">Ganancia potencial, aún sin vender</dt><dd className="font-semibold tabular-nums">{money.fmt(totals.potential_profit)}</dd>
+            {totals.products_with_cost < totals.products_total && <p className="text-muted-foreground">{t.page.margin.coverage(totals.products_with_cost, totals.products_total)}</p>}
+          </div>}
+        </dl>
+      </details>}
       {totalPages > 1 && (
         <div className="flex items-center justify-end gap-1">
           <Button
@@ -685,7 +596,7 @@ export default function ProductsPage() {
         product={confirmDeactivate}
         onClose={() => setConfirmDeactivate(null)}
       />
-    </div>
+    </PageContainer>
   );
 }
 
@@ -728,8 +639,7 @@ function CreateDialog({
       }
     } catch (e) {
       if (e instanceof ApiError) {
-        const data = e.details as Record<string, unknown> | null;
-        setServerError((data?.exception as string | undefined) || t.form.errors.generic);
+        setServerError(e.message || t.form.errors.generic);
       } else {
         setServerError(t.form.errors.generic);
       }
@@ -795,8 +705,7 @@ function EditDialog({
       onClose();
     } catch (e) {
       if (e instanceof ApiError) {
-        const data = e.details as Record<string, unknown> | null;
-        setServerError((data?.exception as string | undefined) || t.form.errors.generic);
+        setServerError(e.message || t.form.errors.generic);
       } else {
         setServerError(t.form.errors.generic);
       }
@@ -865,7 +774,7 @@ function EditDialog({
                   {t.page.rowDeactivate}
                 </Button>
               ) : (
-                <Button
+                <Button requiresWrite
                   variant="ghost"
                   size="sm"
                   onClick={handleReactivate}
@@ -903,18 +812,18 @@ function ProductMarginLine({
   const hasCost = typeof cost === "number";
   if (!hasCost) {
     return (
-      <div className="rounded-lg border border-paper-300 bg-paper-50/60 dark:bg-ink-800/40 p-3 text-sm">
-        <p className="text-xs font-medium uppercase tracking-wider text-ink-400 dark:text-ink-300 mb-1">
+      <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+        <p className="mb-1 text-xs font-medium text-muted-foreground">
           {t.form.margin.heading}
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-ink-400 dark:text-ink-300">
+          <span className="text-muted-foreground">
             {t.form.margin.noCost}
           </span>
           <button
             type="button"
             onClick={onCaptureCost}
-            className="font-medium text-brick-600 dark:text-brick-300 hover:underline"
+            className="min-h-11 font-medium text-primary hover:underline"
           >
             {t.form.margin.captureCost}
           </button>
@@ -926,20 +835,20 @@ function ProductMarginLine({
   const margin = product.price - unitCost;
   const marginPct = product.price > 0 ? (margin / product.price) * 100 : null;
   return (
-    <div className="rounded-lg border border-paper-300 bg-paper-50/60 dark:bg-ink-800/40 p-3 text-sm">
-      <p className="text-xs font-medium uppercase tracking-wider text-ink-400 dark:text-ink-300 mb-1">
+    <div className="rounded-lg border border-border bg-muted/40 p-3 text-sm">
+      <p className="mb-1 text-xs font-medium text-muted-foreground">
         {t.form.margin.heading}
       </p>
       <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1 tabular">
-        <span className="text-ink-500 dark:text-ink-300">
+        <span className="text-muted-foreground">
           {t.form.margin.cost} {money.fmt(unitCost)}
         </span>
-        <span className="text-ink-300">·</span>
-        <span className="text-ink-500 dark:text-ink-300">
+        <span aria-hidden="true" className="text-muted-foreground">·</span>
+        <span className="text-muted-foreground">
           {t.form.margin.price} {money.fmt(product.price)}
         </span>
-        <span className="text-ink-300">·</span>
-        <span className="font-semibold text-moss-700 dark:text-moss-100">
+        <span aria-hidden="true" className="text-muted-foreground">·</span>
+        <span className="font-semibold text-success-text">
           {t.form.margin.marginLabel} {money.fmt(margin)}
           {marginPct != null && !money.hidden
             ? ` (${marginPct.toFixed(0)}%)`
@@ -975,7 +884,7 @@ function DeactivateConfirm({ product, onClose }: { product: Product | null; onCl
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deactivate.isPending}>{common.cancel}</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogAction requiresWrite
             onClick={(e) => {
               e.preventDefault();
               confirm();

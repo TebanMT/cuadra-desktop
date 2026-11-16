@@ -1,3 +1,4 @@
+import { assertCanWrite } from "@/lib/writeAccess";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
@@ -90,9 +91,28 @@ export function useUpdateGymProfile() {
   });
 }
 
+export const PAYMENT_METHOD_KEYS = ["cash", "transfer", "card"] as const;
+export type PaymentMethodKey = (typeof PAYMENT_METHOD_KEYS)[number];
+
+// The desktop owns payment_methods in sync: the sidecar saves them and
+// pushes the gym row to the cloud. An edit made in the cloud would never
+// reach this reception, so this is the only screen that changes them after
+// setup. Invalidating ["gym"] refreshes setup-status, which the checkout reads.
+export function useUpdatePaymentMethods() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (methods: PaymentMethodKey[]) => {
+      assertCanWrite();
+      return api.patch<unknown>("/api/v1/gyms/me/payment-methods", { methods });
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["gym"] }),
+  });
+}
+
 export function useUploadGymLogo() {
   return useMutation({
     mutationFn: async (file: File) => {
+      assertCanWrite();
       const fd = new FormData();
       fd.append("file", file);
       const res = await fetch("/api/v1/gyms/me/logo", { method: "POST", body: fd });

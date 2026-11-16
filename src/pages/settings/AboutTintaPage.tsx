@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { SettingsBackLink } from "@/components/settings/SettingsBackLink";
 // AboutTintaPage — "Sobre Tinta" en Ajustes (ADR-005 §2.8).
 //
 // Muestra la versión instalada, cuándo se hizo el último check de updates,
@@ -23,8 +25,9 @@ export default function AboutTintaPage() {
   const updater = useUpdater();
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+    <PageContainer contentWidth="form" className="space-y-6">
       <header className="space-y-1">
+        <SettingsBackLink />
         <h1 className="text-3xl font-bold text-foreground" style={{ letterSpacing: "-0.02em" }}>
           Sobre Tinta
         </h1>
@@ -109,6 +112,6 @@ export default function AboutTintaPage() {
           la versión anterior. No tienes que hacer nada.
         </p>
       </section>
-    </div>
+    </PageContainer>
   );
 }

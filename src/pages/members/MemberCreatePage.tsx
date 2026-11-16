@@ -1,3 +1,5 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { useCanWrite, READ_ONLY_MESSAGE } from "@/lib/writeAccess";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -37,6 +39,7 @@ type Stage = "form" | "fingerprint";
 // requieren member_id, que sólo existe después de que el backend procesa
 // la inscripción (incluyendo charge_first_payment si aplica).
 export default function MemberCreatePage() {
+  const canWrite = useCanWrite();
   const navigate = useNavigate();
   const create = useCreateMember();
   const [serverError, setServerError] = useState<string | null>(null);
@@ -95,6 +98,7 @@ export default function MemberCreatePage() {
   }
 
   async function submit(payload: CreateMemberInput, name: string) {
+    if (!canWrite) { setServerError(READ_ONLY_MESSAGE); return; }
     try {
       setServerError(null);
       const res = await create.mutateAsync(payload);
@@ -125,7 +129,7 @@ export default function MemberCreatePage() {
           });
           return;
         }
-        setServerError(exception || t.form.errors.generic);
+        setServerError(e.message || t.form.errors.generic);
         return;
       }
       setServerError(t.form.errors.generic);
@@ -145,7 +149,7 @@ export default function MemberCreatePage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-3xl mx-auto">
+    <PageContainer contentWidth="form" className="mx-auto space-y-6">
       <PageHeader
         title={stage === "fingerprint" && newMember ? ct.fingerprint.title(newMember.name) : t.form.titleNew}
         subtitle={stage === "fingerprint" ? "Paso 2 de 2 · Huella (opcional)" : "Paso 1 de 2 · Datos del socio"}
@@ -196,7 +200,7 @@ export default function MemberCreatePage() {
                     {t.form.duplicate.seeExisting}
                   </Button>
                 )}
-                <Button onClick={createAnyway}>{t.form.duplicate.createAnyway}</Button>
+                <Button disabled={!canWrite || create.isPending} onClick={createAnyway}>{t.form.duplicate.createAnyway}</Button>
               </div>
             </div>
           ) : (
@@ -210,7 +214,7 @@ export default function MemberCreatePage() {
           )}
         </div>
       </SectionCard>
-    </div>
+    </PageContainer>
   );
 }
 
@@ -236,6 +240,7 @@ interface FingerprintStageProps {
 }
 
 function FingerprintStage({ memberId, memberName, number, dispatch, onDone }: FingerprintStageProps) {
+  const canWrite = useCanWrite();
   const navigate = useNavigate();
   const bio = useBiometricStatus();
   const fp = useRegisterFingerprint(memberId, {

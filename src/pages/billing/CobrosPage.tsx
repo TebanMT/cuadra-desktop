@@ -1,7 +1,8 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { OtherIncomeDialog } from "@/components/billing/OtherIncomeDialog";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 import {
@@ -15,8 +16,8 @@ import {
   Pencil,
   Plus,
   Receipt,
+  ShoppingCart,
   Undo2,
-  Wallet,
 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -35,7 +36,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { StatCard } from "@/components/shared/StatCard";
 import {
   DataTable,
   DataTableBody,
@@ -61,11 +61,13 @@ import {
 } from "@/hooks/useBilling";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
 import { useMember } from "@/hooks/useMembers";
-import { parseDate, todayIso } from "@/lib/dates";
+import { fmtDate, parseDate, todayIso } from "@/lib/dates";
 import { billing as t } from "@/strings/billing";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores/useAuthStore";
+import { usePermission } from "@/lib/permissions";
+import { RestrictedNote } from "@/components/shared/RestrictedNote";
 import { useRegisterOtherIncome } from "@/hooks/useBilling";
 import { SaleCorrectionModal } from "@/components/sales/SaleCorrectionModal";
 import { ProductRefundModal } from "@/components/sales/ProductRefundModal";
@@ -73,6 +75,7 @@ import { CashDrawerField } from "@/components/cash/CashDrawerField";
 import { RefundModal } from "@/components/billing/RefundModal";
 import { PaymentCorrectionModal } from "@/components/billing/PaymentCorrectionModal";
 import { keyForPayload } from "@/lib/idempotency";
+import { HelpHint } from "@/components/shared/HelpHint";
 
 type Period = "today" | "week" | "month" | "custom";
 
@@ -104,32 +107,17 @@ const CONCEPT_OPTIONS: Array<{ value: PaymentConcept | "all"; label: string }> =
   { value: "other", label: "Otros ingresos" },
 ];
 
+const METHOD_ICONS = { cash: Banknote, transfer: ArrowLeftRight, card: CreditCard } as const;
+
 function MethodBadge({ method }: { method: PaymentMethod | null }) {
-  if (method === "cash") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-sm">
-        <Banknote className="h-4 w-4 text-muted-foreground" />
-        <span>{t.payment.methods.cash}</span>
-      </span>
-    );
-  }
-  if (method === "transfer") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-sm">
-        <ArrowLeftRight className="h-4 w-4 text-muted-foreground" />
-        <span>{t.payment.methods.transfer}</span>
-      </span>
-    );
-  }
-  if (method === "card") {
-    return (
-      <span className="inline-flex items-center gap-1.5 text-sm">
-        <CreditCard className="h-4 w-4 text-muted-foreground" />
-        <span>{t.payment.methods.card}</span>
-      </span>
-    );
-  }
-  return <span className="text-sm text-muted-foreground">—</span>;
+  if (!method || !(method in METHOD_ICONS)) return <span className="text-sm text-muted-foreground">—</span>;
+  const Icon = METHOD_ICONS[method];
+  return (
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm">
+      <Icon aria-hidden="true" className="h-4 w-4 shrink-0 text-muted-foreground" />
+      <span>{t.payment.methods[method]}</span>
+    </span>
+  );
 }
 
 function fmtTime(value: string): string {
@@ -154,6 +142,12 @@ function conceptLabel(c: PaymentConcept): string {
   return t.history.concepts[c] || c;
 }
 
+// What the row is about, in words: names the row's actions for screen readers
+// («Corregir cobro de Ana López», «Devolver cobro de Agua 1L ×2»).
+function paymentSubject(p: Payment): string {
+  return p.member_name || p.sale_summary || (p.concept === "other" ? p.notes : null) || conceptLabel(p.concept);
+}
+
 function rowAccent(p: Payment): string | null {
   if (p.concept === "refund" || p.amount < 0) return "text-destructive";
   if (p.balance_pending > 0) return "text-warning";
@@ -162,9 +156,14 @@ function rowAccent(p: Payment): string | null {
 
 export default function CobrosPage() {
   const navigate = useNavigate();
+  // Venta rápida opens the day's sales here: offer the way back to the sale.
+  const fromSales = (useLocation().state as { from?: string } | null)?.from === "sales";
   const money = useMoneyVisibility();
   const [params, setParams] = useSearchParams();
-  const period: Period = params.get("from") && params.get("to") ? "custom" : ["week", "month", "custom"].includes(params.get("period") ?? "") ? params.get("period") as Period : "today";
+  // Without "view_totals" the backend only lists today and omits the
+  // totals: stay on today whatever the URL says, so no other range is asked.
+  const canViewTotals = usePermission("view_totals");
+  const period: Period = !canViewTotals ? "today" : params.get("from") && params.get("to") ? "custom" : ["week", "month", "custom"].includes(params.get("period") ?? "") ? params.get("period") as Period : "today";
   const customFrom = params.get("from") ?? todayIso();
   const customTo = params.get("to") ?? todayIso();
   const concept = (Object.keys(t.history.concepts).includes(params.get("concept") ?? "") ? params.get("concept") : "all") as PaymentConcept | "all";
@@ -212,7 +211,7 @@ export default function CobrosPage() {
     if (period === "today") return t.cobranza.period.today;
     if (period === "week") return t.cobranza.period.week;
     if (period === "month") return t.cobranza.period.month;
-    return `${range.from || "—"} → ${range.to || "—"}`;
+    return `${fmtDate(range.from)} – ${fmtDate(range.to)}`;
   }, [period, range]);
 
   // Member picked from search → fetch detail to feed PaymentModal.
@@ -237,20 +236,38 @@ export default function CobrosPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <PageContainer className="space-y-6">
+      {fromSales && (
+        <Button asChild variant="ghost" size="sm" className="-ml-3 -mb-3">
+          <Link to="/sales">
+            <ChevronLeft aria-hidden="true" className="h-4 w-4" />
+            {t.cobranza.backToSales}
+          </Link>
+        </Button>
+      )}
       <PageHeader
         title={t.cobranza.title}
-        subtitle={t.cobranza.subtitle}
+        subtitle={
+          canViewTotals ? (
+            t.cobranza.subtitle
+          ) : (
+            <div className="space-y-1">
+              <p>{t.cobranza.todayOnly.subtitle}</p>
+              <RestrictedNote permission="view_totals">{t.cobranza.todayOnly.note}</RestrictedNote>
+            </div>
+          )
+        }
         actions={
-          <div className="flex flex-wrap gap-2">
-          {isOwner && <Button size="lg" onClick={() => setOtherIncomeOpen(true)} className="h-10 font-semibold shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+          <HelpHint topic="cobrar" task="cobrar una membresía" />
+          {isOwner && <Button requiresWrite variant="outline" onClick={() => setOtherIncomeOpen(true)}>
             <CircleDollarSign className="h-4 w-4 mr-2" />
             Otro ingreso
           </Button>}
-          <Button
+          <Button requiresWrite
             size="lg"
             onClick={() => setPickerOpen(true)}
-            className="h-10 rounded-md font-semibold shadow-sm"
+            variant="outline"
           >
             <Plus className="h-4 w-4 mr-2" />
             {t.cobranza.chargeMember}
@@ -259,44 +276,10 @@ export default function CobrosPage() {
         }
       />
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-        <StatCard
-          title={t.cobranza.stats.total}
-          value={money.fmt(query.data?.total_paid ?? 0)}
-          icon={CircleDollarSign}
-          tone="neutral"
-          hint={t.cobranza.stats.totalHint}
-        />
-        <StatCard
-          title={t.cobranza.stats.count}
-          value={query.data?.total ?? 0}
-          icon={Receipt}
-          tone="neutral"
-          hint={t.cobranza.stats.countHint}
-        />
-        <StatCard
-          title={t.cobranza.stats.cash}
-          value={money.fmt(query.data?.cash_total ?? 0)}
-          icon={Banknote}
-          tone="success"
-        />
-        <StatCard
-          title={t.cobranza.stats.transfer}
-          value={money.fmt(query.data?.transfer_total ?? 0)}
-          icon={ArrowLeftRight}
-          tone="neutral"
-        />
-        <StatCard
-          title={t.cobranza.stats.card}
-          value={money.fmt(query.data?.card_total ?? 0)}
-          icon={Wallet}
-          tone="neutral"
-        />
-      </div>
-
-      {/* Period filters */}
+      {/* Period filters. Without "view_totals" there is only today, already
+          named in the subtitle: no lone «Hoy» pill to explain. */}
       <div className="flex flex-wrap items-center gap-3 [&_button]:min-h-11">
+        {canViewTotals && <div role="group" aria-label={t.cobranza.period.label} className="flex flex-wrap items-center gap-3">
         <FilterPill
           label={t.cobranza.period.today}
           active={period === "today"}
@@ -317,6 +300,7 @@ export default function CobrosPage() {
           active={period === "custom"}
           onClick={() => setPeriodAndReset("custom")}
         />
+        </div>}
         {period === "custom" && <DateRangePicker from={customFrom} to={customTo} onChange={(start, end) => { setParams(previous => { const p = new URLSearchParams(previous); p.set("from", start); p.set("to", end); p.set("period", "custom"); p.delete("page"); return p; }); }} />}
         <div className="ml-auto flex items-center gap-2">
           <Label className="text-xs text-muted-foreground">
@@ -328,7 +312,7 @@ export default function CobrosPage() {
               setConcept(v as PaymentConcept | "all");
             }}
           >
-            <SelectTrigger className="h-9 w-[180px]">
+            <SelectTrigger aria-label="Concepto" className="h-11 w-[180px]">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -344,45 +328,76 @@ export default function CobrosPage() {
 
       {query.error && (
         <Alert variant="destructive">
-          <AlertDescription>{t.cobranza.error}</AlertDescription>
+          <AlertDescription>{t.cobranza.error} {query.data && "Se muestran datos anteriores; pueden haber cambiado."} <Button variant="link" onClick={() => void query.refetch()}>Reintentar</Button></AlertDescription>
         </Alert>
       )}
 
-      <SectionCard flush>
+      {/* Totals come only with "view_totals"; an older session may not know
+          the permission yet, so also check the response carries them. */}
+      {canViewTotals && query.data && query.data.total_paid != null && <dl aria-label="Resumen del período" className="flex flex-wrap items-baseline gap-x-8 gap-y-3 border-y py-4">
+        <div><dt className="text-sm text-muted-foreground">Total cobrado</dt><dd className="font-display tabular text-2xl">{money.fmt(query.data.total_paid)}</dd></div>
+        <div><dt className="text-sm text-muted-foreground">Cobros</dt><dd className="font-display tabular">{query.data.total}</dd></div>
+        {[["Efectivo", query.data.cash_total], ["Transferencia", query.data.transfer_total], ["Tarjeta", query.data.card_total]].map(([label, amount]) => <div key={String(label)}><dt className="text-sm text-muted-foreground">{label}</dt><dd className="font-display tabular">{money.fmt(Number(amount))}</dd></div>)}
+      </dl>}
+
+      {(!query.error || query.data) && <SectionCard flush>
         {query.isLoading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            <span role="status" className="flex items-center gap-2"><Loader2 aria-hidden="true" className="h-5 w-5 animate-spin text-muted-foreground" />Cargando cobros…</span>
           </div>
         ) : items.length === 0 ? (
           <EmptyState
             icon={<Receipt className="h-6 w-6" />}
-            title={t.cobranza.empty.title}
-            hint={t.cobranza.empty.hint}
+            title={period === "today" ? t.cobranza.empty.todayTitle : t.cobranza.empty.title}
+            hint={concept === "product" ? t.cobranza.empty.salesHint : t.cobranza.empty.hint}
             action={
-              <Button onClick={() => setPickerOpen(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                {t.cobranza.chargeMember}
-              </Button>
+              // Offer the action that fills THIS list: product sales come from
+              // Venta rápida; refunds and other income have no shortcut here.
+              concept === "product" ? (
+                <Button asChild>
+                  <Link to="/sales">
+                    <ShoppingCart aria-hidden="true" className="h-4 w-4" />
+                    {t.cobranza.empty.goToSales}
+                  </Link>
+                </Button>
+              ) : concept === "refund" || concept === "other" ? undefined : (
+                <Button requiresWrite onClick={() => setPickerOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t.cobranza.chargeMember}
+                </Button>
+              )
             }
           />
         ) : (
+          // Fits the content area, not the viewport: the navigation (220px
+          // open, 70px collapsed) decides the real width. Date and time share
+          // one line, concept and operator go under the name, and row actions
+          // are 44px icons with a name, so nothing hides behind a scroll at
+          // 1024 × 640 or 1280 × 800.
           <DataTable>
             <DataTableHead>
-              <DataTableTh className="w-20 pl-5">{t.cobranza.columns.time}</DataTableTh>
-              <DataTableTh className="w-24">{t.cobranza.columns.date}</DataTableTh>
-              <DataTableTh>{t.cobranza.columns.member}</DataTableTh>
-              <DataTableTh>{t.cobranza.columns.concept}</DataTableTh>
-              <DataTableTh className="text-right">{t.cobranza.columns.amount}</DataTableTh>
-              <DataTableTh>{t.cobranza.columns.method}</DataTableTh>
-              <DataTableTh>{t.cobranza.columns.operator}</DataTableTh>
-              <DataTableTh className="w-40 text-right pr-5" />
+              <DataTableTh className="pl-4 pr-3">{t.cobranza.columns.date}</DataTableTh>
+              <DataTableTh className="px-3">{t.cobranza.columns.subject}</DataTableTh>
+              <DataTableTh className="px-3 text-right">{t.cobranza.columns.amount}</DataTableTh>
+              <DataTableTh className="px-3">{t.cobranza.columns.method}</DataTableTh>
+              <DataTableTh className="px-3 text-right"><span className="sr-only">{t.cobranza.columns.actions}</span></DataTableTh>
             </DataTableHead>
             <DataTableBody>
               {items.map((p) => {
                 const accent = rowAccent(p);
+                const subject = paymentSubject(p);
                 const recognitionDiffers =
                   p.recognized_amount != null &&
                   Math.abs(p.amount - p.recognized_amount) >= 0.005;
+                const canCorrectSale = p.concept === "product" && !!p.sale_id && (isOwner || p.operator_id === currentUserId);
+                const canCorrectPayment = isOwner && (p.concept === "membership" || p.concept === "other") && p.amount > 0;
+                const canRefundSale = isOwner && p.concept === "product" && !!p.sale_id;
+                const canRefundPayment = isOwner && (p.concept === "membership" || p.concept === "balance_settlement" || p.concept === "other") && p.amount > 0;
+                const details = [
+                  p.member_id || !p.sale_summary ? conceptLabel(p.concept) : null,
+                  p.member_id && p.sale_summary ? p.sale_summary : null,
+                  p.operator_name ? t.cobranza.recordedBy(p.operator_name) : null,
+                ].filter(Boolean).join(" · ");
                 return (
                   <DataTableRow
                     key={p.id}
@@ -391,13 +406,10 @@ export default function CobrosPage() {
                       setReceiptFolio(p.reference || undefined);
                     }}
                   >
-                    <DataTableCell className="pl-5 text-sm tabular text-muted-foreground">
-                      {fmtTime(p.created_at)}
+                    <DataTableCell className="whitespace-nowrap pl-4 pr-3 tabular">
+                      {fmtDay(p.payment_date)} · {fmtTime(p.created_at)}
                     </DataTableCell>
-                    <DataTableCell className="text-sm tabular">
-                      {fmtDay(p.payment_date)}
-                    </DataTableCell>
-                    <DataTableCell>
+                    <DataTableCell className="px-3">
                       {p.member_id ? (
                         <button
                           type="button"
@@ -405,130 +417,81 @@ export default function CobrosPage() {
                             e.stopPropagation();
                             navigate(`/members/${p.member_id}`);
                           }}
-                          className="text-sm font-medium text-foreground hover:underline text-left"
+                          className="text-left font-medium text-foreground hover:underline"
                         >
                           {p.member_name || t.cobranza.rowMember}
                         </button>
                       ) : (
-                        <span className="text-sm text-muted-foreground truncate">
-                          {p.sale_summary || (p.concept === "other" ? p.notes : null) || "—"}
+                        <span className="font-medium text-foreground">
+                          {p.sale_summary || (p.concept === "other" ? p.notes : null) || conceptLabel(p.concept)}
                         </span>
                       )}
-                    </DataTableCell>
-                    <DataTableCell className="text-sm">
-                      <span>{conceptLabel(p.concept)}</span>
-                      {p.member_id && p.sale_summary && (
-                        <span className="ml-1.5 text-xs text-muted-foreground">
-                          • {p.sale_summary}
-                        </span>
-                      )}
-                      {p.balance_pending > 0 && (
-                        <span className="ml-1.5 text-xs text-warning">
-                          • {t.cobranza.pendingTag(money.fmt(p.balance_pending))}
-                        </span>
-                      )}
-                      {p.concept === "refund" && (
-                        <span className="ml-1.5 text-xs text-destructive">
-                          • {t.cobranza.refundedTag}
-                        </span>
-                      )}
-                    </DataTableCell>
-                    <DataTableCell
-                      className={cn(
-                        "text-sm text-right font-semibold tabular",
-                        accent
-                      )}
-                    >
-                      <span className="block">{money.fmt(p.amount)}</span>
-                      {recognitionDiffers && (
-                        <span className="block text-[11px] font-normal text-muted-foreground">
-                          {money.fmt(p.recognized_amount!)} cuenta como ingreso
-                        </span>
-                      )}
-                    </DataTableCell>
-                    <DataTableCell>
-                      {p.concept === "product" && p.amount === 0 ? <span>{p.balance_pending > 0 ? "Fiado" : "Sin cobro"}</span> : <MethodBadge method={p.payment_method} />}
-                    </DataTableCell>
-                    <DataTableCell className="text-xs text-muted-foreground">
-                      {p.operator_name || "—"}
-                    </DataTableCell>
-                    <DataTableCell className="text-right pr-5">
-                      <div className="flex items-center justify-end gap-1">
-                        {p.concept === "product" &&
-                          p.sale_id &&
-                          (isOwner || p.operator_id === currentUserId) && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSaleCorrectionTarget(p);
-                            }}
-                            className="h-8"
-                          >
-                            <Pencil className="h-3.5 w-3.5 mr-1" />
-                            Corregir
-                          </Button>
+                      <span className="block text-xs text-muted-foreground">
+                        {details}
+                        {p.balance_pending > 0 && (
+                          <span className="text-warning"> · {t.cobranza.pendingTag(money.fmt(p.balance_pending))}</span>
                         )}
-                        {isOwner &&
-                          (p.concept === "membership" || p.concept === "other") &&
-                          p.amount > 0 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setPaymentCorrectionTarget(p);
-                              }}
-                              className="h-8"
-                            >
-                              <Pencil className="mr-1 h-3.5 w-3.5" />
-                              Corregir
-                            </Button>
-                          )}
-                        {isOwner && p.concept === "product" && p.sale_id && (
-                          <Button
+                        {p.concept === "refund" && (
+                          <span className="text-destructive"> · {t.cobranza.refundedTag}</span>
+                        )}
+                      </span>
+                    </DataTableCell>
+                    <DataTableCell className={cn("px-3 text-right font-display tabular", accent)}>
+                      <span className="block whitespace-nowrap">{money.fmt(p.amount)}</span>
+                      {recognitionDiffers && (
+                        <span className="block font-sans text-xs font-normal text-muted-foreground">
+                          {t.cobranza.recognizedAs(money.fmt(p.recognized_amount!))}
+                        </span>
+                      )}
+                    </DataTableCell>
+                    <DataTableCell className="px-3">
+                      {p.concept === "product" && p.amount === 0 ? <span className="whitespace-nowrap">{p.balance_pending > 0 ? "Fiado" : "Sin cobro"}</span> : <MethodBadge method={p.payment_method} />}
+                    </DataTableCell>
+                    <DataTableCell className="px-3 text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        {(canCorrectSale || canCorrectPayment) && (
+                          <Button requiresWrite
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={(event) => {
                               event.stopPropagation();
-                              setRefundSaleId(p.sale_id ?? null);
+                              if (canCorrectSale) setSaleCorrectionTarget(p);
+                              else setPaymentCorrectionTarget(p);
                             }}
-                            className="h-8 text-destructive hover:text-destructive"
+                            aria-label={t.cobranza.rowActions.correctLabel(subject)}
+                            title={t.cobranza.rowActions.correct}
                           >
-                            <Undo2 className="mr-1 h-3.5 w-3.5" />
-                            Devolver
+                            <Pencil aria-hidden="true" />
                           </Button>
                         )}
-                        {isOwner &&
-                          (p.concept === "membership" ||
-                            p.concept === "balance_settlement" ||
-                            p.concept === "other") &&
-                          p.amount > 0 && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setRefundPayment(p);
-                              }}
-                              className="h-8 text-destructive hover:text-destructive"
-                            >
-                              <Undo2 className="mr-1 h-3.5 w-3.5" />
-                              Devolver
-                            </Button>
-                          )}
+                        {(canRefundSale || canRefundPayment) && (
+                          <Button requiresWrite
+                            variant="ghost"
+                            size="icon"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (canRefundSale) setRefundSaleId(p.sale_id ?? null);
+                              else setRefundPayment(p);
+                            }}
+                            aria-label={t.cobranza.rowActions.refundLabel(subject)}
+                            title={t.cobranza.rowActions.refund}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            <Undo2 aria-hidden="true" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
-                          size="sm"
+                          size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
                             setReceiptId(p.id);
                             setReceiptFolio(p.reference || undefined);
                           }}
-                          className="h-8"
+                          aria-label={t.cobranza.rowActions.receiptLabel(subject)}
+                          title={t.cobranza.rowActions.receipt}
                         >
-                          Ver
+                          <Receipt aria-hidden="true" />
                         </Button>
                       </div>
                     </DataTableCell>
@@ -538,7 +501,7 @@ export default function CobrosPage() {
             </DataTableBody>
           </DataTable>
         )}
-      </SectionCard>
+      </SectionCard>}
 
       {/* Pagination */}
       {query.data && query.data.total > query.data.page_size && (
@@ -597,6 +560,7 @@ export default function CobrosPage() {
           currentMembership={pickedMember.data.current_membership}
           open={paymentOpen}
           onOpenChange={closePayment}
+          onPaid={receipt => navigate(`/members/${pickedMemberId}`, { state: { paymentReceipt: receipt } })}
         />
       )}
 
@@ -639,6 +603,6 @@ export default function CobrosPage() {
           }
         }}
       />
-    </div>
+    </PageContainer>
   );
 }

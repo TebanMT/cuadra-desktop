@@ -43,9 +43,13 @@ export const promotions = {
     title: "Promociones",
     subtitle:
       "Crea descuentos, cupones, 2x1 y días de regalo. Aplícalas al cobrar.",
+    // El operador no crea ni edita promociones: sólo las aplica al cobrar.
+    subtitleOperator:
+      "Descuentos, cupones, 2x1 y días de regalo que puedes aplicar al cobrar. Solo el dueño las crea o cambia.",
     addNew: "Nueva promoción",
     showInactive: "Mostrar inactivas",
-    empty: "Aún no hay promociones.",
+    empty: "Aún no hay promociones. Crea la primera con «Nueva promoción».",
+    emptyOperator: "Aún no hay promociones. El dueño las da de alta.",
   },
   status: {
     active: "Vigente",

@@ -427,7 +427,7 @@ export function ProductForm({
         <Button type="button" variant="outline" onClick={onCancel} disabled={submitting}>
           {t.form.cancel}
         </Button>
-        <Button type="submit" disabled={submitting}>
+        <Button requiresWrite type="submit" disabled={submitting}>
           {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
           {t.form.submit}
         </Button>

@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/stores/useAuthStore";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 const { config, setupState } = vi.hoisted(() => ({
@@ -8,7 +9,10 @@ vi.mock("@/hooks/useSetupStatus", () => ({ useSetupStatus: () => ({
  data: setupState.loaded ? { setup_completed: true, payment_methods: config } : undefined,
  isError: setupState.error, refetch: vi.fn(),
 }) }));
-vi.mock("@/components/cash/CashDrawerField", () => ({ CashDrawerField: () => <div>Caja de prueba</div> }));
+vi.mock("@/components/cash/CashDrawerField", async () => {
+  const { withReadyCashMock } = await import("@/test/readyCashDrawer");
+  return withReadyCashMock({ CashDrawerField: () => <div>Caja de prueba</div> });
+});
 vi.mock("@/components/sales/MemberAssociator", () => ({ MemberAssociator: () => <div>Socio</div> }));
 import { CheckoutModal } from "../CheckoutModal";
 const member = { member_id: "m1", full_name: "Ana", phone: "555" };
@@ -18,10 +22,26 @@ function setup(props: Partial<React.ComponentProps<typeof CheckoutModal>> = {}) 
  return confirm;
 }
 beforeEach(() => {
+ useAuthStore.setState({ readOnly: false, user: { user_id: "u1", role: "owner" } as never });
  config.cash = true; config.card = true; config.transfer = true;
  setupState.loaded = true; setupState.error = false;
 });
 describe("Cobro de productos", () => {
+ it("no ofrece fiar a un operador sin el permiso", () => {
+  useAuthStore.setState({ user: { user_id: "u2", role: "operator", permissions: [] } as never });
+  setup();
+  expect(screen.queryByRole("button", { name: "Fiado" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Dejar saldo pendiente" })).not.toBeInTheDocument();
+  expect(screen.getByRole("note")).toHaveTextContent("Vender fiado no está disponible. Requiere el permiso «Fiar». Pídeselo al dueño.");
+ });
+ it("impide confirmar un cobro en una sesión de solo lectura", () => {
+  useAuthStore.setState({ readOnly: true });
+  const confirm = setup();
+  const charge = screen.getByRole("button", { name: /Cobrar/ });
+  expect(charge).toBeDisabled();
+  fireEvent.click(charge);
+  expect(confirm).not.toHaveBeenCalled();
+ });
  it("permite cobrar en gimnasios existentes sin métodos configurados", async () => {
   config.cash = false; config.card = false; config.transfer = false;
   const confirm = setup({ member: null });

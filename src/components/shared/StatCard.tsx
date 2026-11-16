@@ -3,18 +3,19 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * KPI card — disciplina semántica estricta del spec terracota.
+ * KPI card de Tinta.
  *
- * tone selecciona el tinte del ícono pequeño (32×32) Y el color de la
- * tendencia opcional. NO afecta el número grande, que siempre va en
- * ink-900 / sans-serif tabular (Fraunces queda fuera de KPI numbers).
+ * Etiqueta en frase normal (nunca en mayúsculas) y la cifra en Manrope 700
+ * (`font-display`) con números tabulares: la cifra es lo que «queda en
+ * tinta». `tone` sólo tiñe el ícono pequeño (32×32) y la tendencia; nunca
+ * el número grande, que va en el color del texto.
  */
 export type StatTone = "neutral" | "accent" | "success" | "warning" | "danger";
 
 interface StatCardProps {
-  /** Label arriba — uppercase, tracking-wider, ink-400. */
+  /** Etiqueta arriba, en frase normal. */
   title: string;
-  /** Número grande — sans-serif tabular, NO Fraunces. */
+  /** Cifra principal — font-display, tabular. */
   value: string | number;
   /** Línea bajo el número (ej. "vs mes pasado"). */
   hint?: React.ReactNode;
@@ -84,17 +85,16 @@ export function StatCard({
         }
       }}
       className={cn(
-        // Container per spec: card blanco sobre paper-50, borde paper-300,
-        // radius xl, padding generoso, sombra suave estilo landing.
-        "rounded-xl border border-paper-300 bg-card p-5 sm:p-6 shadow-app transition-all",
+        // Papel con línea fina: borde para contener la cifra, sin sombra.
+        "rounded-xl border border-border bg-card p-5 sm:p-6 transition-colors",
         interactive &&
           "cursor-pointer hover:border-ink-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className
       )}
     >
-      {/* Header row — label uppercase + ícono 32×32 a la derecha. */}
+      {/* Encabezado: etiqueta en frase normal + ícono 32×32 a la derecha. */}
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium text-ink-400 dark:text-ink-300 uppercase tracking-wider leading-tight pt-1">
+        <p className="text-sm font-medium text-muted-foreground leading-tight pt-1">
           {title}
         </p>
         {Icon && (
@@ -110,9 +110,8 @@ export function StatCard({
         )}
       </div>
 
-      {/* Número central — sans-serif (NO Fraunces), tabular, ink-900 en
-          light, paper-50 en dark. truncate + title como red de seguridad
-          para gyms con ingresos extremos.
+      {/* Cifra central — Manrope 700 tabular en el color del texto.
+          title como red de seguridad para gyms con ingresos extremos.
           Font scaling sigue al ancho REAL del card, no al viewport:
           en sm-md el grid es 2 cols (cards anchas) → text-3xl;
           en lg+ el grid se aprieta a 5 cols (cards ~140-240px útil) →
@@ -121,8 +120,7 @@ export function StatCard({
           la mayoría de laptops. */}
       <p
         title={typeof value === "string" || typeof value === "number" ? String(value) : undefined}
-        className="mt-3 text-2xl sm:text-3xl lg:text-xl xl:text-2xl 2xl:text-3xl font-bold tabular text-ink-900 dark:text-paper-50 leading-none truncate"
-        style={{ letterSpacing: "-0.02em" }}
+        className="mt-3 font-display text-2xl sm:text-3xl lg:text-xl xl:text-2xl 2xl:text-3xl tabular text-foreground leading-tight break-words"
       >
         {value}
       </p>
@@ -135,7 +133,7 @@ export function StatCard({
               {delta}
             </span>
           )}
-          {hint && <span className="text-ink-400 dark:text-ink-300">{hint}</span>}
+          {hint && <span className="text-muted-foreground">{hint}</span>}
         </div>
       )}
     </div>
@@ -188,14 +186,14 @@ export function StatListCard({
         }
       }}
       className={cn(
-        "rounded-xl border border-paper-300 bg-card p-5 sm:p-6 shadow-app transition-all",
+        "rounded-xl border border-border bg-card p-5 sm:p-6 transition-colors",
         interactive &&
           "cursor-pointer hover:border-ink-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className
       )}
     >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-medium text-ink-400 dark:text-ink-300 uppercase tracking-wider leading-tight pt-1">
+        <p className="text-sm font-medium text-muted-foreground leading-tight pt-1">
           {title}
         </p>
         {Icon && (
@@ -214,13 +212,12 @@ export function StatListCard({
       <div className="mt-3 space-y-1.5">
         {rows.map((r, i) => (
           <div key={i} className="flex items-baseline justify-between gap-2">
-            <span className="text-xs text-ink-400 dark:text-ink-300">
+            <span className="text-xs text-muted-foreground">
               {r.label}
             </span>
             <span className="flex items-baseline gap-1.5 min-w-0">
               <span
-                className="text-lg font-bold tabular text-ink-900 dark:text-paper-50 leading-none truncate"
-                style={{ letterSpacing: "-0.02em" }}
+                className="font-display text-lg tabular text-foreground leading-tight break-words"
                 title={typeof r.value === "string" ? r.value : undefined}
               >
                 {r.value}
@@ -236,7 +233,7 @@ export function StatListCard({
       </div>
 
       {hint && (
-        <div className="mt-3 text-xs text-ink-400 dark:text-ink-300">{hint}</div>
+        <div className="mt-3 text-xs text-muted-foreground">{hint}</div>
       )}
     </div>
   );

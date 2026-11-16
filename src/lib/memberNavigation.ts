@@ -1,4 +1,6 @@
-export const memberFilters = ["", "active", "expiring_soon", "expired", "inactive", "balance", "unrenewed"] as const;
+// `expired` («Sin vigencia») es la suma de lapsed + unpaid_enrollment +
+// no_membership; los tres separados permiten atender cada caso.
+export const memberFilters = ["", "active", "expiring_soon", "lapsed", "no_membership", "unpaid_enrollment", "expired", "inactive", "balance", "unrenewed"] as const;
 export type MemberView = (typeof memberFilters)[number];
 
 export function memberView(params: URLSearchParams): MemberView {

@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAttentionRequired } from "@/hooks/useReports";
 import { useMoneyVisibility } from "@/hooks/useMoneyVisibility";
+import { MessageSquare, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { whatsappUrl } from "@/lib/whatsapp";
 import { fmtDate } from "@/lib/dates";
@@ -30,8 +31,9 @@ export function MemberBalances({ search }: { search: string }) {
             <div className="flex min-w-0 flex-1 items-center justify-between gap-3"><div className="min-w-0 flex-1"><Link to={`/members/${row.member_id}`} className="font-medium hover:underline">{row.full_name}</Link>
               <p className="text-xs text-muted-foreground">Pendiente desde {fmtDate(row.due_since)}</p></div>
             <span className="shrink-0 tabular-nums font-semibold">{money.fmt(row.balance)}</span></div>
-            <div className="flex gap-2 sm:shrink-0">{whatsapp && <Button asChild variant="outline" size="sm" className="flex-1 sm:flex-none"><a href={whatsapp} target="_blank" rel="noopener noreferrer">WhatsApp</a></Button>}
-              <Button asChild size="sm" className="flex-1 sm:flex-none"><Link to={`/members/${row.member_id}?action=settle`}>Abonar</Link></Button>
+            {/* Una acción por fila: el nombre accesible incluye al socio. */}
+            <div className="flex gap-1 sm:shrink-0">{whatsapp && <Button asChild variant="ghost" className="flex-1 sm:flex-none"><a href={whatsapp} target="_blank" rel="noopener noreferrer" aria-label={`Abrir WhatsApp de ${row.full_name}`}><MessageSquare aria-hidden />WhatsApp</a></Button>}
+              <Button asChild variant="ghost" className="flex-1 text-primary hover:text-primary sm:flex-none"><Link to={`/members/${row.member_id}?action=settle`} aria-label={`Abonar al saldo de ${row.full_name}`}><Wallet aria-hidden />Abonar</Link></Button>
             </div>
           </div>;
         })}

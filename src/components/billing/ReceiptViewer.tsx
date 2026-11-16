@@ -1,3 +1,5 @@
+import { useRef } from "react";
+import { useCanWrite, READ_ONLY_MESSAGE } from "@/lib/writeAccess";
 import { Loader2, Download, Printer, MessageCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -20,6 +22,8 @@ interface Props {
 // (tauri://…), inútil fuera de esta máquina. El canal para compartir es
 // WhatsApp. Si algún día hay links públicos firmados, vuelve el botón.
 export function ReceiptViewer({ paymentId, folio, open, onOpenChange }: Props) {
+  const canWrite = useCanWrite();
+  const opener = useRef<HTMLElement | null>(null);
   const receipt = useReceiptPdf(open ? paymentId : null);
   const send = useSendReceipt(paymentId || "");
 
@@ -50,6 +54,7 @@ export function ReceiptViewer({ paymentId, folio, open, onOpenChange }: Props) {
   }
 
   async function sendWhatsapp() {
+    if (!canWrite || send.isPending) return;
     try {
       const res = await send.mutateAsync({ channel: "whatsapp" });
       notifySendReceiptOutcome(res);
@@ -60,9 +65,13 @@ export function ReceiptViewer({ paymentId, folio, open, onOpenChange }: Props) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl h-[85vh] flex flex-col">
+      <DialogContent aria-describedby={undefined} className="max-w-3xl h-[85vh] flex flex-col" onOpenAutoFocus={() => {
+        opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      }} onCloseAutoFocus={event => {
+        if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus(); }
+      }}>
         <DialogHeader>
-          <DialogTitle>{t.receipt.title(folio || paymentId || "")}</DialogTitle>
+          <DialogTitle>{folio ? t.receipt.title(folio) : "Comprobante de pago"}</DialogTitle>
         </DialogHeader>
 
         <div className="flex-1 overflow-hidden bg-muted/40 rounded-md border">
@@ -79,13 +88,14 @@ export function ReceiptViewer({ paymentId, folio, open, onOpenChange }: Props) {
             </div>
           ) : (
             <iframe
-              title={`receipt-${paymentId}`}
+              title={folio ? `Comprobante ${folio}` : "Comprobante de pago"}
               src={receipt.objectUrl}
               className="w-full h-full bg-white"
             />
           )}
         </div>
 
+        {!canWrite && <p className="text-sm text-muted-foreground">{READ_ONLY_MESSAGE}</p>}
         <div className="flex flex-wrap gap-2 justify-end pt-2">
           <Button variant="outline" onClick={download} disabled={!receipt.data}>
             <Download className="h-4 w-4" />
@@ -95,7 +105,7 @@ export function ReceiptViewer({ paymentId, folio, open, onOpenChange }: Props) {
             <Printer className="h-4 w-4" />
             {t.receipt.print}
           </Button>
-          <Button onClick={sendWhatsapp} disabled={send.isPending || !paymentId}>
+          <Button onClick={sendWhatsapp} disabled={!canWrite || send.isPending || !paymentId}>
             {send.isPending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (

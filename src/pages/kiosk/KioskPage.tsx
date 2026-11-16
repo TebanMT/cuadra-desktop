@@ -1,3 +1,4 @@
+import { TintaWordmark } from "@/components/shared/Logo";
 import { memo, useCallback, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, AlertTriangle, AlertCircle, CloudOff, LogOut } from "lucide-react";
@@ -33,7 +34,7 @@ import { checkin as t } from "@/strings/checkin";
 const KioskClock = memo(function KioskClock({ now }: { now: Date }) {
   return (
     <div className="flex flex-col" aria-live="off">
-      <div className="text-7xl font-bold tracking-tight tabular-nums text-foreground leading-none">
+      <div className="text-4xl sm:text-5xl font-bold tracking-tight tabular-nums text-foreground leading-none">
         {format(now, "HH:mm")}
       </div>
       <div className="mt-1 text-sm font-medium text-muted-foreground capitalize">
@@ -163,7 +164,7 @@ export default function KioskPage() {
 
   async function submitNumber(value?: string) {
     const candidate = value ?? numberInput;
-    if (candidate.length !== 4) return;
+    if (checkinByNumber.isPending || candidate.length !== 4) return;
     setFeedback({ kind: "processing" });
     setNumberError(null);
     try {
@@ -173,9 +174,9 @@ export default function KioskPage() {
       announceTone(fb);
       setNumberInput("");
     } catch (err) {
-      const msg = checkinErrorMessage(err, t.numberPad.invalid);
+      const msg = checkinErrorMessage(err, t.feedback.operationalError);
       setNumberError(msg);
-      setFeedback({ kind: "denied_not_found", detail: msg });
+      setFeedback({ kind: "operational_error", detail: msg });
       // Shake brief en el teclado como feedback haptico-visual
       // de "intento incorrecto". 360ms total, sin acumular si
       // hay clics rápidos.
@@ -253,7 +254,7 @@ export default function KioskPage() {
           : AlertCircle;
   const syncColor =
     syncLevel === "ok"
-      ? "text-success"
+      ? "text-success-text"
       : syncLevel === "offline"
         ? "text-muted-foreground"
         : syncLevel === "offlineLong"
@@ -262,12 +263,12 @@ export default function KioskPage() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex h-screen w-screen flex-col bg-background"
+      className="fixed inset-0 z-50 flex h-dvh w-screen flex-col overflow-y-auto bg-background"
       onPointerDown={unlockAudio}
       onKeyDown={unlockAudio}
     >
       {/* Top bar — reloj + fecha a la izquierda; counter + reader status a la derecha. */}
-      <div className="absolute top-6 left-6 right-6 flex items-start justify-between text-muted-foreground pointer-events-none">
+      <div className="shrink-0 px-6 pt-4 flex items-start justify-between text-muted-foreground pointer-events-none">
         <KioskClock now={now} />
         <div className="flex flex-col items-end gap-2">
           <div
@@ -286,9 +287,11 @@ export default function KioskPage() {
       </div>
 
       {/* Main feedback area — central, large, animated. */}
-      <main className="flex flex-1 items-center justify-center px-12">
-        <div className="flex flex-col items-center gap-10 w-full max-w-3xl">
-          <CheckinFeedback state={feedback} idleMessage={idleMessage} size="xl" />
+      <main className="flex flex-1 items-center justify-center px-6 py-3">
+        <div className="flex flex-col items-center gap-4 w-full max-w-3xl">
+          {/* En solo lectura (prueba terminada) el kiosko sigue igual: registrar
+              entradas es justo lo que se permite. */}
+          {numberAvailable && feedback.kind === "idle" ? <h1 className="text-center font-display text-2xl">{idleMessage}</h1> : <CheckinFeedback state={feedback} idleMessage={idleMessage} size="lg" />}
 
           {numberAvailable && feedback.kind === "idle" && (
             <div
@@ -305,7 +308,7 @@ export default function KioskPage() {
                 }}
                 onSubmit={submitNumber}
                 disabled={checkinByNumber.isPending}
-                size="lg"
+                size="md"
               />
               {numberError && (
                 <p
@@ -324,17 +327,12 @@ export default function KioskPage() {
           pointer-events-none para que el área grande no atrape clicks
           accidentales (un socio recargando la pantalla, etc.); sólo el
           botón de salir reactiva pointer-events. */}
-      <div className="absolute bottom-4 left-6 right-6 flex items-center justify-between text-xs text-muted-foreground pointer-events-none">
+      <div className="shrink-0 px-6 pb-4 flex items-center justify-between text-xs text-muted-foreground pointer-events-none">
         {/* Brand mark sutil — confirma "esto corre con Tinta" sin
             competir con el branding visual del gym. */}
-        <span className="font-display font-semibold opacity-40 inline-flex items-baseline relative" style={{ letterSpacing: "-0.02em" }}>
-          T<span className="relative inline-block">
-            <span aria-hidden="true" className="absolute bg-brick-500 rounded-full" style={{ width: "0.18em", height: "0.18em", top: "-0.05em", left: "0.10em" }} />
-            inta
-          </span>
-        </span>
+        <TintaWordmark className="w-20" />
         <div className="flex items-center gap-3">
-          <span className="inline-flex items-center gap-1.5 opacity-70">
+          <span className="inline-flex items-center gap-1.5 ">
             <SyncIcon className={cn("h-4 w-4", syncColor)} />
             <span>{syncLevel === "offline" || syncLevel === "offlineLong" ? t.kiosk.syncOffline : t.kiosk.sync}</span>
           </span>
@@ -350,7 +348,7 @@ export default function KioskPage() {
             type="button"
             aria-label={t.kiosk.exitButtonAriaLabel}
             onClick={() => void exitKiosk()}
-            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 opacity-30 transition-opacity hover:opacity-90 focus:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="pointer-events-auto inline-flex items-center gap-1.5 rounded-md px-2 py-1 min-h-11 transition-colors hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <LogOut className="h-4 w-4" aria-hidden="true" />
             <span>{t.kiosk.exitHint}</span>

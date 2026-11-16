@@ -31,8 +31,8 @@ export const messaging = {
     monthlyReached: (limit: number) =>
       `Llegaste al máximo de ${limit} envíos este mes. Se renueva el día 1.`,
     overCap: (count: number, cap: number) =>
-      `Tienes ${count} socios en este grupo, pero el máximo por envío es ${cap}. Usa un grupo más chico o mejora a Plus.`,
-    plusHint: "Standard: 2 envíos al mes, hasta 150 socios por envío. Plus: sin estos límites.",
+      `Tienes ${count} socios en este grupo, pero el máximo por envío es ${cap}. Usa un grupo más chico o consulta a soporte.`,
+    plusHint: "El límite disponible se confirma con el servidor antes del envío.",
     // Selección manual de socios (opción C)
     chooseSpecific: "Elegir socios específicos",
     adjustRecipients: (n: number) => `Ajustar destinatarios (${n})`,

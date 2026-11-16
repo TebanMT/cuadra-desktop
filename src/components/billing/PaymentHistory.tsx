@@ -79,7 +79,8 @@ function MethodCell({ method }: { method: PaymentMethod | null }) {
 
 export function PaymentHistory({ memberId, memberName }: Props) {
   const role = useAuthStore((s) => s.user?.role);
-  const isOwner = role === "owner";
+  const readOnly = useAuthStore(s => s.readOnly);
+  const isOwner = role === "owner" && !readOnly;
   const money = useMoneyVisibility();
 
   const [concept, setConcept] = useState<PaymentConcept | "all">("all");
@@ -114,7 +115,7 @@ export function PaymentHistory({ memberId, memberName }: Props) {
             value={concept}
             onValueChange={(v) => setConcept(v as PaymentConcept | "all")}
           >
-            <SelectTrigger id="ph-concept" className="h-9 text-sm">
+            <SelectTrigger id="ph-concept" className="h-11 text-sm">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -169,11 +170,11 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                     }}
                   >
                     <TableCell className="text-sm tabular-nums">
-                      {fmtDate(p.payment_date)}
+                      <Button variant="link" className="h-auto p-0 text-left min-h-11" aria-label={`Ver comprobante del ${fmtDate(p.payment_date)}`} onClick={event => { event.stopPropagation(); event.currentTarget.focus(); setReceiptId(p.id); setReceiptFolio(p.reference); }}>{fmtDate(p.payment_date)}</Button>
                     </TableCell>
                     <TableCell className="text-sm">
                       {t.history.concepts[p.concept] || p.concept}
-                      {p.balance_pending > 0 && (
+                      {!readOnly && p.balance_pending > 0 && (
                         <button
                           type="button"
                           onClick={(e) => {
@@ -214,7 +215,7 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-7 w-7">
+                          <Button variant="ghost" size="icon" aria-label={`Acciones del cobro del ${fmtDate(p.payment_date)}`} className="h-11 w-11">
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -231,7 +232,7 @@ export function PaymentHistory({ memberId, memberName }: Props) {
                               acepta padres membership Y product) — el gate
                               por membership dejaba las ventas fiadas sin
                               camino visible de cobro. */}
-                          {p.balance_pending > 0 && (
+                          {!readOnly && p.balance_pending > 0 && (
                             <DropdownMenuItem onSelect={() => setSettleTarget(p)}>
                               {t.history.pendingSettle}
                             </DropdownMenuItem>

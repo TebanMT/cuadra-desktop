@@ -3,6 +3,7 @@ import { format } from "date-fns";
 import { AlertTriangle, Check, Fingerprint, Loader2, X } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MemberPhoto } from "@/components/members/MemberPhoto";
+import { useMember } from "@/hooks/useMembers";
 import {
   eventToFeedback,
   feedbackDetail,
@@ -258,7 +259,7 @@ export default function CheckinFloatPage() {
           {t.float.title}
         </span>
         {last && (
-          <span className="pointer-events-none ml-1 text-[11px] tabular-nums text-muted-foreground/70">
+          <span className="pointer-events-none ml-1 text-[11px] tabular-nums text-muted-foreground">
             {t.float.lastResultAt(last.at)}
           </span>
         )}
@@ -399,6 +400,10 @@ function CenteredState({
 // fondo por tono para leer el veredicto antes que el texto.
 function ResultCard({ last }: { last: LastResult }) {
   const { feedback, memberId } = last;
+  // El evento no trae photo_url: la ficha (caché compartida, sidecar local)
+  // dice si hay foto. Sin foto no se pide la imagen (evita el 404) y quedan
+  // las iniciales sobre fondo neutro.
+  const hasPhoto = !!useMember(memberId).data?.member.photo_url;
   const tone = feedbackTone(feedback.kind);
   const detail = feedbackDetail(feedback);
   const name = feedback.memberName;
@@ -420,7 +425,7 @@ function ResultCard({ last }: { last: LastResult }) {
     >
       {name ? (
         <Avatar className="h-16 w-16 shrink-0 ring-2 ring-background">
-          <MemberPhoto memberId={memberId ?? undefined} />
+          {hasPhoto && <MemberPhoto memberId={memberId ?? undefined} />}
           <AvatarFallback
             className="text-lg font-semibold"
             style={{ backgroundColor: palette.bg, color: palette.text }}

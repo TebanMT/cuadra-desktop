@@ -1,5 +1,6 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
 import { Link } from "react-router-dom";
-import { Lock, Sparkles } from "lucide-react";
+import { Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { settings as t } from "@/strings/settings";
 
@@ -22,10 +23,10 @@ interface Props {
 export function PlusFeatureLock({
   title = t.plus.lockedTitle,
   body = t.plus.lockedBody,
-  icon: Icon = Sparkles,
+  icon: Icon = Lock,
 }: Props) {
   return (
-    <div className="p-6 max-w-2xl mx-auto">
+    <PageContainer contentWidth="form">
       <div className="rounded-xl border border-border bg-card text-card-foreground p-8 text-center space-y-4">
         <div className="mx-auto h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center relative">
           <Icon className="h-7 w-7 text-primary" />
@@ -37,12 +38,13 @@ export function PlusFeatureLock({
           {title}
         </h1>
         <p className="text-sm text-muted-foreground max-w-md mx-auto">{body}</p>
+        <p className="text-sm text-muted-foreground">Standard incluye las funciones disponibles. Si esperabas tener acceso, revisa la sincronización y consulta a soporte.</p>
         <div className="pt-2">
           <Button size="lg" asChild>
-            <Link to="/settings/subscription">{t.plus.cta}</Link>
+            <Link to="/help">{t.plus.cta}</Link>
           </Button>
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

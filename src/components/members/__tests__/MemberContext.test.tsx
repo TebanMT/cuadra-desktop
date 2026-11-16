@@ -34,9 +34,9 @@ beforeEach(() => {
 describe("Consultas dentro de su módulo", () => {
   it("Inicio lleva directo a cada filtro, sin cumpleaños ni ausencias", () => {
     mount(<MemberProductLinks summary={{expiring_soon:2,pending_balance:3,low_stock:1}} />);
-    expect(screen.getByRole("link",{name:/Membresías por vencer/})).toHaveAttribute("href","/members?status=expiring_soon");
-    expect(screen.getByRole("link",{name:/saldo pendiente/})).toHaveAttribute("href","/members?status=balance");
-    expect(screen.getByRole("link",{name:/pocas existencias/})).toHaveAttribute("href","/products?low_stock=1");
+    expect(screen.getByRole("link",{name:/Por vencer/})).toHaveAttribute("href","/members?status=expiring_soon");
+    expect(screen.getByRole("link",{name:/Con saldo/})).toHaveAttribute("href","/members?status=balance");
+    expect(screen.getByRole("link",{name:/Por surtir/})).toHaveAttribute("href","/products?low_stock=1");
     expect(screen.queryByText(/Atención inmediata|cumpleañ|sin venir/i)).not.toBeInTheDocument();
   });
   it("no ofrece Productos a un rol sin acceso ni celebra una lista vacía", () => {
@@ -53,7 +53,7 @@ describe("Consultas dentro de su módulo", () => {
     expect(screen.queryByText("Socio 29")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button",{name:"Siguiente"}));
     expect(screen.getByText("Socio 29")).toBeInTheDocument();
-    expect(screen.getAllByRole("link",{name:"Abonar"})[0]).toHaveAttribute("href","/members/member-25?action=settle");
+    expect(screen.getByRole("link",{name:"Abonar al saldo de Socio 25"})).toHaveAttribute("href","/members/member-25?action=settle");
     fireEvent.change(screen.getByRole("textbox"), {target:{value:"Socio 29"}});
     await waitFor(() => expect(screen.queryByText("Socio 25")).not.toBeInTheDocument());
     expect(screen.getByText("Socio 29")).toBeInTheDocument();

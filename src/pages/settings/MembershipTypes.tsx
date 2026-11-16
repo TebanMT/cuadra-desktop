@@ -1,6 +1,9 @@
+import { PageContainer } from "@/components/shared/PagePrimitives";
+import { useCanWrite } from "@/lib/writeAccess";
+import { useAuthStore } from "@/stores/useAuthStore";
 import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Check, Loader2, Plus, Pencil, BadgeMinus } from "lucide-react";
+import { ChevronDown, Check, Loader2, Plus, Pencil, BadgeMinus } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -80,8 +83,9 @@ const FREQ_OPTIONS: { value: MaintenanceFrequency; label: string }[] = [
 export default function MembershipTypesPage() {
   const [params, setParams] = useSearchParams();
   const tab = parseTab(params.get("tab"));
+  const isOwner = useAuthStore((st) => st.user?.role === "owner");
   return (
-    <div className="p-6 space-y-4 max-w-5xl mx-auto">
+    <PageContainer className="space-y-4">
       <div className="space-y-1">
         <h1
           className="text-3xl font-bold text-foreground"
@@ -90,7 +94,9 @@ export default function MembershipTypesPage() {
           Membresías y promociones
         </h1>
         <p className="text-sm text-muted-foreground">
-          Tus planes de membresía + las promociones que aplicas al cobrar.
+          {isOwner
+            ? "Los planes que ofreces y las promociones que aplicas al cobrar."
+            : "Consulta los planes y las promociones que puedes aplicar al cobrar."}
         </p>
       </div>
       <Tabs
@@ -106,18 +112,23 @@ export default function MembershipTypesPage() {
           <TabsTrigger value="membresias">Membresías</TabsTrigger>
           <TabsTrigger value="promociones">Promociones</TabsTrigger>
         </TabsList>
-        <TabsContent value="membresias" className="pt-4">
+        <TabsContent value="membresias" className="pt-2">
           <MembershipsTab />
         </TabsContent>
-        <TabsContent value="promociones" className="pt-4">
+        <TabsContent value="promociones" className="pt-2">
           <PromotionsTab />
         </TabsContent>
       </Tabs>
-    </div>
+    </PageContainer>
   );
 }
 
 function MembershipsTab() {
+  // Plans and the gym's default fees are the owner's: the backend rejects
+  // an operator's change, so reception only reads them here.
+  const isOwner = useAuthStore((st) => st.user?.role === "owner");
+  const writable = useCanWrite();
+  const canWrite = writable && isOwner;
   const types = useMembershipTypes(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<MembershipType | null>(null);
@@ -130,7 +141,7 @@ function MembershipsTab() {
   const [params, setParams] = useSearchParams();
   const editParam = params.get("edit");
   useEffect(() => {
-    if (!editParam || !types.data) return;
+    if (!canWrite || !editParam || !types.data) return;
     const target = types.data.find((p) => p.id === editParam);
     if (target) {
       setEditing(target);
@@ -141,7 +152,7 @@ function MembershipsTab() {
     next.delete("edit");
     setParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editParam, types.data]);
+  }, [editParam, types.data, canWrite]);
 
   // Carga del backend. Antes esto vivía en localStorage; ahora la
   // fuente de verdad es `gyms.charge_settings`. El hook hace migración
@@ -183,7 +194,7 @@ function MembershipsTab() {
   // después del último cambio para no pegarle al server por cada
   // keystroke en los inputs numéricos.
   useEffect(() => {
-    if (!hydratedRef.current) return;
+    if (!canWrite || !hydratedRef.current) return;
     const handle = setTimeout(() => {
       const eAmt = parseFloat(enrollmentAmount);
       const mAmt = parseFloat(maintenanceAmount);
@@ -200,7 +211,7 @@ function MembershipsTab() {
     }, 600);
     return () => clearTimeout(handle);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chargeEnrollment, chargeMaintenance, maintFreq, enrollmentAmount, maintenanceAmount]);
+  }, [chargeEnrollment, chargeMaintenance, maintFreq, enrollmentAmount, maintenanceAmount, canWrite]);
 
   useEffect(() => {
     if (savedAt === null) return;
@@ -209,24 +220,91 @@ function MembershipsTab() {
   }, [savedAt]);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-start justify-end gap-4 flex-wrap">
-        <Button
+    <div className="space-y-4">
+      {isOwner ? <div className="flex items-start justify-end gap-4 flex-wrap">
+        <Button requiresWrite
           size="lg"
-          onClick={() => setCreateOpen(true)}
-          className="h-10 rounded-md font-semibold shadow-sm"
+          disabled={!canWrite} onClick={() => setCreateOpen(true)}
+          className="h-11 rounded-md font-semibold"
         >
           <Plus className="h-4 w-4 mr-2" />
           {t.types.addNew}
         </Button>
-      </div>
+      </div> : <p className="text-sm text-muted-foreground">Solo el dueño puede cambiar los planes y las cuotas.</p>}
 
-      {/* Gym-level settings: el dueño habilita las features que su gym
-          cobra. Layout en 2 columnas para que el card no empuje la
-          tabla cuando ambos toggles están activos. La frecuencia usa
-          un Select (no radio) para no inflar verticalmente cuando se
-          expande con las 5 opciones. */}
-      <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm p-5 space-y-4">
+
+      {types.error && (
+        <Alert variant="destructive">
+          <AlertDescription>{t.errors.loadTypes} {types.data && "Se muestran datos anteriores; pueden haber cambiado."} <Button variant="link" onClick={() => void types.refetch()}>Reintentar</Button></AlertDescription>
+        </Alert>
+      )}
+
+      {(!types.isError || types.data) && <div className="rounded-xl border border-border bg-card text-card-foreground overflow-hidden">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t.types.columns.name}</TableHead>
+              <TableHead>{t.types.columns.price}</TableHead>
+              <TableHead>{t.types.columns.duration}</TableHead>
+              <TableHead>{t.types.columns.status}</TableHead>
+              {isOwner && <TableHead className="text-right">{t.types.columns.actions}</TableHead>}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {types.isLoading ? (
+              <TableRow>
+                <TableCell colSpan={isOwner ? 5 : 4} className="h-24 text-center text-muted-foreground">
+                  <span role="status"><Loader2 aria-hidden="true" className="mr-2 h-5 w-5 animate-spin inline-block" />Cargando catálogo…</span>
+                </TableCell>
+              </TableRow>
+            ) : types.isError && !types.data ? null : (types.data ?? []).length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={isOwner ? 5 : 4} className="h-24 text-center text-muted-foreground">
+                  {isOwner
+                    ? "Aún no hay membresías. Crea la primera con «Agregar membresía»."
+                    : "Aún no hay membresías. El dueño las da de alta."}
+                </TableCell>
+              </TableRow>
+            ) : (
+              (types.data ?? []).map((p) => (
+                <TableRow key={p.id} className={p.active ? "" : "text-muted-foreground"}>
+                  <TableCell className="font-medium">{p.name}</TableCell>
+                  <TableCell>{formatMoney(p.price)}</TableCell>
+                  <TableCell>{t.types.durationLabel(p.duration_days, p.duration_months)}</TableCell>
+                  <TableCell>
+                    {p.active ? (
+                      <Badge variant="success">{t.types.statusActive}</Badge>
+                    ) : (
+                      <Badge variant="outline">{t.types.statusInactive}</Badge>
+                    )}
+                  </TableCell>
+                  {isOwner && <TableCell className="text-right space-x-1">
+                    <Button requiresWrite variant="ghost" size="sm" disabled={!canWrite} onClick={() => setEditing(p)}>
+                      <Pencil className="h-4 w-4" />
+                      {t.types.edit}
+                    </Button>
+                    {p.active && (
+                      <Button requiresWrite
+                        variant="ghost"
+                        size="sm"
+                        disabled={!canWrite} onClick={() => setConfirmDeactivate(p)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <BadgeMinus className="h-4 w-4" />
+                        {t.types.deactivate}
+                      </Button>
+                    )}
+                  </TableCell>}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>}
+
+      <details className="group border-t pt-2">
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium"><ChevronDown aria-hidden="true" className="mr-2 h-4 w-4 -rotate-90 transition-transform group-open:rotate-0" />Cuotas predeterminadas del gimnasio</summary>
+        <div className="py-3 space-y-4">
         <div className="flex items-start justify-between gap-3">
           <div className="space-y-1 min-w-0">
             <h2 className="text-base font-semibold tracking-tight">{t.types.gymSettingsTitle}</h2>
@@ -261,7 +339,7 @@ function MembershipsTab() {
                   {t.types.chargeEnrollmentHint}
                 </div>
               </div>
-              <Switch
+              <Switch requiresWrite disabled={!canWrite}
                 checked={chargeEnrollment}
                 onCheckedChange={(v) => setChargeEnrollment(!!v)}
               />
@@ -269,10 +347,10 @@ function MembershipsTab() {
             {chargeEnrollment && (
               <div className="relative">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                <Input
+                <Input disabled={!canWrite}
                   id="gym-enrollment-amount"
                   inputMode="decimal"
-                  className="pl-7 h-9"
+                  className="pl-7 h-11"
                   placeholder="Monto"
                   value={enrollmentAmount}
                   onChange={(e) => setEnrollmentAmount(e.target.value.replace(/[^\d.]/g, ""))}
@@ -291,7 +369,7 @@ function MembershipsTab() {
                   {t.types.chargeMaintenanceHint}
                 </div>
               </div>
-              <Switch
+              <Switch requiresWrite disabled={!canWrite}
                 checked={chargeMaintenance}
                 onCheckedChange={(v) => setChargeMaintenance(!!v)}
               />
@@ -300,10 +378,10 @@ function MembershipsTab() {
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                  <Input
+                  <Input disabled={!canWrite}
                     id="gym-maintenance-amount"
                     inputMode="decimal"
-                    className="pl-7 h-9"
+                    className="pl-7 h-11"
                     placeholder="Monto"
                     value={maintenanceAmount}
                     onChange={(e) => setMaintenanceAmount(e.target.value.replace(/[^\d.]/g, ""))}
@@ -314,7 +392,7 @@ function MembershipsTab() {
                   value={maintFreq}
                   onValueChange={(v) => setMaintFreq(v as MaintenanceFrequency)}
                 >
-                  <SelectTrigger className="h-9 w-[120px]" aria-label={t.types.maintenanceFrequency}>
+                  <SelectTrigger disabled={!canWrite} className="h-11 w-[120px]" aria-label={t.types.maintenanceFrequency}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -337,73 +415,7 @@ function MembershipsTab() {
         )}
       </div>
 
-      {types.error && (
-        <Alert variant="destructive">
-          <AlertDescription>{t.errors.loadTypes}</AlertDescription>
-        </Alert>
-      )}
-
-      <div className="rounded-xl border border-border bg-card text-card-foreground shadow-sm overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t.types.columns.name}</TableHead>
-              <TableHead>{t.types.columns.price}</TableHead>
-              <TableHead>{t.types.columns.duration}</TableHead>
-              <TableHead>{t.types.columns.status}</TableHead>
-              <TableHead className="text-right">{t.types.columns.actions}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {types.isLoading ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                  <Loader2 className="h-5 w-5 animate-spin inline-block" />
-                </TableCell>
-              </TableRow>
-            ) : (types.data ?? []).length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                  Aún no hay membresías. Crea la primera.
-                </TableCell>
-              </TableRow>
-            ) : (
-              (types.data ?? []).map((p) => (
-                <TableRow key={p.id} className={p.active ? "" : "opacity-60"}>
-                  <TableCell className="font-medium">{p.name}</TableCell>
-                  <TableCell>{formatMoney(p.price)}</TableCell>
-                  <TableCell>{t.types.durationLabel(p.duration_days, p.duration_months)}</TableCell>
-                  <TableCell>
-                    {p.active ? (
-                      <Badge variant="secondary">{t.types.statusActive}</Badge>
-                    ) : (
-                      <Badge variant="outline">{t.types.statusInactive}</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button variant="ghost" size="sm" onClick={() => setEditing(p)}>
-                      <Pencil className="h-4 w-4" />
-                      {t.types.edit}
-                    </Button>
-                    {p.active && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setConfirmDeactivate(p)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <BadgeMinus className="h-4 w-4" />
-                        {t.types.deactivate}
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
+      </details>
       <CreateDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -468,8 +480,7 @@ function CreateDialog({
       handleClose(false);
     } catch (e) {
       if (e instanceof ApiError) {
-        const data = e.details as Record<string, unknown> | null;
-        setServerError((data?.exception as string | undefined) || t.types.form.errors.generic);
+        setServerError(e.message || t.types.form.errors.generic);
       } else {
         setServerError(t.types.form.errors.generic);
       }
@@ -522,8 +533,7 @@ function EditDialog({
       onClose();
     } catch (e) {
       if (e instanceof ApiError) {
-        const data = e.details as Record<string, unknown> | null;
-        setServerError((data?.exception as string | undefined) || t.types.form.errors.generic);
+        setServerError(e.message || t.types.form.errors.generic);
       } else {
         setServerError(t.types.form.errors.generic);
       }
@@ -587,7 +597,7 @@ function DeactivateConfirm({ type, onClose }: { type: MembershipType | null; onC
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={deactivate.isPending}>{t.form.cancel}</AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogAction requiresWrite
             onClick={(e) => {
               e.preventDefault();
               confirm();

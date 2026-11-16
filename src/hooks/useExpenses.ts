@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/stores/useAuthStore";
 import { useMutation, useQuery, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import type { ExpenseCategory, ExpensePaymentMethod } from "@/strings/expenses";
@@ -181,7 +182,7 @@ export function useExpenseOccurrences(from: string | undefined, to: string, enab
     queryFn: async () => {
       // Template mutations invalidate this query. Generate first so saving or
       // reactivating a schedule immediately refreshes both the list and count.
-      await api.post("/api/v1/expense-occurrences/materialize", { to });
+      if (!useAuthStore.getState().readOnly) await api.post("/api/v1/expense-occurrences/materialize", { to });
       return fetchAllFinancialRows<ExpenseOccurrence>("/api/v1/expense-occurrences", { from, to });
     },
     enabled,
