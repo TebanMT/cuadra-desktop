@@ -12,10 +12,16 @@ describe("launch entitlements", () => {
     expect(isPaidPlan(plan)).toBe(plan !== "trial");
     expect(canAccessFeature(gym, "unknown" as Feature)).toBe(false);
   });
-  it("keeps the plan rules when a grant is missing or false", () => {
-    expect(canAccessPlusFeatures({ subscription_plan: "standard_monthly" })).toBe(false);
-    expect(canAccessPlusFeatures({ subscription_plan: "standard_monthly", all_features_access: false })).toBe(false);
+  it("gives trial and Standard every built feature without a grant", () => {
+    const plusOnly: Feature[] = ["own_whatsapp", "broadcasts"];
+    for (const plan of ["trial", "standard_monthly", "standard_annual"]) {
+      for (const feature of Object.keys(FEATURE_TIERS) as Feature[]) {
+        expect(canAccessFeature({ subscription_plan: plan, all_features_access: false }, feature)).toBe(!plusOnly.includes(feature));
+      }
+      expect(canAccessPlusFeatures({ subscription_plan: plan })).toBe(true);
+    }
+    expect(canAccessFeature("plus_monthly", "own_whatsapp")).toBe(true);
     expect(canAccessPlusFeatures(null)).toBe(false);
-    expect(canAccessFeature("standard_monthly", "daily_operations")).toBe(true);
+    expect(canAccessFeature("", "daily_operations")).toBe(false);
   });
 });

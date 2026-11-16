@@ -34,8 +34,10 @@ describe("Acceso visible a pagos recurrentes", () => {
     mock.get.mockResolvedValue({ items: [], total: 0 });
   });
 
-  it.each(["standard_monthly", "standard_annual", "trial"])("%s descubre la función y puede consultar los planes sin cargar datos Plus", async plan => {
-    mock.plan = plan;
+  // Desde el 16 nov 2026 la prueba y Standard traen pagos programados; el
+  // estado bloqueado sólo aplica a un gym sin la función (plan desconocido).
+  it("un gym sin la función la descubre sin cargar pagos programados", async () => {
+    mock.plan = "";
     show();
     const tab = screen.getByRole("tab", { name: "Pagos que se repiten No habilitado" });
     expect(tab).toBeEnabled();
@@ -52,6 +54,7 @@ describe("Acceso visible a pagos recurrentes", () => {
   });
 
   it("un enlace directo explica el plan requerido sin redirigir a Por pagar", async () => {
+    mock.plan = "";
     show("/expenses?view=recurring");
     expect(screen.getByRole("tab", { name: "Pagos que se repiten No habilitado" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("heading", { name: "Acceso no habilitado" })).toBeVisible();
@@ -59,7 +62,7 @@ describe("Acceso visible a pagos recurrentes", () => {
     expect(scheduledRequests()).toEqual([]);
   });
 
-  it.each(["plus_monthly", "plus_annual"])("%s conserva el acceso al registro y a sus pagos programados", async plan => {
+  it.each(["trial", "standard_monthly", "standard_annual", "plus_monthly", "plus_annual"])("%s tiene el registro y sus pagos programados", async plan => {
     mock.plan = plan;
     show("/expenses?view=recurring");
     expect(screen.getByRole("tab", { name: "Pagos que se repiten" })).toHaveAttribute("aria-selected", "true");

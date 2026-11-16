@@ -2,21 +2,23 @@ import { isDev } from "@/lib/runtime";
 
 // Mirrors gyms/domain/gym/features.go. Add new gated features explicitly;
 // unknown feature names never receive access, even with a launch grant.
+// Oferta vigente (16 nov 2026): la prueba y Standard traen todo lo que existe.
+// Plus sólo conserva el número propio de WhatsApp y los envíos sin tope.
 export const FEATURE_TIERS = {
-  held_messages: "plus",
+  held_messages: "standard",
   daily_operations: "standard",
-  recurring_expenses: "plus",
-  analytics: "plus",
-  report_exports: "plus",
-  product_margins: "plus",
-  promotions_roi: "plus",
-  audit_log: "plus",
-  branding: "plus",
-  fiscal_details: "plus",
-  access_hardware: "plus",
+  recurring_expenses: "standard",
+  analytics: "standard",
+  report_exports: "standard",
+  product_margins: "standard",
+  promotions_roi: "standard",
+  audit_log: "standard",
+  branding: "standard",
+  fiscal_details: "standard",
+  access_hardware: "standard",
   own_whatsapp: "plus",
   broadcasts: "plus",
-  extra_operators: "plus",
+  extra_operators: "standard",
 } as const;
 export type Feature = keyof typeof FEATURE_TIERS;
 export type FeatureAccess = string | { subscription_plan: string; all_features_access?: boolean } | null | undefined;

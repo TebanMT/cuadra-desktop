@@ -93,9 +93,9 @@ export function useOperators(includeInactive = true) {
 }
 
 // Cupo de operadores activos. El servidor es la fuente de verdad
-// (checkOperatorCapacity, al crear y al reactivar): sin extra_operators
-// (Standard) cabe 1 operador además del dueño; con extra_operators (Plus),
-// 10. Cuenta sólo a los operadores activos: el dueño y los desactivados no
+// (checkOperatorCapacity, al crear y al reactivar): con extra_operators (hoy
+// prueba, Standard y Plus) caben 10 además del dueño; sin la feature, 1.
+// Cuenta sólo a los operadores activos: el dueño y los desactivados no
 // ocupan lugar. Repetir aquí los mismos números evita que el dueño llene un
 // formulario que el servidor va a rechazar.
 export const OPERATOR_LIMIT_PLUS = 10;

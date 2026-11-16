@@ -23,11 +23,11 @@ it.each([
 ])("refreshes Plus access after a pull: %j", async update => {
   const { rerender } = renderHook(() => useHydrateAuth());
   await waitFor(() => expect(mocks.get).toHaveBeenCalledTimes(1));
-  expect(canAccessFeature(useAuthStore.getState().gym, "product_margins")).toBe(false);
+  expect(canAccessFeature(useAuthStore.getState().gym, "own_whatsapp")).toBe(false);
   mocks.get.mockResolvedValue({ user, gym: { ...gym, ...update } });
   mocks.pulled = "2026-10-26T16:00:00Z";
   rerender();
-  await waitFor(() => expect(canAccessFeature(useAuthStore.getState().gym, "product_margins")).toBe(true));
+  await waitFor(() => expect(canAccessFeature(useAuthStore.getState().gym, "own_whatsapp")).toBe(true));
   rerender();
   expect(mocks.get).toHaveBeenCalledTimes(2);
 });

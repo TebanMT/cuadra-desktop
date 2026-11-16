@@ -423,7 +423,7 @@ export default function GymProfilePage() {
 
         {/* Branding (logo + colores) — feature Plus, mismo trato que Tax.
             El BE sigue gateando inline en PATCH /gyms/me cuando vienen
-            LogoURL / PrimaryColor / SecondaryColor (gym.HasPlusOnlyFields),
+            LogoURL / PrimaryColor / SecondaryColor (gym.GatedFeatures),
             así que la defensa en profundidad sigue activa. */}
         {isPlus && (
           <details className="rounded-lg border bg-card">
