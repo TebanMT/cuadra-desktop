@@ -14,7 +14,7 @@ export default {
       colors: {
         // ── Semantic tokens (shadcn) — resuelven a --primary/--success/etc.
         // Componentes que usan bg-primary / text-success / etc. heredan
-        // automáticamente la paleta terracota desde globals.css.
+        // la identidad Tinta desde globals.css.
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -33,6 +33,7 @@ export default {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
           soft: "hsl(var(--destructive-soft))",
+          text: "hsl(var(--destructive-text))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -55,6 +56,7 @@ export default {
           DEFAULT: "hsl(var(--success))",
           foreground: "hsl(var(--success-foreground))",
           soft: "hsl(var(--success-soft))",
+          text: "hsl(var(--success-text))",
         },
         warning: {
           // Híbrido: contrato shadcn + escala numérica para spec
@@ -76,7 +78,7 @@ export default {
 
         // ── Named scales — para shades específicos. Disciplina:
         //   ink/paper  → tipografía + superficies
-        //   brick      → ACCIÓN POSITIVA (CTAs, links, nav activa)
+        //   brick      → alias histórico de azul Tinta (CTAs, links, nav activa)
         //   moss       → success (Activo, Pagado, Sincronizado)
         //   warning    → ámbar dorado (Por vencer)
         //   danger     → rojo profundo (Vencido) — alias de destructive
@@ -122,10 +124,8 @@ export default {
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
-        // Display — Fraunces. Aplicar SOLO en page headers grandes,
-        // empty states amistosos y modales emocionales. NO usar en data
-        // tables, KPI numbers, formularios, navegación o status pills.
-        display: ["Fraunces", "Georgia", "serif"],
+        // Manrope local, solo peso 700.
+        display: ["Tinta Manrope", "sans-serif"],
       },
       backgroundImage: {
         "paper-pattern":

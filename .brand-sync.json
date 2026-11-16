@@ -1,0 +1,16 @@
+{
+  "source": "cuadra-landing",
+  "files": {
+    "BRAND.md": "4735812e74dfd36d6be2134fad5bfc242bcb0b5bb41c882d2b6d77dc88d95606",
+    "public/brand/tinta-app-icon.svg": "1437753b5bf8c0e47ba5a7fdd5d6bb774d6a58ef6607bba2d329e78b26896e2e",
+    "public/brand/tinta-symbol-black.svg": "d498bbb3db8ad4c24666a8debaa91887a44ae43bd68ee30aef7bc04860047f6f",
+    "public/brand/tinta-symbol-ink.svg": "60fcb93e086725ff1e4f3ef4b7d519cf9d351ef8faa70e321b284a20772e6855",
+    "public/brand/tinta-symbol-white.svg": "a3375b70fc0a718b4900ee53c6984b40b9625cb0e698f5739b7d881aa809e9a0",
+    "public/brand/tinta-wordmark-black.svg": "ff1f2a369f9436f9a8620a060d8c5fa82a0565c9cd04ed63a21ad25a3700e916",
+    "public/brand/tinta-wordmark-ink.svg": "05c888c8a6e42205646ad5a8f63d85d209af50417e58be6f5b825f876715a3a1",
+    "public/brand/tinta-wordmark-white.svg": "84a83dbe8840d39b467bc7a56a9f5bab115fb18d62060401af684e4df84c1165",
+    "public/brand/tokens.css": "b8ff9eb64f2b35149a472d30edba83c12ea8900542488e08c0b45a442d9e77b5",
+    "public/brand/fonts/OFL-Manrope.txt": "58172e0c0fac2cda8a37b348164bb55e44b0e69051e557e92b1d3f6910141f7b",
+    "public/brand/fonts/manrope-bold.ttf": "ea1f264039fed13fd36e6d6f49fcae4fe7007def02cf2972b5c7f6d6f1349d06"
+  }
+}

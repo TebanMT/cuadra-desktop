@@ -33,3 +33,7 @@ pnpm-debug.log*
 !.env.example
 !*.env.example
 !.env.development.local.example
+
+# Capturas de revisión de diseño (impeccable): pesadas y pueden traer datos
+# reales de socios. Se quedan locales.
+.impeccable/review/

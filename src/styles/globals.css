@@ -4,32 +4,24 @@
 
 @layer base {
   :root {
-    /* ── Identidad terracota — alineada con landing + dashboard ──────
-       Paper cremoso de fondo, ink navy oscuro para tipografía, brick
-       (#D6593C) como primario de acción, moss para success, warning
-       dorado y danger rojo profundo con disciplina semántica estricta.
-
-       La paleta convive como CSS vars en HSL "h s% l%" para que el
-       Tailwind extend en tailwind.config.ts pueda referenciarlas con
-       hsl(var(--token)) y el modo dark sobreescribirlas en bloque. */
-
+    /* Identidad aprobada Tinta. Equivalentes HSL para utilidades con alfa. */
     /* ── Named scales ── nuevos tokens del spec ─────────────────────── */
-    --ink-900: 222 51% 12%;   /* #0F1A2E */
-    --ink-700: 217 33% 17%;   /* #1F2937 */
-    --ink-500: 217 13% 34%;   /* #4B5563 */
-    --ink-400: 220 9% 46%;    /* #6B7280 */
+    --ink-900: 202.623 55.963% 21.373%;
+    --ink-700: 203 35% 17%;
+    --ink-500: 200.571 18.919% 36.275%;
+    --ink-400: 200.571 18.919% 36.275%;
     --ink-300: 218 11% 65%;   /* #9CA3AF */
 
-    --paper-50:  40 64% 98%;  /* #FDFBF6 */
-    --paper-100: 36 35% 97%;  /* #FAF7F2 */
-    --paper-200: 36 31% 91%;  /* #F1ECE2 */
-    --paper-300: 38 23% 86%;  /* #E5DFD2 */
+    --paper-50: 0 0% 100%;
+    --paper-100: 171.429 24.138% 94.314%;
+    --paper-200: 171.429 24.138% 94.314%;
+    --paper-300: 184.286 16.667% 83.529%;
 
-    --brick-100: 17 84% 93%;  /* #FCE8DF */
-    --brick-300: 18 82% 75%;  /* #F4A688 */
-    --brick-500: 12 64% 54%;  /* #D6593C  ← primario */
-    --brick-600: 12 64% 44%;  /* #B8442A */
-    --brick-700: 12 65% 34%;  /* #8E311E */
+    --brick-100: 171.429 24.138% 94.314%;
+    --brick-300: 199 49% 78%;
+    --brick-500: 202.623 55.963% 21.373%;
+    --brick-600: 202.623 55.963% 21.373%;
+    --brick-700: 203 56% 16%;
 
     --moss-100: 161 32% 91%;  /* #E0F1EC */
     --moss-500: 175 77% 26%;  /* #0F766E */
@@ -55,7 +47,7 @@
 
     --primary: var(--brick-500);
     --primary-foreground: var(--paper-50);
-    --primary-soft: var(--brick-100);
+    --primary-soft: 203 45% 93%;
 
     --secondary: var(--paper-100);
     --secondary-foreground: var(--ink-900);
@@ -70,107 +62,106 @@
     --destructive: var(--danger-500);
     --destructive-foreground: var(--paper-50);
     --destructive-soft: var(--danger-100);
+    --destructive-text: var(--danger-700);
 
     --success: var(--moss-500);
     --success-foreground: var(--paper-50);
     --success-soft: var(--moss-100);
+    --success-text: var(--moss-700);
 
-    --warning: var(--warning-500);
+    --warning: var(--warning-700);
     --warning-foreground: var(--warning-700);
     --warning-soft: var(--warning-100);
 
     --border: var(--paper-300);
-    --input: var(--paper-300);
+    --input: 201 16% 53%;
     --ring: var(--brick-500);
 
     --radius: 0.625rem;
 
-    /* Charts — terracota como serie principal, moss segunda, warning
-       tercera. Mantenemos púrpura/azul como hues distintos para que 5
-       series sigan siendo legibles. */
+
     --chart-1: var(--brick-500);
     --chart-2: var(--moss-500);
     --chart-3: var(--warning-500);
     --chart-4: 271 70% 55%;
     --chart-5: 199 89% 48%;
 
-    /* Sidebar — superficie paper-100 (más cálida que el bg).
-       Item activo en brick-100 + texto brick-600 (estilo "soft active"
-       per spec, no solid pill). */
-    --sidebar: var(--paper-100);
-    --sidebar-foreground: var(--ink-900);
-    --sidebar-muted: var(--ink-400);
-    --sidebar-active: var(--brick-100);
-    --sidebar-active-foreground: var(--brick-600);
-    --sidebar-hover: var(--paper-200);
-    --sidebar-border: var(--paper-300);
+
+    /* Navegación como campo de tinta (identidad: tinta sobre papel). El
+       marcador lima es acento de ubicación, nunca estado. Pares AA:
+       texto 10.4:1, secundario 6.1:1, marcador 6.2:1. */
+    --sidebar: var(--ink-900);
+    --sidebar-foreground: 195 35% 96%;
+    --sidebar-muted: 199 24% 74%;
+    --sidebar-active: 203 50% 30%;
+    --sidebar-active-foreground: 0 0% 100%;
+    --sidebar-marker: 78 61% 80%;
+    --sidebar-hover: 203 52% 26%;
+    --sidebar-border: 203 45% 28%;
   }
 
   .dark {
-    /* ── Dark mode terracota ──────────────────────────────────────────
-       Las named scales (--ink-*, --paper-*, --brick-*, etc.) se HEREDAN
-       de :root sin override. `bg-ink-900` siempre es navy oscuro y
-       `bg-paper-50` siempre es cremoso — son colores absolutos, no
-       relativos a tema.
+    /* Tema oscuro derivado de la tinta (#183e55, 203°): fondo de tinta
+       profunda, superficies que suben en el mismo tono y texto papel frío.
+       Pares AA verificados: texto 16.4:1, secundario 9.1:1 sobre fondo. */
+    --background: 204 45% 9%;
+    --foreground: 195 30% 96%;
 
-       Lo que SÍ flippea son los semantic tokens. Componentes que
-       hardcodean named scales (StatCard icon, Badge soft pills,
-       EmptyState icon) tienen `dark:` variants explícitos. */
+    --card: 204 38% 13%;
+    --card-foreground: 195 30% 96%;
 
-    /* Surfaces — flip a tonos oscuros. */
-    --background: 222 51% 12%;       /* ink-900 */
-    --foreground: 40 64% 98%;        /* paper-50 */
+    --popover: 204 36% 15%;
+    --popover-foreground: 195 30% 96%;
 
-    --card: 217 33% 17%;             /* ink-700 — surface lifted */
-    --card-foreground: 40 64% 98%;
+    --primary: 199 49% 78%;
+    --primary-foreground: 203 56% 16%;
+    --primary-soft: 203 40% 22%;
 
-    --popover: 217 33% 17%;
-    --popover-foreground: 40 64% 98%;
+    --secondary: 204 30% 18%;
+    --secondary-foreground: 195 30% 96%;
 
-    /* Primary — brick mantiene matiz cross-theme. */
-    --primary: 12 64% 54%;
-    --primary-foreground: 40 64% 98%;
-    --primary-soft: 12 35% 18%;
+    --muted: 204 30% 17%;
+    --muted-foreground: 200 18% 72%;
 
-    --secondary: 217 33% 17%;
-    --secondary-foreground: 40 64% 98%;
+    /* Resaltado de opción: superficie propia, distinta del popover. El
+       anillo --ring (9.2:1) marca la opción activa en menús y búsqueda. */
+    --accent: 204 34% 24%;
+    --accent-foreground: 195 30% 96%;
+    --accent-soft: 204 34% 14%;
 
-    --muted: 217 33% 17%;
-    --muted-foreground: 218 11% 65%;
-
-    --accent: 217 33% 17%;
-    --accent-foreground: 40 64% 98%;
-    --accent-soft: 217 33% 14%;
-
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 40 64% 98%;
+    --destructive: 0 85% 75%;
+    --destructive-foreground: 0 50% 12%;
     --destructive-soft: 0 50% 16%;
+    --destructive-text: 0 85% 80%;
 
-    --success: 175 55% 38%;          /* moss-500 lifted +12L */
-    --success-foreground: 40 64% 98%;
+    --success: 175 55% 38%;
+    --success-foreground: 195 30% 96%;
     --success-soft: 175 50% 14%;
+    --success-text: 161 32% 91%;
 
-    --warning: 32 92% 55%;           /* warning-500 lifted */
+    --warning: 32 92% 55%;
     --warning-foreground: 48 96% 89%;
     --warning-soft: 32 60% 16%;
 
-    --border: 217 33% 22%;
-    --input: 217 33% 22%;
-    --ring: 12 64% 54%;
+    --border: 204 28% 22%;
+    --input: 204 18% 44%;
+    --ring: 199 49% 78%;
 
-    --chart-1: 12 70% 60%;
+    --chart-1: 199 49% 78%;
     --chart-2: 175 55% 45%;
     --chart-3: 32 92% 60%;
     --chart-4: 271 70% 65%;
     --chart-5: 199 89% 60%;
 
-    --sidebar: 222 55% 9%;
-    --sidebar-foreground: 40 64% 98%;
-    --sidebar-muted: 218 11% 65%;
-    --sidebar-active: 12 35% 20%;
-    --sidebar-active-foreground: 18 82% 80%;
-    --sidebar-hover: 217 33% 17%;
-    --sidebar-border: 217 33% 17%;
+    /* Navegación: campo de tinta más profundo que el área de trabajo. */
+    --sidebar: 205 55% 6%;
+    --sidebar-foreground: 195 30% 94%;
+    --sidebar-muted: 200 18% 68%;
+    --sidebar-active: 203 45% 18%;
+    --sidebar-active-foreground: 195 30% 98%;
+    --sidebar-marker: 78 61% 80%;
+    --sidebar-hover: 204 40% 12%;
+    --sidebar-border: 204 40% 12%;
   }
 
   * {
@@ -188,7 +179,9 @@
   }
 
   h1, h2, h3, h4 {
-    @apply font-semibold tracking-tight;
+    font-family: var(--tinta-brand-display);
+    font-weight: 700;
+    font-synthesis: none;
     letter-spacing: -0.02em;
   }
 }
@@ -199,11 +192,11 @@
     font-feature-settings: "tnum", "lnum";
   }
 
-  /* Display type (Fraunces). Aplicar selectivamente — page headers,
-     empty states, modales emocionales. NO en data tables, KPI numbers,
-     formularios, navegación o status pills. */
+
   .font-display {
-    font-family: "Fraunces", Georgia, serif;
+    font-family: var(--tinta-brand-display);
+    font-weight: 700;
+    font-synthesis: none;
     letter-spacing: -0.02em;
   }
 
@@ -219,12 +212,7 @@
       0 24px 60px -20px rgb(15 26 46 / 0.10);
   }
 
-  /* Patrón de fondo paper sutil. */
-  .paper-pattern {
-    background-color: hsl(var(--paper-50));
-    background-image: radial-gradient(circle at 1px 1px, rgb(15 26 46 / 0.04) 1px, transparent 0);
-    background-size: 28px 28px;
-  }
+  .paper-pattern { background-color: hsl(var(--background)); }
 
   /* Subtle elevated card — matches petzul's shadow-sm + ring-1 feel. */
   .surface-raised {
@@ -272,4 +260,43 @@
   .text-sidebar-foreground { color: hsl(var(--sidebar-foreground)); }
   .text-sidebar-muted { color: hsl(var(--sidebar-muted)); }
   .border-sidebar-border { border-color: hsl(var(--sidebar-border)); }
+}
+
+/* Teclado y preferencias del sistema, también en controles no Radix. */
+@layer base {
+  :root { color-scheme: light; }
+  .dark { color-scheme: dark; }
+  :where(:focus-visible) { outline: 2px solid hsl(var(--ring)); outline-offset: 3px; }
+  ::selection { background: var(--tinta-brand-accent); color: var(--tinta-brand-ink); }
+  /* Barras de desplazamiento del sistema, teñidas con la paleta. */
+  html { scrollbar-color: hsl(var(--input) / 0.55) transparent; }
+  .tinta-sidebar-scroll { scrollbar-width: thin; scrollbar-color: hsl(var(--sidebar-muted) / 0.4) transparent; }
+  input, textarea { caret-color: hsl(var(--primary)); }
+  [aria-invalid="true"] { border-color: hsl(var(--destructive)); }
+  /* Desplegables: un solo marcador en toda la app. El triángulo nativo
+     cambia de forma entre WebKit y Chromium y convivía con chevrons
+     dibujados a mano; aquí todos usan el mismo chevron, a la derecha
+     cerrado y hacia abajo abierto. Los summary con icono propio o con
+     list-none (filas que dibujan su ›) no lo llevan. */
+  summary { list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary:not(.list-none):not(:has(> svg))::before {
+    content: "";
+    display: inline-block;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    margin-right: 0.5rem;
+    vertical-align: -0.2em;
+    background-color: currentColor;
+    opacity: 0.6;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+    transform: rotate(-90deg);
+    transition: transform 150ms ease-out;
+  }
+  details[open] > summary:not(.list-none):not(:has(> svg))::before { transform: rotate(0deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

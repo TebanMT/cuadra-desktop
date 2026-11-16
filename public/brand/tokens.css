@@ -1,0 +1,17 @@
+/* Shared identity primitives. Opt-in: no global typography or semantic overrides. */
+@font-face {
+  font-family: 'Tinta Manrope';
+  src: url('./fonts/manrope-bold.ttf') format('truetype');
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+}
+:root {
+  --tinta-brand-ink: #183e55;
+  --tinta-brand-muted: #4b626e;
+  --tinta-brand-line: #cedbdc;
+  --tinta-brand-paper: #ffffff;
+  --tinta-brand-wash: #edf4f3;
+  --tinta-brand-accent: #d9edaa;
+  --tinta-brand-display: 'Tinta Manrope', sans-serif;
+}
