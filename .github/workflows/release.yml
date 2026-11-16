@@ -416,13 +416,16 @@ jobs:
           aws_secret_access_key = ${R2_SECRET_ACCESS_KEY}
           EOF
           chmod 600 ~/.aws/credentials
+          # R2 sólo acepta regiones propias (auto, wnam, …). El runner trae una
+          # región de AWS por defecto (us-west-2) que R2 rechaza con
+          # InvalidRegionName, así que cada llamada fija --region auto.
 
           upload() {
             local file="$1" key="$2" cache="$3" content_type="$4"
             [ -f "$file" ] || { echo "  ⊘ skip (no existe): $file"; return 0; }
             echo "  → s3://${R2_BUCKET}/${key}"
             aws s3 cp "${file}" "s3://${R2_BUCKET}/${key}" \
-              --endpoint-url "${R2_ENDPOINT}" --profile r2 \
+              --endpoint-url "${R2_ENDPOINT}" --profile r2 --region auto \
               --cache-control "${cache}" --content-type "${content_type}" \
               --only-show-errors
           }
