@@ -74,6 +74,37 @@ export const billing = {
       generic: "No pudimos cobrar. Vuelve a intentar.",
     },
   },
+  planChange: {
+    trigger: "Cambiar de plan",
+    title: (name: string) => `Cambiar plan de ${name}`,
+    currentLabel: "Plan actual",
+    expires: (date: string, days: number) =>
+      days === 0
+        ? `vence hoy (${date})`
+        : `vence el ${date} (quedan ${days} ${days === 1 ? "día" : "días"})`,
+    newLabel: "Plan nuevo",
+    newPlaceholder: "Selecciona…",
+    chargeLabel: "Cobro por lo que queda del ciclo",
+    prorated: "Proporcional (recomendado)",
+    proratedDetail: (delta: string, days: number, cycle: number) =>
+      `${delta} × ${days}/${cycle} días`,
+    full: "Diferencia completa",
+    lateralFree: "Cambio sin costo: los dos planes cuestan lo mismo.",
+    noEligible:
+      "No hay planes activos de precio igual o mayor. Para cambiar a un plan más barato, elígelo al renovar.",
+    keepsExpiry: (date: string) => `Su vigencia no cambia: sigue venciendo el ${date}.`,
+    nextRenewal: (type: string, price: string) =>
+      `Desde su próxima renovación pagará ${type} — ${price}.`,
+    noCharge: "Sin cobro",
+    submit: (amount: string) => `Cobrar ${amount} y cambiar`,
+    submitFree: "Cambiar sin cobro",
+    success: (name: string, type: string, expiry: string) =>
+      `${name} ahora tiene ${type}. Sigue venciendo el ${expiry}.`,
+    errors: {
+      typeRequired: "Selecciona el plan nuevo.",
+      generic: "No pudimos cambiar el plan. Vuelve a intentar.",
+    },
+  },
   settle: {
     title: (name: string) => `Liquidar saldo — ${name}`,
     pendingLabel: (amount: string) => `Saldo pendiente: ${amount}`,

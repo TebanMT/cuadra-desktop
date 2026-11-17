@@ -20,6 +20,7 @@ vi.mock("@/components/members/LockExpiryModal",()=>({LockExpiryModal:()=>null}))
 vi.mock("@/components/members/AssignMemberNumberModal",()=>({AssignMemberNumberModal:({open}: {open:boolean})=>open?<p>Cambio de número abierto</p>:null}));
 vi.mock("@/components/members/RegisterFingerprintModal",()=>({RegisterFingerprintModal:()=>null}));
 vi.mock("@/components/billing/PaymentModal",()=>({PaymentModal:({open}: {open:boolean})=>open?<p>Cobro abierto</p>:null}));
+vi.mock("@/components/billing/PlanChangeModal",()=>({PlanChangeModal:()=>null}));
 vi.mock("@/components/billing/SettleBalanceModal",()=>({SettleBalanceModal:()=>null}));
 vi.mock("@/components/billing/PaymentHistory",()=>({PaymentHistory:()=>null}));
 vi.mock("@/components/billing/ReceiptViewer", async()=>{const {Dialog,DialogContent,DialogTitle}=await import("@/components/ui/dialog"); return {ReceiptViewer:({open,onOpenChange}: {open:boolean,onOpenChange:(v:boolean)=>void})=><Dialog open={open} onOpenChange={onOpenChange}><DialogContent><DialogTitle>Comprobante ficticio</DialogTitle></DialogContent></Dialog>}});

@@ -293,6 +293,54 @@ export function useRegisterMembershipPayment() {
   });
 }
 
+// PlanChangeInput espeja planChangeReq del backend (payment_controller.go,
+// UC-048). `amount` es el monto ELEGIDO (proporcional o diferencia completa)
+// antes de descuento; el BE valida 0 ≤ amount ≤ delta. payment_method sólo
+// se exige cuando el total resultante es > 0.
+export interface PlanChangeInput {
+  idempotency_key: string;
+  member_id: string;
+  new_membership_type_id: string;
+  amount: number;
+  payment_method?: PaymentMethod;
+  cash_drawer_id?: string;
+  discount_amount?: number;
+  discount_reason?: string;
+  partial_amount?: number;
+  notes?: string;
+}
+
+// Espeja planChangeResp del backend. payment_id ausente → cambio $0, no se
+// creó Payment (DA-48.6). expiry es la vigencia CONSERVADA (DA-48.2).
+export interface PlanChangeResponse {
+  payment_id?: string | null;
+  folio?: string;
+  delta: number;
+  prorated_suggested: number;
+  subtotal: number;
+  discount: number;
+  total: number;
+  paid: number;
+  balance_pending: number;
+  new_membership_id: string;
+  expiry: string;
+  old_type_name: string;
+  new_type_name: string;
+  charge_option: string;
+  days_remaining: number;
+  cycle_days: number;
+  pending_offline_sync?: boolean;
+}
+
+export function useChangeMembershipPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: PlanChangeInput) =>
+      api.post<PlanChangeResponse>("/api/v1/payments/plan-change", input),
+    onSuccess: (_res, vars) => invalidateMember(qc, vars.member_id),
+  });
+}
+
 export function useSettleBalance(paymentID: string) {
   const qc = useQueryClient();
   return useMutation({

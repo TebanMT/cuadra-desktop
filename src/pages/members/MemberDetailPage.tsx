@@ -18,6 +18,7 @@ import {
   DollarSign,
   Lock,
   CalendarClock,
+  ArrowLeftRight,
   Wallet,
   Fingerprint,
   Copy,
@@ -68,6 +69,7 @@ import { LockExpiryModal } from "@/components/members/LockExpiryModal";
 import { AssignMemberNumberModal } from "@/components/members/AssignMemberNumberModal";
 import { RegisterFingerprintModal } from "@/components/members/RegisterFingerprintModal";
 import { PaymentModal } from "@/components/billing/PaymentModal";
+import { PlanChangeModal } from "@/components/billing/PlanChangeModal";
 import { SettleBalanceModal } from "@/components/billing/SettleBalanceModal";
 import { ReceiptViewer } from "@/components/billing/ReceiptViewer";
 import type { RegisterMembershipPaymentResponse } from "@/hooks/useBilling";
@@ -106,6 +108,7 @@ export default function MemberDetailPage() {
   const [lockOpen, setLockOpen] = useState(false);
   const [numberOpen, setNumberOpen] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
+  const [planOpen, setPlanOpen] = useState(false);
   const [settleOpen, setSettleOpen] = useState(false);
   const [fpOpen, setFpOpen] = useState(false);
   const [confirmFpDeleteOpen, setConfirmFpDeleteOpen] = useState(false);
@@ -228,7 +231,7 @@ export default function MemberDetailPage() {
   // Hotkeys: las desactivamos mientras algún sub-modal está abierto
   // para no interceptar teclas dentro de los inputs del modal.
   const anyModalOpen =
-    editOpen || statusOpen || lockOpen || numberOpen || payOpen || settleOpen || fpOpen || !!receiptId || confirmFpDeleteOpen;
+    editOpen || statusOpen || lockOpen || numberOpen || payOpen || planOpen || settleOpen || fpOpen || !!receiptId || confirmFpDeleteOpen;
 
   const hotkeyHandlers = useMemo(
     () => ({
@@ -273,6 +276,15 @@ export default function MemberDetailPage() {
   const isActiveMember = member?.status === "active";
   const checkinPrimary = isActiveMember && vigencia.canEnter;
   const payPrimary = isActiveMember && !vigencia.canEnter;
+  // UC-048: el cambio de plan sólo aplica con membresía activa y no vencida.
+  // Vencido o sin membresía, el camino es cobrar la renovación (UC-018).
+  const canChangePlan =
+    isActiveMember &&
+    !!membership &&
+    !isPending &&
+    membership.status === "active" &&
+    expiryDays !== null &&
+    expiryDays >= 0;
 
   if (detail.isLoading && !member) {
     return (
@@ -471,6 +483,18 @@ export default function MemberDetailPage() {
                     <DollarSign className="h-4 w-4 mr-1" />
                     {t.detail.membership.pay}
                   </Button>
+                  {canChangePlan && (
+                    <Button
+                      requiresWrite
+                      variant="outline"
+                      className={payPrimary ? "h-12" : undefined}
+                      disabled={readOnly}
+                      onClick={() => setPlanOpen(true)}
+                    >
+                      <ArrowLeftRight className="h-4 w-4 mr-1" aria-hidden />
+                      {bt.planChange.trigger}
+                    </Button>
+                  )}
                   <Button
                     requiresWrite
                     variant="outline"
@@ -662,6 +686,14 @@ export default function MemberDetailPage() {
         onOpenChange={setPayOpen}
         onPaid={setLastReceipt}
       />
+      {canChangePlan && membership && (
+        <PlanChangeModal
+          member={member}
+          currentMembership={membership}
+          open={planOpen}
+          onOpenChange={setPlanOpen}
+        />
+      )}
       {oldestPendingPayment && (
         <SettleBalanceModal
           paymentId={oldestPendingPayment.id}
