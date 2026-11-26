@@ -85,6 +85,15 @@ impl SidecarManager {
             }
         };
 
+        // La versión de la app (tauri.conf.json) viaja al sidecar por env:
+        // su sync agent la reporta al cloud en X-Tinta-App-Version y queda
+        // en sidecar_credentials.app_version — así soporte sabe qué build
+        // corre cada gym. Es la misma versión que compara el updater.
+        let cmd = cmd.env(
+            "TINTA_APP_VERSION",
+            app.package_info().version.to_string(),
+        );
+
         // Resuelve los paths persistentes del sidecar (SQLite + cache
         // de fotos) al app-data dir per-OS. Sin esto el sidecar cae
         // a ./tmp/ relativo al cwd, que en macOS empaquetado es `/`
