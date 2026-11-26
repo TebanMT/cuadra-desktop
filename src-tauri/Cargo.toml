@@ -1,6 +1,6 @@
 [package]
 name = "tinta-desktop"
-version = "1.2.7"
+version = "1.2.8"
 description = "Tinta — software de recepción para gimnasios"
 authors = ["Tinta"]
 edition = "2021"
